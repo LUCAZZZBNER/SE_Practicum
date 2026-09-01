@@ -5,16 +5,14 @@
 ## 目录结构
 
 ```text
-backend/                 Spring Boot 后端（待初始化）
+backend/                 Spring Boot + Spring Modulith 单体后端
   src/main/java/         Java 源代码
-    controller/          HTTP 接口层
-    service/             业务逻辑层
-    mapper/              数据访问层
-    entity/              数据实体
-    dto/                 请求对象
-    vo/                  返回对象
-    exception/           统一异常处理
-    config/              配置和安全组件
+    com/delivery/backend/user/       用户模块
+    com/delivery/backend/merchant/   商家模块
+    com/delivery/backend/shopping/   购物车模块
+    com/delivery/backend/order/      订单模块
+    com/delivery/backend/restaurant/ 店铺模块
+    com/delivery/backend/item/       商品模块
   src/main/resources/    后端配置和资源
   src/test/java/         后端单元、接口和集成测试
   src/test/resources/    测试配置及数据库脚本
@@ -37,4 +35,4 @@ docs/                    项目文档
 
 需求基线见 [软件需求规格说明书](docs/software-requirements-specification.md)。
 
-后端和前端尚未初始化，当前提交只建立可协作的项目目录和文档占位。
+后端已完成 Spring Modulith 单体模块骨架，前端仍待初始化。各业务模块的边界和职责见[架构设计](docs/architecture/README.md)。
