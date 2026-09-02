@@ -1,0 +1,1 @@
+import{_ as o}from"./_plugin-vue_export-helper-DlAUqK2U.js";import{g as r,e as t,o as c}from"./index-BCNGhpy9.js";const n={};function s(_,p){const e=t("el-empty");return c(),r(e,{description:"暂无订单"})}const f=o(n,[["render",s]]);export{f as default};

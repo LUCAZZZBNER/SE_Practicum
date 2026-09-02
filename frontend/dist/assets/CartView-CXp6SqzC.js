@@ -1,0 +1,1 @@
+import{_ as o}from"./_plugin-vue_export-helper-DlAUqK2U.js";import{g as t,e as r,o as c}from"./index-BCNGhpy9.js";const n={};function s(_,a){const e=r("el-empty");return c(),t(e,{description:"购物车暂为空"})}const f=o(n,[["render",s]]);export{f as default};
