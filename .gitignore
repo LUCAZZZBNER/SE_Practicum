@@ -32,3 +32,5 @@ pnpm-debug.log*
 !.env.example
 
 SE_Practicum.md
+
+AGENTS.md
