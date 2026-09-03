@@ -1,28 +1,14 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import acceptanceRoutes from './modules/acceptance'
+import authRoutes from './modules/auth'
+import customerRoutes from './modules/customer'
+import merchantRoutes from './modules/merchant'
 
 const routes = [
-  {
-    path: '/',
-    redirect: '/home',
-  },
-  {
-    path: '/home',
-    name: 'Home',
-    component: () => import('../views/HomeView.vue'),
-    meta: { title: '店铺浏览' },
-  },
-  {
-    path: '/cart',
-    name: 'Cart',
-    component: () => import('../views/CartView.vue'),
-    meta: { title: '购物车' },
-  },
-  {
-    path: '/orders',
-    name: 'Orders',
-    component: () => import('../views/OrdersView.vue'),
-    meta: { title: '我的订单' },
-  },
+  ...authRoutes,
+  ...customerRoutes,
+  ...merchantRoutes,
+  ...acceptanceRoutes,
 ]
 
 export default createRouter({
