@@ -89,22 +89,196 @@ Content-Type: application/json
 
 对无权查看的他人订单或购物车项可返回 404，避免泄漏资源是否存在。
 
-## 5. 资源模型
+## 5. 资源模型与字段类型
 
-枚举值：用户状态为 `ACTIVE`、`DISABLED`；商家状态为 `ACTIVE`、`SUSPENDED`；店铺状态为 `OPEN`、`CLOSED`、`TEMPORARILY_CLOSED`；商品状态为 `ON_SALE`、`OFF_SALE`；阶段 1 订单状态为 `PENDING_PAYMENT`、`CANCELLED`，并保留 `PAID`、`PREPARING`、`DELIVERING`、`COMPLETED`。
+### 5.1 类型表示
 
-| 模型 | 响应字段 |
+下表中的类型是 JSON 类型，并用约束补充 Java/业务含义：
+
+| 类型 | 含义 |
 | --- | --- |
-| `User` | `id`, `account`, `nickname`, `phone`, `status`, `createdAt`, `updatedAt` |
-| `Merchant` | `id`, `userId`, `name`, `phone`, `status`, `createdAt` |
-| `Shop` | `id`, `merchantId`, `name`, `description`, `status`, `createdAt`, `updatedAt` |
-| `Category` | `id`, `shopId`, `name`, `sortOrder`, `createdAt`, `updatedAt` |
-| `Product` | `id`, `shopId`, `categoryId`, `name`, `description`, `price`, `stock`, `status`, `version`, `createdAt`, `updatedAt` |
-| `CartItem` | `id`, `product`, `quantity`, `subtotal`, `available`, `unavailableReason`, `createdAt`, `updatedAt` |
-| `OrderLine` | `productId`, `productName`, `unitPrice`, `quantity`, `subtotal` |
-| `Order` | `id`, `orderNumber`, `userId`, `shopId`, `shopName`, `lines`, `total`, `status`, `createdAt`, `updatedAt`, `cancelledAt` |
+| `integer(int64)` | JSON number；正整数 ID 或时间间隔，后端 Java 使用 `long` |
+| `integer(int32)` | JSON number；数量、页码、排序号等 32 位整数，后端 Java 使用 `int` |
+| `number(decimal)` | JSON number；十进制金额，最多两位小数，后端使用 `BigDecimal` |
+| `string` | JSON string；普通文本或脱敏后的联系方式 |
+| `string(date-time)` | JSON string；ISO 8601 UTC 时间，例如 `2026-09-03T08:30:00Z` |
+| `string(enum)` | JSON string；值必须来自对应枚举表 |
+| `boolean` | JSON true/false |
+| `object` | JSON object；字段按对象定义 |
+| `array<T>` | JSON array；每个元素均为 `T` |
+| `null` | JSON null；仅在下表明确标记“可空”时允许 |
 
-`CartItem.product` 是最新 `Product` 摘要；`OrderLine` 是下单时的不可变快照。
+除特别标记外，响应字段均为必返且不可为 `null`。服务端不得把金额、ID、数量或版本号序列化为字符串。
+
+### 5.2 通用响应与分页对象
+
+| 对象 | 字段 | JSON 类型 | 是否可空 | 说明 |
+| --- | --- | --- | --- | --- |
+| `ApiResponse<T>` | `code` | `integer(int32)` | 否 | 成功为 `0`，失败为业务错误码 |
+|  | `msg` | `string` | 否 | 面向调用方的简短提示 |
+|  | `data` | `object` 或 `null` | 是 | 成功时为接口约定对象；无数据操作可为 `null` |
+| `Page<T>` | `items` | `array<T>` | 否 | 当前页元素，可为空数组 |
+|  | `page` | `integer(int32)` | 否 | 从 `1` 开始 |
+|  | `pageSize` | `integer(int32)` | 否 | `1`–`100` |
+|  | `total` | `integer(int64)` | 否 | 满足过滤条件的总条数，非负 |
+|  | `totalPages` | `integer(int32)` | 否 | 总页数，空结果为 `0` |
+
+### 5.3 认证会话对象
+
+| 对象 | 字段 | JSON 类型 | 是否可空 | 说明 |
+| --- | --- | --- | --- | --- |
+| `AuthSession` | `accessToken` | `string` | 否 | Bearer 访问令牌 |
+|  | `tokenType` | `string` | 否 | 固定为 `Bearer` |
+|  | `expiresIn` | `integer(int64)` | 否 | 有效期秒数，正整数 |
+|  | `user` | `User` | 否 | 登录用户非敏感资料 |
+|  | `roles` | `array<string>` | 否 | 角色名称，如 `USER`、`MERCHANT` |
+
+### 5.4 业务资源对象
+
+#### `User`
+
+| 字段 | JSON 类型 | 是否可空 | 说明 |
+| --- | --- | --- | --- |
+| `id` | `integer(int64)` | 否 | 用户 ID，正整数 |
+| `account` | `string` | 否 | 唯一登录账号 |
+| `nickname` | `string` | 否 | 展示昵称 |
+| `phone` | `string` | 是 | 联系方式；未填写时为 `null`，不得返回密码 |
+| `status` | `string(enum)` | 否 | `ACTIVE` 或 `DISABLED` |
+| `createdAt` | `string(date-time)` | 否 | 创建时间 |
+| `updatedAt` | `string(date-time)` | 否 | 最后更新时间 |
+
+#### `Merchant`
+
+| 字段 | JSON 类型 | 是否可空 | 说明 |
+| --- | --- | --- | --- |
+| `id` | `integer(int64)` | 否 | 商家 ID |
+| `userId` | `integer(int64)` | 否 | 关联用户 ID |
+| `name` | `string` | 否 | 商家名称 |
+| `phone` | `string` | 否 | 商家联系方式 |
+| `status` | `string(enum)` | 否 | `ACTIVE` 或 `SUSPENDED` |
+| `createdAt` | `string(date-time)` | 否 | 创建时间 |
+
+#### `Shop`
+
+| 字段 | JSON 类型 | 是否可空 | 说明 |
+| --- | --- | --- | --- |
+| `id` | `integer(int64)` | 否 | 店铺 ID |
+| `merchantId` | `integer(int64)` | 否 | 所属商家 ID |
+| `name` | `string` | 否 | 店铺名称 |
+| `description` | `string` | 是 | 店铺简介，可为 `null` |
+| `status` | `string(enum)` | 否 | `OPEN`、`CLOSED` 或 `TEMPORARILY_CLOSED` |
+| `createdAt` | `string(date-time)` | 否 | 创建时间 |
+| `updatedAt` | `string(date-time)` | 否 | 最后更新时间 |
+
+#### `Category`
+
+| 字段 | JSON 类型 | 是否可空 | 说明 |
+| --- | --- | --- | --- |
+| `id` | `integer(int64)` | 否 | 分类 ID |
+| `shopId` | `integer(int64)` | 否 | 所属店铺 ID |
+| `name` | `string` | 否 | 分类名称 |
+| `sortOrder` | `integer(int32)` | 否 | 非负排序号，数值越小越靠前 |
+| `createdAt` | `string(date-time)` | 否 | 创建时间 |
+| `updatedAt` | `string(date-time)` | 否 | 最后更新时间 |
+
+#### `Product`
+
+| 字段 | JSON 类型 | 是否可空 | 说明 |
+| --- | --- | --- | --- |
+| `id` | `integer(int64)` | 否 | 商品 ID |
+| `shopId` | `integer(int64)` | 否 | 所属店铺 ID |
+| `categoryId` | `integer(int64)` | 否 | 所属分类 ID |
+| `name` | `string` | 否 | 商品名称 |
+| `description` | `string` | 是 | 商品描述，可为 `null` |
+| `price` | `number(decimal)` | 否 | 当前单价，大于 0 |
+| `stock` | `integer(int32)` | 否 | 当前库存，不小于 0 |
+| `status` | `string(enum)` | 否 | `ON_SALE` 或 `OFF_SALE` |
+| `version` | `integer(int64)` | 否 | 乐观锁版本，正整数 |
+| `createdAt` | `string(date-time)` | 否 | 创建时间 |
+| `updatedAt` | `string(date-time)` | 否 | 最后更新时间 |
+
+#### `CartItem`
+
+| 字段 | JSON 类型 | 是否可空 | 说明 |
+| --- | --- | --- | --- |
+| `id` | `integer(int64)` | 否 | 购物车项 ID |
+| `product` | `CartProduct` | 否 | 最新商品摘要，不是下单成交快照 |
+| `quantity` | `integer(int32)` | 否 | 购买数量，正整数 |
+| `subtotal` | `number(decimal)` | 否 | 当前价格乘以数量，仅供展示 |
+| `available` | `boolean` | 否 | 当前是否满足加入购物车/下单条件 |
+| `unavailableReason` | `string` | 是 | `available=false` 时的原因，否则为 `null` |
+| `createdAt` | `string(date-time)` | 否 | 加入时间 |
+| `updatedAt` | `string(date-time)` | 否 | 最后修改时间 |
+
+#### `CartProduct`
+
+| 字段 | JSON 类型 | 是否可空 | 说明 |
+| --- | --- | --- | --- |
+| `id` | `integer(int64)` | 否 | 商品 ID |
+| `shopId` | `integer(int64)` | 否 | 所属店铺 ID |
+| `name` | `string` | 否 | 最新商品名称 |
+| `price` | `number(decimal)` | 否 | 最新商品价格 |
+| `stock` | `integer(int32)` | 否 | 最新库存 |
+| `status` | `string(enum)` | 否 | `ON_SALE` 或 `OFF_SALE` |
+| `version` | `integer(int64)` | 否 | 当前商品版本 |
+
+#### `Cart`
+
+| 字段 | JSON 类型 | 是否可空 | 说明 |
+| --- | --- | --- | --- |
+| `items` | `array<CartItem>` | 否 | 当前用户购物车项，可为空数组 |
+| `total` | `number(decimal)` | 否 | 所有购物车项当前小计之和，仅供展示 |
+
+#### `OrderLine`
+
+| 字段 | JSON 类型 | 是否可空 | 说明 |
+| --- | --- | --- | --- |
+| `productId` | `integer(int64)` | 否 | 下单时的商品 ID |
+| `productName` | `string` | 否 | 下单时商品名称快照 |
+| `unitPrice` | `number(decimal)` | 否 | 下单时成交单价快照 |
+| `quantity` | `integer(int32)` | 否 | 成交数量，正整数 |
+| `subtotal` | `number(decimal)` | 否 | `unitPrice × quantity` |
+
+#### `Order`
+
+| 字段 | JSON 类型 | 是否可空 | 说明 |
+| --- | --- | --- | --- |
+| `id` | `integer(int64)` | 否 | 订单 ID |
+| `orderNumber` | `string` | 否 | 对外展示的唯一订单编号 |
+| `userId` | `integer(int64)` | 否 | 下单用户 ID |
+| `shopId` | `integer(int64)` | 否 | 订单所属店铺 ID |
+| `shopName` | `string` | 否 | 下单时店铺名称快照 |
+| `lines` | `array<OrderLine>` | 否 | 订单明细，至少一个元素 |
+| `total` | `number(decimal)` | 否 | 服务端计算的订单总额 |
+| `status` | `string(enum)` | 否 | `PENDING_PAYMENT`、`PAID`、`PREPARING`、`DELIVERING`、`COMPLETED` 或 `CANCELLED` |
+| `createdAt` | `string(date-time)` | 否 | 创建时间 |
+| `updatedAt` | `string(date-time)` | 否 | 最后更新时间 |
+| `cancelledAt` | `string(date-time)` | 是 | 取消时间；未取消时为 `null` |
+
+#### `OrderSummary`
+
+订单列表中的元素为精简对象，不包含 `lines`：
+
+| 字段 | JSON 类型 | 是否可空 | 说明 |
+| --- | --- | --- | --- |
+| `id` | `integer(int64)` | 否 | 订单 ID |
+| `orderNumber` | `string` | 否 | 唯一订单编号 |
+| `shopId` | `integer(int64)` | 否 | 店铺 ID |
+| `shopName` | `string` | 否 | 店铺名称 |
+| `total` | `number(decimal)` | 否 | 订单总额 |
+| `status` | `string(enum)` | 否 | 当前订单状态 |
+| `createdAt` | `string(date-time)` | 否 | 创建时间 |
+
+### 5.5 操作结果和错误数据对象
+
+| 对象 | 字段 | JSON 类型 | 是否可空 | 说明 |
+| --- | --- | --- | --- | --- |
+| `DeleteResult` | `id` | `integer(int64)` | 否 | 被逻辑删除的资源 ID |
+|  | `deleted` | `boolean` | 否 | 成功删除固定为 `true` |
+| `ValidationData` | `fieldErrors` | `object<string,string>` | 否 | 字段名到错误消息的映射，可为空对象 |
+| `PriceChangeData` | `currentItems` | `array<CartItem>` | 否 | 价格/版本变化后的最新购物车项 |
+
+`CartItem.product` 是最新 `CartProduct` 摘要；`OrderLine` 是下单时的不可变快照。所有数组字段在无元素时返回 `[]`，不返回 `null`。
 
 ## 6. 用户接口
 
