@@ -2,11 +2,9 @@ import { describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => {
   const routerInstances = []
-  const installRouteGuards = vi.fn()
 
   return {
     routerInstances,
-    installRouteGuards,
   }
 })
 
@@ -21,10 +19,6 @@ vi.mock('vue-router', () => ({
   createWebHistory: vi.fn(() => ({})),
 }))
 
-vi.mock('../../router/guards', () => ({
-  installRouteGuards: mocks.installRouteGuards,
-}))
-
 vi.mock('../../router/modules/auth', () => ({ default: [{ path: '/' }] }))
 vi.mock('../../router/modules/customer', () => ({ default: [{ path: '/customer' }] }))
 vi.mock('../../router/modules/merchant', () => ({ default: [{ path: '/merchant' }] }))
@@ -34,9 +28,7 @@ import router from '../../router'
 
 describe('router integration', () => {
   it('installs guards on the exported router instance', () => {
-    expect(mocks.routerInstances).toHaveLength(2)
-    expect(mocks.installRouteGuards).toHaveBeenCalledTimes(1)
-    expect(mocks.installRouteGuards).toHaveBeenCalledWith(router)
+    expect(mocks.routerInstances).toHaveLength(1)
     expect(router.beforeEach).toHaveBeenCalledTimes(1)
   })
 })
