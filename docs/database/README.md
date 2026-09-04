@@ -1,518 +1,491 @@
-+# 轻量级外卖平台数据库设计
+# 轻量级外卖平台数据库设计（阶段 1 最小版）
 
-> 项目：SE_Practicum  
-> 数据库负责人：B  
-> 架构与测试审查：A  
-> 前端字段审查：C  
-> 当前版本：V1.0  
-> 文档状态：AI 辅助技术自检通过；A、C 人工评审按负责人要求暂时跳过
-> 最后更新：2026-09-03
+> 负责人：B
+>
+> 评审：A（架构、事务、测试）、C（页面字段）
+>
+> 版本：V2.0-minimal
+>
+> 更新日期：2026-09-04
+>
+> 当前状态：表结构设计已收敛；尚未运行 Flyway、尚未在正式库创建表
 
----
+## 1. 文档目的和效力
 
-## 1. 文档目的
+本文档只定义课程阶段 1 必须使用的数据库结构，是 B 编写 Flyway V1、Entity、Mapper 和 ServiceImpl 的依据。
 
-本文档定义第一阶段数据库结构，是 Entity、MyBatis Mapper、Service、Flyway、接口和测试数据的共同依据。
+执行范围以根目录 `最小必要范围-ABC前期准备与TDD执行文档.md` 为准。旧版数据库设计中的幂等、取消订单、支付、配送、乐观锁和通用逻辑删除不进入阶段 1。
 
-实施顺序：B 完成设计 → A 检查约束、事务和测试 → C 检查页面字段 → 三人评审 → A 先提交失败测试 → B 编写 Flyway SQL。
+当前允许 B 完成：
 
-正式表结构只能通过 Flyway 修改；禁止在 IDEA/Workbench 中手工修改正式表；禁止在本文档或 Git 中记录密码。
+- 确认本设计；
+- 创建空的 `delivery_dev`、`delivery_test`；
+- 编写 `V1__create_core_tables.sql`；
+- 检查 SQL。
 
-## 2. 固定技术约定
+当前不允许：
+
+- 在 `delivery_dev` 或 `delivery_test` 手工执行 `CREATE TABLE`；
+- 用 IDEA 或 Workbench 手工建立正式表；
+- 在 A 的 Red 测试之前实现业务 Mapper 或 ServiceImpl。
+
+正式表必须等 A 合并 Flyway 依赖后，由应用启动自动创建。
+
+## 2. 数据库和命名约定
 
 | 项目 | 固定值 |
 | --- | --- |
-| 数据库 | MySQL 8 |
+| 数据库 | MySQL |
 | 开发库 | `delivery_dev` |
 | 测试库 | `delivery_test` |
-| 应用账号 | `delivery_app` |
-| 字符集/排序 | `utf8mb4` / `utf8mb4_unicode_ci` |
-| 迁移/持久化 | Flyway / MyBatis |
+| 应用账号 | `delivery_app@localhost` |
+| 字符集 | `utf8mb4` |
+| 排序规则 | `utf8mb4_unicode_ci` |
+| 迁移工具 | Flyway |
+| 持久化 | MyBatis |
 | 主键 | `BIGINT UNSIGNED AUTO_INCREMENT` |
-| 金额 | `DECIMAL(10,2)`，Java 使用 `BigDecimal` |
-| 时间 | `DATETIME(3)`，应用时区 `Asia/Shanghai` |
-| 逻辑删除 | 长期业务表使用 `deleted` |
-| 状态 | 大写英文字符串，与 Java 枚举一致 |
+| 金额 | `DECIMAL(10,2)`；Java 使用 `BigDecimal` |
+| 时间 | `DATETIME(3)`；应用时区 `Asia/Shanghai` |
+| 表名 | 小写复数、snake_case |
+| 字段名 | 小写 snake_case |
+| 状态值 | 大写英文字符串，与 Java 枚举一致 |
 
-API、数据库和前端使用 `shop/product`；第一阶段 Java 内部仍可使用现有 `restaurant/item` 模块。
+数据库账号和密码只从本机环境变量读取：
 
-## 3. 数据模型总览
+```text
+DELIVERY_DB_USERNAME
+DELIVERY_DB_PASSWORD
+```
 
-| 表 | 含义 |
-| --- | --- |
-| `users` | 普通用户与商家的统一登录账号 |
-| `merchants` | 与账号一对一关联的商家资料 |
-| `shops` | 商家的店铺 |
-| `product_categories` | 店铺内商品分类 |
-| `products` | 商品、价格、库存与状态 |
-| `cart_items` | 用户购物车项 |
-| `orders` | 订单主信息 |
-| `order_items` | 下单时商品快照 |
+不得在 Git 中保存真实密码。
 
-~~~mermaid
-erDiagram
-    USERS ||--o| MERCHANTS : "扩展为商家"
-    USERS ||--o{ CART_ITEMS : "拥有"
-    USERS ||--o{ ORDERS : "创建"
-    MERCHANTS ||--o{ SHOPS : "经营"
-    SHOPS ||--o{ PRODUCT_CATEGORIES : "包含"
-    SHOPS ||--o{ PRODUCTS : "销售"
-    SHOPS ||--o{ ORDERS : "接收"
-    PRODUCT_CATEGORIES ||--o{ PRODUCTS : "归类"
-    PRODUCTS ||--o{ CART_ITEMS : "被选择"
-    PRODUCTS ||--o{ ORDER_ITEMS : "形成快照"
-    ORDERS ||--|{ ORDER_ITEMS : "包含"
-~~~
+## 3. 8 张表和关系
 
-关系规则：
+阶段 1 只有以下 8 张业务表：
 
-- 一个账号最多一条商家资料；
-- 商家角色由后端查询 `merchants` 判断；
-- 商品的分类必须属于同一店铺；
-- 同一用户同一商品最多一条购物车记录；
-- 第一阶段一个订单只属于一个店铺；
-- 订单明细保存成交快照。
+| 表 | 用途 | 所属模块 |
+| --- | --- | --- |
+| `users` | 普通用户和商家的统一登录账号 | user |
+| `merchants` | 商家身份资料 | merchant |
+| `shops` | 商家的唯一店铺 | restaurant |
+| `product_categories` | 店铺商品分类 | item |
+| `products` | 商品、价格、库存和上下架状态 | item |
+| `cart_items` | 用户购物车临时数据 | shopping |
+| `orders` | 订单主信息 | order |
+| `order_items` | 下单时的商品快照 | order |
 
-## 4. 通用规则
+关系：
 
-- 表和字段使用小写蛇形命名，表名用复数；
-- 主键叫 `id`，外键叫 `资源_id`；
-- 长期表使用 `created_at`、`updated_at`；
-- `deleted=0` 有效，`deleted=1` 已删除；
-- 普通查询必须过滤 `deleted=0`；
-- users、merchants、shops、product_categories、products、orders 使用逻辑删除；
-- cart_items 是临时数据，允许物理删除；
-- order_items 是历史快照，不提供单独删除；
-- 用户账号即使逻辑删除，也不能被另一人复用。
+```text
+users 1 ── 0..1 merchants
+merchants 1 ── 0..1 shops
+shops 1 ── N product_categories
+shops 1 ── N products
+product_categories 1 ── N products
+users 1 ── N cart_items
+products 1 ── N cart_items
+users 1 ── N orders
+shops 1 ── N orders
+orders 1 ── N order_items
+products 1 ── N order_items
+```
 
-状态：
+阶段 1 的最小限制：
 
-| 资源 | 状态 |
-| --- | --- |
-| 用户 | `ACTIVE`、`DISABLED` |
-| 商家 | `ACTIVE`、`SUSPENDED` |
-| 店铺 | `OPEN`、`CLOSED`、`TEMPORARILY_CLOSED` |
-| 分类 | `ACTIVE`、`DISABLED` |
-| 商品 | `ON_SALE`、`OFF_SALE` |
-| 订单 | `PENDING_PAYMENT`、`PAID`、`PREPARING`、`DELIVERING`、`COMPLETED`、`CANCELLED` |
+- 一个账号最多有一个商家身份；
+- 一个商家最多有一个店铺；
+- 同一店铺的分类名不能重复；
+- 同一用户和同一商品最多有一条购物车项；
+- 一个订单只属于一个店铺；
+- 订单明细保存成交时的商品名称和单价。
 
-## 5. 表结构
+## 4. 表结构
 
-### 5.1 `users`
+### 4.1 `users`
 
-用途：保存全部登录主体。
+用途：保存所有登录账号。普通用户注册只写本表；商家注册在同一事务中写 `users` 和 `merchants`。
 
-| 字段 | 类型 | 可空 | 默认 | 约束/索引 | 含义 |
+| 字段 | 类型 | 可空 | 默认值 | 约束 | 含义 |
 | --- | --- | --- | --- | --- | --- |
 | `id` | `BIGINT UNSIGNED` | 否 | 自增 | 主键 | 用户 ID |
 | `account` | `VARCHAR(50)` | 否 | 无 | 唯一 | 登录账号 |
-| `password_hash` | `VARCHAR(100)` | 否 | 无 | 无 | BCrypt 摘要 |
-| `nickname` | `VARCHAR(50)` | 是 | NULL | 无 | 昵称 |
+| `password_hash` | `VARCHAR(100)` | 否 | 无 | 无 | BCrypt 密码摘要 |
+| `nickname` | `VARCHAR(50)` | 否 | 无 | 无 | 昵称 |
 | `phone` | `VARCHAR(20)` | 是 | NULL | 无 | 联系电话 |
-| `status` | `VARCHAR(20)` | 否 | ACTIVE | 状态检查 | 账号状态 |
+| `status` | `VARCHAR(20)` | 否 | `ACTIVE` | CHECK | 用户状态 |
 | `created_at` | `DATETIME(3)` | 否 | 当前时间 | 无 | 创建时间 |
-| `updated_at` | `DATETIME(3)` | 否 | 当前时间 | 无 | 更新时间 |
-| `deleted` | `TINYINT(1)` | 否 | 0 | 索引 | 逻辑删除 |
+| `updated_at` | `DATETIME(3)` | 否 | 当前时间 | 自动更新时间 | 更新时间 |
 
-索引：`uk_users_account(account)`、`idx_users_status_deleted(status, deleted)`。
+约束：
 
-规则：账号统一转小写后保存；密码只存 BCrypt 摘要；响应 DTO 不得含密码；DISABLED 或已删除账号不能登录。
+- `PRIMARY KEY (id)`；
+- `UNIQUE (account)`；
+- `status IN ('ACTIVE', 'DISABLED')`。
 
-### 5.2 `merchants`
+业务规则：
 
-| 字段 | 类型 | 可空 | 默认 | 约束/索引 | 含义 |
+- account 去除首尾空格后不能为空；
+- account 全局唯一；
+- 密码只保存 BCrypt 摘要；
+- 响应不能返回 `password_hash`；
+- 只有 `ACTIVE` 用户可以登录和执行业务操作。
+
+### 4.2 `merchants`
+
+用途：标识某个用户拥有商家身份。
+
+| 字段 | 类型 | 可空 | 默认值 | 约束 | 含义 |
 | --- | --- | --- | --- | --- | --- |
 | `id` | `BIGINT UNSIGNED` | 否 | 自增 | 主键 | 商家 ID |
-| `user_id` | `BIGINT UNSIGNED` | 否 | 无 | 外键、唯一 | 用户账号 |
-| `merchant_name` | `VARCHAR(100)` | 否 | 无 | 无 | 商家名称 |
-| `contact_phone` | `VARCHAR(20)` | 否 | 无 | 无 | 联系方式 |
-| `status` | `VARCHAR(20)` | 否 | ACTIVE | 状态检查 | 商家状态 |
+| `user_id` | `BIGINT UNSIGNED` | 否 | 无 | 外键、唯一 | 对应用户 |
+| `name` | `VARCHAR(100)` | 否 | 无 | 无 | 商家名称 |
 | `created_at` | `DATETIME(3)` | 否 | 当前时间 | 无 | 创建时间 |
-| `updated_at` | `DATETIME(3)` | 否 | 当前时间 | 无 | 更新时间 |
-| `deleted` | `TINYINT(1)` | 否 | 0 | 索引 | 逻辑删除 |
 
-约束：`user_id → users.id`；`uk_merchants_user(user_id)`；`idx_merchants_status_deleted(status,deleted)`。
+约束：
 
-规则：注册商家时 users 和 merchants 在同一事务创建；失败整体回滚；SUSPENDED 商家不能管理资源。
+- `PRIMARY KEY (id)`；
+- `UNIQUE (user_id)`；
+- `user_id REFERENCES users(id)`；
+- 删除策略为 `RESTRICT`。
 
-### 5.3 `shops`
+业务规则：
 
-| 字段 | 类型 | 可空 | 默认 | 约束/索引 | 含义 |
+- 一个用户最多注册一次商家；
+- 商家注册时 users 和 merchants 必须在同一事务中创建；
+- 任一步失败都回滚。
+
+### 4.3 `shops`
+
+用途：保存商家的唯一店铺及营业状态。
+
+| 字段 | 类型 | 可空 | 默认值 | 约束 | 含义 |
 | --- | --- | --- | --- | --- | --- |
 | `id` | `BIGINT UNSIGNED` | 否 | 自增 | 主键 | 店铺 ID |
-| `merchant_id` | `BIGINT UNSIGNED` | 否 | 无 | 外键 | 所属商家 |
-| `name` | `VARCHAR(100)` | 否 | 无 | 索引 | 店铺名称 |
-| `description` | `VARCHAR(500)` | 是 | NULL | 无 | 简介 |
-| `status` | `VARCHAR(30)` | 否 | CLOSED | 状态检查 | 营业状态 |
+| `merchant_id` | `BIGINT UNSIGNED` | 否 | 无 | 外键、唯一 | 所属商家 |
+| `name` | `VARCHAR(100)` | 否 | 无 | 无 | 店铺名称 |
+| `description` | `VARCHAR(500)` | 是 | NULL | 无 | 店铺简介 |
+| `status` | `VARCHAR(30)` | 否 | `CLOSED` | CHECK | 营业状态 |
 | `created_at` | `DATETIME(3)` | 否 | 当前时间 | 无 | 创建时间 |
-| `updated_at` | `DATETIME(3)` | 否 | 当前时间 | 无 | 更新时间 |
-| `deleted` | `TINYINT(1)` | 否 | 0 | 索引 | 逻辑删除 |
+| `updated_at` | `DATETIME(3)` | 否 | 当前时间 | 自动更新时间 | 更新时间 |
 
-约束：`merchant_id → merchants.id`；索引 `(merchant_id,deleted)`、`(status,deleted)`、`name`。
+约束：
 
-规则：新店固定 CLOSED；只有 OPEN 可接单；商家只能修改自己的店；状态变化不能删除历史数据。
+- `PRIMARY KEY (id)`；
+- `UNIQUE (merchant_id)`；
+- `merchant_id REFERENCES merchants(id)`；
+- `status IN ('OPEN', 'CLOSED', 'TEMPORARILY_CLOSED')`；
+- 删除策略为 `RESTRICT`。
 
-### 5.4 `product_categories`
+业务规则：
 
-| 字段 | 类型 | 可空 | 默认 | 约束/索引 | 含义 |
+- 一个商家阶段 1 最多一个店铺；
+- 新店铺初始状态为 `CLOSED`；
+- 只有店主可以修改店铺状态；
+- 只有 `OPEN` 店铺允许加入购物车和创建订单。
+
+### 4.4 `product_categories`
+
+用途：保存店铺内的商品分类。
+
+| 字段 | 类型 | 可空 | 默认值 | 约束 | 含义 |
 | --- | --- | --- | --- | --- | --- |
 | `id` | `BIGINT UNSIGNED` | 否 | 自增 | 主键 | 分类 ID |
 | `shop_id` | `BIGINT UNSIGNED` | 否 | 无 | 外键 | 所属店铺 |
-| `name` | `VARCHAR(100)` | 否 | 无 | 业务唯一 | 分类名 |
-| `sort_order` | `INT` | 否 | 0 | 无 | 显示顺序 |
-| `status` | `VARCHAR(20)` | 否 | ACTIVE | 状态检查 | 分类状态 |
-| `created_at` | `DATETIME(3)` | 否 | 当前时间 | 无 | 创建时间 |
-| `updated_at` | `DATETIME(3)` | 否 | 当前时间 | 无 | 更新时间 |
-| `deleted` | `TINYINT(1)` | 否 | 0 | 索引 | 逻辑删除 |
+| `name` | `VARCHAR(100)` | 否 | 无 | 与 shop_id 组合唯一 | 分类名 |
 
-约束：`shop_id → shops.id`；索引 `(shop_id,status,deleted)`、`(shop_id,sort_order)`。
+约束：
 
-规则：同店有效分类名由 Service 保证不重复；有商品引用时不能物理删除；按 sort_order、id 排序。
+- `PRIMARY KEY (id)`；
+- `UNIQUE (shop_id, name)`；
+- `shop_id REFERENCES shops(id)`；
+- 删除策略为 `RESTRICT`。
 
-### 5.5 `products`
+业务规则：
 
-| 字段 | 类型 | 可空 | 默认 | 约束/索引 | 含义 |
+- 分类名称不能为空；
+- 同一店铺内分类名不能重复；
+- 只有店主可以新增分类。
+
+阶段 1 不实现分类删除和排序字段。
+
+### 4.5 `products`
+
+用途：保存商品资料、当前价格、库存和上下架状态。
+
+| 字段 | 类型 | 可空 | 默认值 | 约束 | 含义 |
 | --- | --- | --- | --- | --- | --- |
 | `id` | `BIGINT UNSIGNED` | 否 | 自增 | 主键 | 商品 ID |
-| `shop_id` | `BIGINT UNSIGNED` | 否 | 无 | 外键 | 店铺 |
-| `category_id` | `BIGINT UNSIGNED` | 否 | 无 | 外键 | 分类 |
-| `name` | `VARCHAR(100)` | 否 | 无 | 索引 | 商品名 |
-| `description` | `VARCHAR(1000)` | 是 | NULL | 无 | 描述 |
-| `price` | `DECIMAL(10,2)` | 否 | 无 | CHECK > 0 | 价格 |
-| `stock` | `INT UNSIGNED` | 否 | 0 | CHECK >= 0 | 库存 |
-| `status` | `VARCHAR(20)` | 否 | OFF_SALE | 状态检查 | 上下架 |
-| `version` | `INT UNSIGNED` | 否 | 0 | 无 | 并发版本 |
+| `shop_id` | `BIGINT UNSIGNED` | 否 | 无 | 外键 | 所属店铺 |
+| `category_id` | `BIGINT UNSIGNED` | 否 | 无 | 外键 | 所属分类 |
+| `name` | `VARCHAR(100)` | 否 | 无 | 无 | 商品名称 |
+| `description` | `VARCHAR(1000)` | 是 | NULL | 无 | 商品描述 |
+| `price` | `DECIMAL(10,2)` | 否 | 无 | CHECK > 0 | 当前价格 |
+| `stock` | `INT UNSIGNED` | 否 | 0 | CHECK >= 0 | 当前库存 |
+| `status` | `VARCHAR(20)` | 否 | `OFF_SALE` | CHECK | 上下架状态 |
 | `created_at` | `DATETIME(3)` | 否 | 当前时间 | 无 | 创建时间 |
-| `updated_at` | `DATETIME(3)` | 否 | 当前时间 | 无 | 更新时间 |
-| `deleted` | `TINYINT(1)` | 否 | 0 | 索引 | 逻辑删除 |
+| `updated_at` | `DATETIME(3)` | 否 | 当前时间 | 自动更新时间 | 更新时间 |
 
-外键：shop_id → shops.id；category_id → product_categories.id。索引：`(shop_id,status,deleted)`、`(category_id,status,deleted)`、`name`。
+约束：
 
-规则：新商品 OFF_SALE；分类必须属于相同店铺；商家只能管理自己的商品；下架或零库存不能购买；改价不改变订单快照。
+- `PRIMARY KEY (id)`；
+- `shop_id REFERENCES shops(id)`；
+- `category_id REFERENCES product_categories(id)`；
+- `price > 0`；
+- `stock >= 0`；
+- `status IN ('ON_SALE', 'OFF_SALE')`；
+- 索引 `(shop_id, status)`；
+- 索引 `(category_id)`；
+- 删除策略为 `RESTRICT`。
 
-原子扣库存必须带条件：
+业务规则：
 
-~~~sql
-UPDATE products
-SET stock = stock - #{quantity},
-    version = version + 1,
-    updated_at = CURRENT_TIMESTAMP(3)
-WHERE id = #{productId}
-  AND stock >= #{quantity}
-  AND status = 'ON_SALE'
-  AND deleted = 0;
-~~~
+- 新商品初始状态为 `OFF_SALE`；
+- category 必须属于同一个 shop，该规则由 ServiceImpl 校验；
+- 普通用户只浏览 `ON_SALE` 商品；
+- `OFF_SALE` 或库存不足时不能加入购物车或下单；
+- 商品后续改名、改价不能改变已生成的订单明细快照。
 
-受影响行数必须为 1，否则作为库存或状态冲突。
+### 4.6 `cart_items`
 
-### 5.6 `cart_items`
+用途：保存用户尚未结算的购物车项。
 
-| 字段 | 类型 | 可空 | 默认 | 约束/索引 | 含义 |
+| 字段 | 类型 | 可空 | 默认值 | 约束 | 含义 |
 | --- | --- | --- | --- | --- | --- |
 | `id` | `BIGINT UNSIGNED` | 否 | 自增 | 主键 | 购物车项 ID |
-| `user_id` | `BIGINT UNSIGNED` | 否 | 无 | 外键 | 用户 |
+| `user_id` | `BIGINT UNSIGNED` | 否 | 无 | 外键 | 所属用户 |
 | `product_id` | `BIGINT UNSIGNED` | 否 | 无 | 外键 | 商品 |
 | `quantity` | `INT UNSIGNED` | 否 | 无 | CHECK > 0 | 数量 |
 | `created_at` | `DATETIME(3)` | 否 | 当前时间 | 无 | 创建时间 |
-| `updated_at` | `DATETIME(3)` | 否 | 当前时间 | 无 | 更新时间 |
+| `updated_at` | `DATETIME(3)` | 否 | 当前时间 | 自动更新时间 | 更新时间 |
 
-约束：user_id → users.id；product_id → products.id；`UNIQUE(user_id,product_id)`；索引 `user_id`。
+约束：
 
-规则：只能操作本人购物车；重复加入时累加数量；累加后不能超过库存；删除购物车不修改库存。
+- `PRIMARY KEY (id)`；
+- `UNIQUE (user_id, product_id)`；
+- `user_id REFERENCES users(id)`；
+- `product_id REFERENCES products(id)`；
+- `quantity > 0`；
+- 索引 `(user_id)`；
+- 删除策略为 `RESTRICT`。
 
-### 5.7 `orders`
+业务规则：
 
-| 字段 | 类型 | 可空 | 默认 | 约束/索引 | 含义 |
+- 只能操作本人的购物车；
+- 重复加入同一商品时更新原记录的数量；
+- 阶段 1 一个用户的购物车只允许同一店铺商品，该规则由 ServiceImpl 校验；
+- 加入和修改数量时重新检查店铺、商品和库存；
+- 删除购物车项使用物理删除，因为它只是临时数据。
+
+### 4.7 `orders`
+
+用途：保存订单主信息。
+
+| 字段 | 类型 | 可空 | 默认值 | 约束 | 含义 |
 | --- | --- | --- | --- | --- | --- |
 | `id` | `BIGINT UNSIGNED` | 否 | 自增 | 主键 | 订单 ID |
-| `order_number` | `VARCHAR(40)` | 否 | 无 | 唯一 | 订单编号 |
-| `user_id` | `BIGINT UNSIGNED` | 否 | 无 | 外键 | 用户 |
-| `shop_id` | `BIGINT UNSIGNED` | 否 | 无 | 外键 | 店铺 |
-| `idempotency_key` | `VARCHAR(64)` | 否 | 无 | 与用户组合唯一 | 防重复键 |
-| `total_amount` | `DECIMAL(10,2)` | 否 | 无 | CHECK >= 0 | 总金额 |
-| `status` | `VARCHAR(30)` | 否 | PENDING_PAYMENT | 状态检查 | 状态 |
-| `version` | `INT UNSIGNED` | 否 | 0 | 无 | 并发版本 |
+| `order_no` | `VARCHAR(40)` | 否 | 无 | 唯一 | 展示用订单编号 |
+| `user_id` | `BIGINT UNSIGNED` | 否 | 无 | 外键 | 下单用户 |
+| `shop_id` | `BIGINT UNSIGNED` | 否 | 无 | 外键 | 订单店铺 |
+| `total_amount` | `DECIMAL(10,2)` | 否 | 无 | CHECK > 0 | 后端计算的总额 |
+| `status` | `VARCHAR(30)` | 否 | `PENDING_PAYMENT` | CHECK | 订单状态 |
 | `created_at` | `DATETIME(3)` | 否 | 当前时间 | 无 | 创建时间 |
-| `updated_at` | `DATETIME(3)` | 否 | 当前时间 | 无 | 更新时间 |
-| `cancelled_at` | `DATETIME(3)` | 是 | NULL | 无 | 取消时间 |
-| `deleted` | `TINYINT(1)` | 否 | 0 | 索引 | 逻辑删除 |
 
-约束：order_number 唯一；`UNIQUE(user_id,idempotency_key)`；user_id → users.id；shop_id → shops.id。索引 `(user_id,created_at)`、`(user_id,status,created_at)`、`(shop_id,created_at)`。
+约束：
 
-规则：金额由服务端计算；初始 PENDING_PAYMENT；只有 PENDING_PAYMENT 可取消；幂等键避免重复订单；状态更新必须带原状态或 version 条件。
+- `PRIMARY KEY (id)`；
+- `UNIQUE (order_no)`；
+- `user_id REFERENCES users(id)`；
+- `shop_id REFERENCES shops(id)`；
+- `total_amount > 0`；
+- 阶段 1 只允许 `status = 'PENDING_PAYMENT'`；
+- 索引 `(user_id, created_at)`；
+- 删除策略为 `RESTRICT`。
 
-### 5.8 `order_items`
+业务规则：
 
-| 字段 | 类型 | 可空 | 默认 | 约束/索引 | 含义 |
+- 订单金额由后端根据商品当前价格计算；
+- 创建订单时重新检查店铺状态、商品状态和库存；
+- 阶段 1 不实现支付、取消和后续状态流转；
+- 只能查询本人的订单。
+
+### 4.8 `order_items`
+
+用途：保存下单时的商品快照。
+
+| 字段 | 类型 | 可空 | 默认值 | 约束 | 含义 |
 | --- | --- | --- | --- | --- | --- |
 | `id` | `BIGINT UNSIGNED` | 否 | 自增 | 主键 | 明细 ID |
-| `order_id` | `BIGINT UNSIGNED` | 否 | 无 | 外键 | 订单 |
-| `product_id` | `BIGINT UNSIGNED` | 否 | 无 | 索引 | 原商品 ID |
-| `product_name_snapshot` | `VARCHAR(100)` | 否 | 无 | 无 | 商品名快照 |
-| `unit_price_snapshot` | `DECIMAL(10,2)` | 否 | 无 | CHECK > 0 | 成交单价 |
-| `quantity` | `INT UNSIGNED` | 否 | 无 | CHECK > 0 | 数量 |
-| `subtotal` | `DECIMAL(10,2)` | 否 | 无 | CHECK > 0 | 小计 |
-| `created_at` | `DATETIME(3)` | 否 | 当前时间 | 无 | 创建时间 |
+| `order_id` | `BIGINT UNSIGNED` | 否 | 无 | 外键 | 所属订单 |
+| `product_id` | `BIGINT UNSIGNED` | 否 | 无 | 外键 | 原商品 ID |
+| `product_name` | `VARCHAR(100)` | 否 | 无 | 无 | 商品名称快照 |
+| `unit_price` | `DECIMAL(10,2)` | 否 | 无 | CHECK > 0 | 成交单价快照 |
+| `quantity` | `INT UNSIGNED` | 否 | 无 | CHECK > 0 | 成交数量 |
 
-约束：order_id → orders.id；索引 `order_id`、`product_id`。
+约束：
 
-规则：快照在下单时写入；subtotal 由服务端计算；商品改名、改价、下架或删除均不能改变历史明细；不提供单独修改/删除接口。
+- `PRIMARY KEY (id)`；
+- `order_id REFERENCES orders(id)`；
+- `product_id REFERENCES products(id)`；
+- `unit_price > 0`；
+- `quantity > 0`；
+- 索引 `(order_id)`；
+- 删除策略为 `RESTRICT`。
 
-## 6. 外键删除策略
+业务规则：
 
-优先使用 `ON DELETE RESTRICT` 或默认限制，禁止可能删除历史记录的 `ON DELETE CASCADE`。
+- 商品名称和单价在创建订单时写入；
+- 商品之后改名、改价或下架，不修改历史明细；
+- 阶段 1 不提供订单明细的修改和删除接口。
 
-| 父表 | 子表 | 处理 |
+## 5. 必要索引
+
+只建立当前接口实际使用的索引：
+
+| 查询 | 索引/约束 |
+| --- | --- |
+| 按账号登录 | `users(account)` 唯一索引 |
+| 按用户找商家 | `merchants(user_id)` 唯一索引 |
+| 按商家找店铺 | `shops(merchant_id)` 唯一索引 |
+| 店铺分类 | `product_categories(shop_id, name)` 唯一索引 |
+| 店铺在售商品 | `products(shop_id, status)` |
+| 分类商品 | `products(category_id)` |
+| 用户购物车 | `cart_items(user_id)` |
+| 防止重复购物车项 | `cart_items(user_id, product_id)` 唯一索引 |
+| 用户订单列表 | `orders(user_id, created_at)` |
+| 订单明细 | `order_items(order_id)` |
+
+阶段 1 不做复杂排序索引和性能预优化。
+
+## 6. 创建订单事务边界
+
+后续由 B 在 `OrderServiceImpl.createFromCart` 中使用一个事务完成：
+
+```text
+检查用户 ACTIVE
+→ 查询本人购物车并检查非空
+→ 确认购物车只有一个店铺
+→ 检查店铺 OPEN
+→ 重新查询商品状态、价格和库存
+→ 计算 total_amount
+→ 写 orders
+→ 写 order_items 快照
+→ 扣减 products.stock
+→ 删除本人 cart_items
+→ 提交事务
+```
+
+任一步失败必须回滚全部修改。
+
+这只是后续业务需求说明。A 提交创建订单的 Red 测试之前，B 不实现该事务。
+
+## 7. 数据库和 Service 的校验边界
+
+| 规则 | 数据库负责 | ServiceImpl 负责 |
 | --- | --- | --- |
-| users | merchants/orders | 使用逻辑删除，不删历史 |
-| users | cart_items | Service 可清理临时数据 |
-| merchants | shops | 使用逻辑删除 |
-| shops | categories/products/orders | 不物理级联 |
-| categories | products | 有商品时禁止物理删除 |
-| products | order_items | 绝不删除历史快照 |
-| orders | order_items | 正常业务不物理删除 |
+| 必填字段 | NOT NULL | 参数校验和错误消息 |
+| 账号唯一 | UNIQUE | 注册前检查并处理冲突 |
+| 状态合法 | CHECK | 状态和操作规则 |
+| 数值范围 | CHECK | 提前校验并返回 400/409 |
+| 外键存在 | FOREIGN KEY | 资源不存在时返回 404 |
+| 资源归属 | 不能代替权限校验 | 必须校验当前用户是否拥有资源 |
+| 分类属于同一店铺 | 当前最小表不能直接保证 | 必须校验 |
+| 购物车只含同店商品 | 当前最小表不能直接保证 | 必须校验 |
+| 订单金额 | DECIMAL 保存结果 | 必须按服务端价格计算 |
+| 订单事务 | 数据库支持事务 | 必须声明事务并正确编排 |
 
-## 7. 订单事务
+## 8. Flyway V1 规则
 
-创建订单必须在一个 Service 事务内：
+迁移文件固定为：
 
-~~~text
-验证用户 → 读取购物车 → 检查非空和单店铺
-→ 检查店铺 OPEN → 检查商品 ON_SALE 和库存
-→ 读取服务端价格 → 计算金额
-→ 写 orders → 写 order_items
-→ 原子扣库存 → 清理购物车 → 提交
-~~~
+```text
+backend/src/main/resources/db/migration/V1__create_core_tables.sql
+```
 
-任何一步失败都必须回滚订单、明细、库存和购物车。
+建表顺序固定为：
 
-取消规则：仅 `PENDING_PAYMENT → CANCELLED`。因创建订单已扣库存，取消成功必须在同一事务中条件更新订单、恢复库存、填写 cancelled_at；并发取消只能一次成功，库存只能恢复一次。
-
-## 8. 校验职责
-
-| 规则 | C 前端 | B Service | 数据库 |
-| --- | --- | --- | --- |
-| 必填 | 提示 | 必须校验 | NOT NULL |
-| 账号唯一 | 可提示 | 检查并处理冲突 | UNIQUE |
-| 密码 | 基础格式 | BCrypt | 只存摘要 |
-| 价格/库存 | 输入限制 | 必须校验 | CHECK |
-| 资源归属 | 隐藏按钮 | 必须校验 | 外键不能代替权限 |
-| 店铺/商品状态 | 展示 | 操作时重新校验 | 状态约束 |
-| 订单金额 | 展示 | 服务端计算 | DECIMAL |
-| 防重复订单 | 禁用按钮 | 幂等判断 | 组合唯一键 |
-
-## 9. 查询与索引
-
-| 查询 | 索引 |
-| --- | --- |
-| 登录查账号 | users.account |
-| 商家查店铺 | shops(merchant_id,deleted) |
-| 用户浏览店铺 | shops(status,deleted) |
-| 店铺商品 | products(shop_id,status,deleted) |
-| 分类商品 | products(category_id,status,deleted) |
-| 用户购物车 | cart_items(user_id) |
-| 用户订单 | orders(user_id,status,created_at) |
-| 订单明细 | order_items(order_id) |
-
-sortBy 不能直接拼 SQL。白名单：
-
-- 店铺：createdAt、name；
-- 商品：createdAt、price、name；
-- 订单：createdAt、totalAmount；
-- sortOrder：asc、desc。
-
-未知排序字段第一阶段返回 400。
-
-## 10. Flyway 约定
-
-目录：
-
-~~~text
-backend/src/main/resources/db/migration/
-~~~
-
-第一阶段文件：
-
-| 文件 | 内容 |
-| --- | --- |
-| `V1__create_core_tables.sql` | 创建 8 张表、外键、约束和索引 |
-| `V2__add_query_indexes.sql` | 仅在评审发现缺失索引时新增 |
+```text
+users
+→ merchants
+→ shops
+→ product_categories
+→ products
+→ cart_items
+→ orders
+→ order_items
+```
 
 规则：
 
-1. 迁移编号递增；
-2. 合并 develop 且执行过的旧迁移禁止修改；
-3. 修复只能新增迁移；
-4. 演示数据不进入正式迁移；
-5. 测试数据放 `backend/src/test/resources/db/test-data/`；
-6. 不删除或手工修改 `flyway_schema_history`；
-7. 先在 delivery_test 验证，再在 delivery_dev 验证。
+1. V1 只创建上述 8 张表、必要约束和必要索引；
+2. V1 不插入演示数据；
+3. V1 不包含数据库账号或密码；
+4. V1 未经 Flyway 执行前，不手工在正式库建表；
+5. V1 一旦合并且执行过，后续修改结构使用 V2，不能改写历史迁移；
+6. 先迁移 `delivery_test`，验证后再迁移 `delivery_dev`；
+7. 第二次运行必须成功且不能重复创建表。
 
-## 11. MyBatis 约定
+完整 V1 模板见根目录执行文档第 8.3.10 节。
 
-~~~text
-backend/src/main/java/com/delivery/backend/<module>/mapper/
-backend/src/main/resources/mapper/<module>/
-~~~
+## 9. 阶段 1 明确不实施
 
-- Mapper 只做数据访问；
-- 参数使用 `#{...}`；
-- 禁止用 `${...}` 拼接用户输入；
-- 排序使用 Java 白名单；
-- Entity、请求 DTO、响应 DTO 分开；
-- Controller 不直接调用 Mapper；
-- 更新必须检查受影响行数；
-- 查询必须过滤 deleted=0。
+以下内容不出现在 V1，也不进入阶段 1 测试：
 
-## 12. 测试清单
+- 订单幂等键；
+- 订单取消和库存恢复；
+- 支付、退款、配送、骑手；
+- `PAID`、`PREPARING`、`DELIVERING`、`COMPLETED`、`CANCELLED` 状态流；
+- products/orders 乐观锁 version；
+- 全表 deleted 逻辑删除；
+- cancelled_at；
+- 图片表、地址表、支付表、日志表；
+- 为阶段 2 猜测的预留字段；
+- 复杂分页、排序和性能索引。
 
-### 结构与约束
+如果教师阶段 2 正式要求其中某项，再先由 A 增加测试，然后新增迁移和实现。
 
-- [ ] 8 张表由 Flyway 创建；
-- [ ] 账号、merchant user_id、购物车组合键、订单号、幂等键唯一；
-- [ ] 价格、库存、数量、金额约束有效；
-- [ ] 外键阻止无效关联；
-- [ ] 逻辑删除数据不出现在普通查询。
+## 10. B 的设计自检
 
-### 事务和并发
+### 10.1 表和字段
 
-- [ ] 下单成功写订单、明细、扣库存、清购物车；
-- [ ] 任一失败全部回滚；
-- [ ] 并发库存不为负；
-- [ ] 相同幂等键不重复下单；
-- [ ] 并发取消只恢复一次库存。
+- [x] 只有 8 张阶段 1 业务表；
+- [x] 表名和字段名统一使用 snake_case；
+- [x] 金额统一使用 `DECIMAL(10,2)`；
+- [x] 密码字段只保存摘要；
+- [x] 订单明细保存名称和单价快照；
+- [x] 不含幂等、取消、支付、配送和乐观锁字段。
 
-### 历史一致性
+### 10.2 关系和约束
 
-- [ ] 商品改名/改价不改变订单快照；
-- [ ] 商品下架不删除订单明细；
-- [ ] 店铺关闭不删除订单；
-- [ ] 取消不删除订单和明细。
+- [x] account 唯一；
+- [x] 一个用户最多一个商家；
+- [x] 一个商家最多一个店铺；
+- [x] 同店分类名唯一；
+- [x] 同用户同商品购物车项唯一；
+- [x] 必要外键均为 RESTRICT；
+- [x] 价格、库存、数量和订单金额有 CHECK；
+- [x] 必要查询已有索引。
 
-## 13. 数据库设计自检与评审状态
+### 10.3 尚未完成
 
-### 13.1 自检范围和方法
+- [ ] A 确认 MyBatis/Flyway 依赖；
+- [ ] A 确认 Service 方法和 DTO 字段；
+- [ ] B 创建并人工检查 V1；
+- [ ] Flyway 在 `delivery_test` 创建表；
+- [ ] B 验证外键、唯一键和 CHECK；
+- [ ] Flyway 在 `delivery_dev` 创建表；
+- [ ] A、B、C 完成最终字段对齐。
 
-2026-09-03 对数据库设计进行了 AI 辅助的文档一致性自检。检查范围包括：
+## 11. 本步骤完成判定
 
-- 课程需求中的 8 个核心数据对象是否全部落表；
-- 主键、外键、唯一约束、状态、金额、库存和时间字段是否明确；
-- 用户、商家、店铺、商品、购物车和订单业务规则是否能由当前模型支持；
-- 订单创建、取消、库存扣减和幂等是否有数据基础；
-- 逻辑删除和外键策略是否会破坏历史订单；
-- 开发库和测试库是否分离；
-- 文档中是否包含数据库密码、JWT 密钥或其他敏感值。
+第六步只要求数据库设计收敛，不要求表已经创建。
 
-本次自检是技术文档检查，不代表 A、B、C 已经完成人工讨论，也不能替代课程要求的成员理解和答辩。B 在进入 SQL 实现前仍需亲自阅读并能够解释第 3、5、6、7、8、9、10 节。
+本步骤完成条件：
 
-### B 自检
+- [x] 数据库设计文档只包含 8 张阶段 1 表；
+- [x] 每张表字段、类型、主键、外键、唯一键和 CHECK 已明确；
+- [x] 订单事务边界已说明；
+- [x] 数据库和 Service 校验职责已区分；
+- [x] 额外功能已明确移出阶段 1；
+- [x] 当前状态明确记录为“尚未运行 Flyway、尚未创建正式表”。
 
-- [x] 8 张表字段完整：users、merchants、shops、product_categories、products、cart_items、orders、order_items 均已定义；
-- [x] 外键关系明确，并规定不得使用会破坏历史订单的级联删除；
-- [x] 用户、商家、店铺、分类、商品和订单状态值明确；
-- [x] 金额统一使用 DECIMAL(10,2)，Java 端统一使用 BigDecimal；
-- [x] 订单明细包含商品名称、成交单价、数量和小计快照；
-- [x] orders 包含 order_number 和 idempotency_key 两类防重复依据；
-- [x] products 和 orders 包含 version，并给出了条件更新方案；
-- [x] 购物车包含 user_id + product_id 组合唯一约束；
-- [x] 密码仅保存 password_hash，文档中没有真实密码和 JWT 密钥；
-- [x] 逻辑删除和 RESTRICT 策略不会主动删除历史订单和明细；
-- [x] delivery_dev 与 delivery_test 的用途已经分离；
-- [x] Flyway 版本、目录和禁止修改旧迁移的规则已经明确。
-
-### 13.2 自检中确认的特殊设计
-
-| 项目 | 自检结论 | 实现时必须做的事 |
-| --- | --- | --- |
-| 分类名称唯一 | 不使用 `(shop_id,name,deleted)` 布尔组合唯一键 | Service 在事务中检查同店有效分类名 |
-| 商品库存 | 不能只“先查再减” | 使用 `stock >= quantity` 的条件更新并检查影响行数 |
-| 订单幂等 | 数据库提供用户 + 幂等键唯一约束 | API 文档必须定义 `idempotencyKey` |
-| 订单快照 | order_items 保存名称和成交价格 | 历史查询不得用 products 当前值覆盖 |
-| 商品历史引用 | order_items.product_id 不做级联删除 | 商品删除后仍保留历史快照 |
-| 订单取消 | 第一阶段仅待支付可取消 | 状态更新和库存恢复必须在同一事务，且只能成功一次 |
-| CHECK 约束 | 设计依赖 MySQL 8 的有效 CHECK | 实现前确认 MySQL 版本不低于 8.0.16 |
-| 测试隔离 | 开发库和测试库分开 | 自动化测试只能连接 delivery_test |
-
-### 13.3 自检发现但尚需在后续文档同步的事项
-
-以下不是数据库设计缺失，但后续实现前必须同步：
-
-1. `docs/api/README.md` 必须明确订单创建请求中的 `idempotencyKey`；
-2. API 文档必须统一分页返回 `items/page/pageSize/total/totalPages`；
-3. 架构文档必须说明订单 Service 的事务边界；
-4. 测试配置必须使用 delivery_test，不能继承开发库 URL；
-5. Flyway SQL 必须真实创建本设计中的 CHECK、唯一键和查询索引；
-6. A 的测试必须覆盖库存原子更新、重复下单和并发取消。
-
-### A 评审
-
-- [ ] 核心规则可测试；
-- [ ] 事务范围完整；
-- [ ] 原子扣库存；
-- [ ] 并发取消不重复恢复；
-- [ ] 测试库与开发库隔离；
-- [ ] 错误可映射到正确 HTTP 状态码。
-
-状态：按负责人本次指示跳过，未标记为“通过”。
-
-### C 评审
-
-- [ ] 用户、店铺、分类、商品字段满足页面；
-- [ ] 购物车可显示数量、价格和小计；
-- [ ] 订单可显示编号、状态、总额、时间和明细快照；
-- [ ] 分页 DTO 能提供 items、page、pageSize、total、totalPages。
-
-状态：按负责人本次指示跳过，未标记为“通过”。
-
-### 评审记录
-
-| 项目 | 内容 |
-| --- | --- |
-| 自检日期 | 2026-09-03 |
-| 执行方式 | AI 辅助文档一致性自检 |
-| B 自检项 | 技术检查全部通过；B 本人理解确认仍由 B 负责 |
-| A 评审 | 按负责人指示跳过，未执行 |
-| C 评审 | 按负责人指示跳过，未执行 |
-| 发现事项 | 见 13.2 和 13.3 |
-| 文档修改 | 补充自检依据、特殊设计、后续同步项和评审状态 |
-| 当前结论 | 数据库设计技术自检通过，可进入 Red 测试准备；不等同于小组人工评审通过 |
-| 关联 PR | 待本次自检文档提交后填写 |
-
-由于负责人明确要求跳过 A、C 评审，本轮不以评审作为进入下一步的阻塞条件。该偏差已经如实记录；为满足课程对小组理解和设计决策的要求，建议最迟在阶段 1 验收前由 A、C 补充确认。
-
-## 14. 提交顺序
-
-第一次提交：
-
-~~~powershell
-git status
-git diff -- docs/database/README.md
-git add docs/database/README.md
-git commit -m "docs(database): design core data model"
-git push -u origin feature/b-database
-~~~
-
-A、C 评审修改后第二次提交：
-
-~~~powershell
-git add docs/database/README.md
-git commit -m "docs(database): apply schema review feedback"
-git push
-~~~
-
-然后由 A 先提交失败测试，B 再提交 Flyway 实现，A 最后提交 Green 和回归日志。
-
-## 15. 当前进度
-
-- [x] MySQL 8、开发库、测试库和 delivery_app 已准备；
-- [x] Windows 环境变量已设置；
-- [x] IDEA 两个数据库连接已建立；
-- [x] 数据库 V1.0 初稿已完成；
-- [x] AI 辅助数据库设计技术自检；
-- [ ] B 本人确认能够解释数据库设计；
-- [ ] A、C 评审（按负责人指示暂时跳过）；
-- [ ] 三人确认（建议在阶段 1 验收前补充）；
-- [ ] A 提交失败测试；
-- [ ] B 配置 MyBatis/Flyway 并编写 V1 迁移；
-- [ ] 测试库和开发库迁移成功；
-- [ ] A 保存 Green 和回归记录。
+下一步：B 检查 A 的依赖进度，然后创建数据库配置文件和 `V1__create_core_tables.sql`。在 Flyway 可运行之前不要手工建表。
