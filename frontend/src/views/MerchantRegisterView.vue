@@ -1,18 +1,33 @@
 <script setup>
-import { reactive } from 'vue'
+import { getCurrentInstance, reactive } from 'vue'
 import { ElMessage } from 'element-plus'
 import AuthFormCard from '../components/common/AuthFormCard.vue'
+import { registerMerchant } from '../api/user'
 
 const form = reactive({
-  username: '',
+  account: '',
   password: '',
+  passwordConfirm: '',
+  name: '',
   phone: '',
-  storeName: '',
-  storeCategory: '',
 })
+const instance = getCurrentInstance()
 
-function submitRegister() {
-  ElMessage.success('商家注册占位：接口确认后接入真实请求')
+async function submitRegister() {
+  try {
+    await registerMerchant({
+      account: form.account,
+      password: form.password,
+      passwordConfirm: form.passwordConfirm,
+      name: form.name,
+      phone: form.phone,
+    })
+
+    ElMessage.success('注册成功')
+    instance?.proxy?.$router?.push('/login/merchant')
+  } catch (error) {
+    ElMessage.error(error?.message || '注册失败')
+  }
 }
 </script>
 
@@ -20,19 +35,19 @@ function submitRegister() {
   <AuthFormCard title="商家注册">
     <el-form :model="form" label-width="100px">
       <el-form-item label="商家账号">
-        <el-input v-model="form.username" placeholder="请输入商家账号" />
+        <el-input v-model="form.account" placeholder="请输入商家账号" />
       </el-form-item>
       <el-form-item label="密码">
         <el-input v-model="form.password" type="password" show-password placeholder="请输入密码" />
       </el-form-item>
+      <el-form-item label="确认密码">
+        <el-input v-model="form.passwordConfirm" type="password" show-password placeholder="请再次输入密码" />
+      </el-form-item>
+      <el-form-item label="商家名称">
+        <el-input v-model="form.name" placeholder="请输入商家名称" />
+      </el-form-item>
       <el-form-item label="手机号">
         <el-input v-model="form.phone" placeholder="请输入手机号" />
-      </el-form-item>
-      <el-form-item label="店铺名称">
-        <el-input v-model="form.storeName" placeholder="请输入店铺名称" />
-      </el-form-item>
-      <el-form-item label="店铺类别">
-        <el-input v-model="form.storeCategory" placeholder="例如：简餐、面食、饮品" />
       </el-form-item>
       <el-form-item>
         <el-button type="primary" @click="submitRegister">提交注册</el-button>
