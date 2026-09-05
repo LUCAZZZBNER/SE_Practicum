@@ -29,7 +29,7 @@
 - 用 IDEA 或 Workbench 手工建立正式表；
 - 在 A 的 Red 测试之前实现业务 Mapper 或 ServiceImpl。
 
-正式表必须等 A 合并 Flyway 依赖后，由应用启动自动创建。
+按照 2026-09-05 的新分工，B 接管 JDK 17、Maven Wrapper、MyBatis/Flyway 和测试 Profile；完成这些运行基础后，由 Flyway 自动创建正式表。
 
 ## 2. 数据库和命名约定
 
@@ -467,7 +467,7 @@ users
 
 ### 10.3 尚未完成
 
-- [ ] A 确认 MyBatis/Flyway 依赖；
+- [ ] B 补齐并验证 MyBatis/Flyway 依赖；
 - [ ] A 确认 Service 方法和 DTO 字段；
 - [ ] B 创建并人工检查 V1；
 - [ ] Flyway 在 `delivery_test` 创建表；
