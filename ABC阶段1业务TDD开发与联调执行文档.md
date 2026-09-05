@@ -294,6 +294,291 @@ git log -3 --oneline --decorate
 
 ## 7. B 的第一阶段：建立可开发的数据库和 ServiceImpl 基础
 
+### 7.0 B 现在从这里开始：无需等待任何人
+
+当前 A 已经交付 6 个 Controller、30 个 HTTP 映射、6 个业务 Service 接口、JWT/异常公共层、143 个绿色公共测试和 26 个 Service Red 测试。B 的输入已经齐全，不再等待 A 发需求单，也不等待 C 完成前端。
+
+B 只在以下情况暂停对应切片并找 A：
+
+1. API 路径/字段与现有 Controller 或 Service 签名无法同时满足；
+2. SRS 的业务规则与现有契约测试断言相反；
+3. 为了让测试通过必须删除断言、跳过测试或改变公开接口；
+4. 当前切片缺少关键成功、失败或边界 Red，无法判断正确行为。
+
+数据库字段不足、Mapper 不存在、ServiceImpl 不存在都属于 B 的正常工作，不是等待 A 的理由。
+
+#### 7.0.1 确认当前起点并创建 B 分支
+
+先关闭正在占用项目文件的程序，不要删除 `target` 以外的任何文件。打开新的 PowerShell：
+
+```powershell
+Set-Location 'D:\Projects\SchoolWorks\SW_2609\SE_Practicum'
+git status --short --branch
+git fetch origin --prune
+git switch develop
+git pull --ff-only origin develop
+git status --short
+git log -3 --oneline --decorate
+git branch --list feature/b-tdd
+```
+
+要求：
+
+- 第一次 `git status` 不得出现自己未提交的代码；
+- 本地 `develop` 必须与 `origin/develop` 一致；
+- 若最后一条没有输出，创建新分支：
+
+```powershell
+git switch -c feature/b-tdd
+```
+
+- 若最后一条已经显示 `feature/b-tdd`，不要重复创建，执行：
+
+```powershell
+git switch feature/b-tdd
+git merge --ff-only develop
+```
+
+最后确认：
+
+```powershell
+git branch --show-current
+git status --short
+```
+
+必须输出 `feature/b-tdd`，且工作区为空。后续所有 B 业务代码都在这个分支完成，禁止直接在 `develop` 编写。
+
+#### 7.0.2 设置当前终端并保存 Red 基线
+
+仍在同一 PowerShell 中执行：
+
+```powershell
+Set-Location 'D:\Projects\SchoolWorks\SW_2609\SE_Practicum\backend'
+$env:JAVA_HOME = 'D:\Dev\Java\JDK17'
+$env:Path = "$env:JAVA_HOME\bin;$env:Path"
+$env:DELIVERY_DB_USERNAME = 'delivery_app'
+$env:DELIVERY_DB_PASSWORD = Read-Host '输入本机 delivery_app 密码' -MaskInput
+$env:SPRING_PROFILES_ACTIVE = 'test'
+
+java -version
+.\mvnw.cmd -version
+.\mvnw.cmd clean test
+```
+
+判断：
+
+- Java 和 Maven 都必须显示 Java 17；
+- 应发现 169 个测试；
+- 143 个公共层/Controller 测试应通过；
+- 26 个 Service 契约测试应因没有 ServiceImpl Bean 而报错；
+- 如果出现 `Access denied`、`Unknown database`、连接拒绝、Flyway checksum、编译失败或公共测试失败，先处理环境问题，不能把它登记为预期 Red。
+
+在 `docs/test/test-log.md` 人工追加以下真实信息：日期、分支、HEAD 提交号、命令、169/143/26 结果、第一个根因。不要粘贴数据库密码，不要把失败写成通过。
+
+#### 7.0.3 用 IDEA 建立六个最小 ServiceImpl 外壳
+
+需要新建的文件和现有接口如下：
+
+| 新文件 | 实现接口 | 需要实现的方法数 |
+| --- | --- | ---: |
+| `user/service/impl/UserServiceImpl.java` | `UserService` | 5 |
+| `merchant/service/impl/MerchantServiceImpl.java` | `MerchantService` | 5 |
+| `restaurant/service/impl/RestaurantServiceImpl.java` | `RestaurantService` | 6 |
+| `item/service/impl/ItemServiceImpl.java` | `ItemService` | 10 |
+| `shopping/service/impl/ShoppingServiceImpl.java` | `ShoppingService` | 6 |
+| `order/service/impl/OrderServiceImpl.java` | `OrderService` | 6 |
+
+IDEA 中对每个模块执行：
+
+1. 在现有 `service` 目录上右键，选择 New → Package；
+2. 包名输入 `impl`；
+3. 在 `impl` 上右键，选择 New → Java Class；
+4. 类名输入对应的 `UserServiceImpl` 等名称；
+5. 在类声明后写 `implements UserService`；
+6. 按 `Alt+Enter`，选择 Implement methods，勾选全部接口方法；
+7. 类上添加 `@Service`，导入 `org.springframework.stereotype.Service`；
+8. 每个尚未开发的方法删除 IDE 生成的 `return null`、`return 0` 或 `return false`；
+9. 方法体统一改为：
+
+```java
+throw new UnsupportedOperationException("Pending TDD implementation");
+```
+
+10. 此时不注入 DAO、不写 SQL、不返回假业务对象，也不修改 Service 接口。
+
+六个外壳完成后编译：
+
+```powershell
+Set-Location 'D:\Projects\SchoolWorks\SW_2609\SE_Practicum\backend'
+.\mvnw.cmd clean test-compile
+.\mvnw.cmd clean test
+```
+
+验收：
+
+- 不再出现 `No qualifying bean of type ...Service`；
+- Spring 测试上下文能够创建；
+- 26 个业务测试仍可处于 Red，但根因应变成明确的 `Pending TDD implementation`；
+- 143 个公共测试必须继续通过。
+
+如果仍提示某个 Service Bean 不存在，检查实现类是否有 `@Service`、包是否位于 `com.delivery.backend` 下面、类是否实现了正确接口。
+
+#### 7.0.4 单独提交外壳，不夹带业务实现
+
+```powershell
+Set-Location 'D:\Projects\SchoolWorks\SW_2609\SE_Practicum'
+git status --short
+git diff --check
+git add -- backend/src/main/java/com/delivery/backend/user/service/impl
+git add -- backend/src/main/java/com/delivery/backend/merchant/service/impl
+git add -- backend/src/main/java/com/delivery/backend/restaurant/service/impl
+git add -- backend/src/main/java/com/delivery/backend/item/service/impl
+git add -- backend/src/main/java/com/delivery/backend/shopping/service/impl
+git add -- backend/src/main/java/com/delivery/backend/order/service/impl
+git diff --cached --check
+git diff --cached --stat
+git commit -m 'chore(service): add injectable tdd implementation shells'
+git status --short
+```
+
+`git status --short` 应为空。这个提交只解决可注入问题，不标记 `[GREEN]`，因为业务断言还没有通过。
+
+#### 7.0.5 在写业务前创建 V2
+
+先确认 V1 未被改动：
+
+```powershell
+git diff --exit-code origin/develop -- backend/src/main/resources/db/migration/V1__create_core_tables.sql
+```
+
+没有输出才继续。检查当前两库迁移历史和业务数据：
+
+```powershell
+mysql -u delivery_app -p delivery_test -e "SELECT version, script, success FROM flyway_schema_history ORDER BY installed_rank;"
+mysql -u delivery_app -p delivery_dev -e "SELECT version, script, success FROM flyway_schema_history ORDER BY installed_rank;"
+mysql -u delivery_app -p delivery_test -e "SELECT (SELECT COUNT(*) FROM users) users, (SELECT COUNT(*) FROM merchants) merchants, (SELECT COUNT(*) FROM shops) shops, (SELECT COUNT(*) FROM products) products, (SELECT COUNT(*) FROM cart_items) cart_items, (SELECT COUNT(*) FROM orders) orders;"
+```
+
+当前尚未正式开发，业务表原则上应为空。如果存在不能丢失的数据，不要删库、截表或强行增加非空列，先确认数据来源和回填策略。
+
+在 IDEA 中新建：
+
+```text
+backend/src/main/resources/db/migration/V2__align_schema_with_api_contract.sql
+```
+
+V2 具体清单见 7.4。SQL 完成后不要手工复制到 MySQL 执行，由 Flyway 运行。先使用 test Profile：
+
+```powershell
+Set-Location 'D:\Projects\SchoolWorks\SW_2609\SE_Practicum\backend'
+$env:SPRING_PROFILES_ACTIVE = 'test'
+.\mvnw.cmd "-DskipTests" spring-boot:run
+```
+
+看到 `Started BackendApplication` 后，按 `Ctrl+C` 正常停止，再检查：
+
+```powershell
+mysql -u delivery_app -p delivery_test -e "SELECT installed_rank, version, script, success FROM flyway_schema_history ORDER BY installed_rank;"
+```
+
+必须看到 V1、V2 各一条且 `success=1`。再运行一次相同启动命令，确认不会重复执行 V2。
+
+然后验证开发库：
+
+```powershell
+$env:SPRING_PROFILES_ACTIVE = 'dev'
+.\mvnw.cmd "-DskipTests" spring-boot:run
+```
+
+看到启动成功后按 `Ctrl+C`，检查：
+
+```powershell
+mysql -u delivery_app -p delivery_dev -e "SELECT installed_rank, version, script, success FROM flyway_schema_history ORDER BY installed_rank;"
+```
+
+如果 V2 失败，不要删除 `flyway_schema_history`、不要执行 `flyway repair`、不要直接改 V1；先保存完整错误并检查失败的 DDL。只有尚未发布且失败迁移没有成功记录时，才修正 V2 后重新验证。
+
+#### 7.0.6 第一个真实 Green：User 模块
+
+V2 成功后只开发 User，不同时开发 Merchant/Shop/Item。需要建立：
+
+```text
+backend/src/main/java/com/delivery/backend/user/entity/UserEntity.java
+backend/src/main/java/com/delivery/backend/user/dao/UserDao.java
+backend/src/main/resources/mapper/user/UserDao.xml
+backend/src/main/java/com/delivery/backend/user/service/impl/UserServiceImpl.java
+```
+
+如果 `pom.xml` 还没有 `spring-security-crypto`，先按 7.3 添加，使用 BCrypt 保存摘要。禁止自己实现明文、可逆加密或简单 MD5 密码方案。
+
+按以下四个现有 Red 逐个实现，不一次写完其他模块：
+
+1. 注册成功：
+
+```powershell
+.\mvnw.cmd "-Dtest=UserServiceContractTests#registrationReturnsAnActiveNonSensitiveUser" test
+```
+
+只实现插入用户、默认 `ACTIVE`、返回非敏感 UserView。
+
+2. 重复账号和确认密码：
+
+```powershell
+.\mvnw.cmd "-Dtest=UserServiceContractTests#duplicateAccountAndPasswordMismatchAreRejectedWithoutPartialRegistration" test
+```
+
+实现密码一致校验、账号唯一查询/约束异常映射，并保证失败不留下记录。
+
+3. 用户登录：
+
+```powershell
+.\mvnw.cmd "-Dtest=UserServiceContractTests#loginReturnsAUserBearerSessionAndRejectsBadCredentials" test
+```
+
+实现 BCrypt 匹配、禁用状态判断、调用 `JwtTokenService.issue(..., Role.USER)`，错误凭据返回 `BAD_CREDENTIALS`。
+
+4. 本人信息和有效性：
+
+```powershell
+.\mvnw.cmd "-Dtest=UserServiceContractTests#currentProfileUpdateAndActiveSnapshotAreScopedToTheUserId" test
+```
+
+实现按 ID 查询、局部更新、资源不存在和 `requireActive`。
+
+四个场景分别变绿后运行整个用户模块和公共回归：
+
+```powershell
+.\mvnw.cmd "-Dtest=UserServiceContractTests,UserControllerTests,DefaultJwtTokenServiceTests,AuthenticationInterceptorTests,GlobalExceptionHandlerTests" test
+```
+
+User 模块必须全部通过。其他未实现模块继续 Red 是当前阶段允许的。提交前：
+
+```powershell
+Set-Location 'D:\Projects\SchoolWorks\SW_2609\SE_Practicum'
+git status --short
+git diff --check
+git add -- backend/pom.xml
+git add -- backend/src/main/java/com/delivery/backend/user
+git add -- backend/src/main/resources/mapper/user
+git add -- backend/src/main/resources/db/migration/V2__align_schema_with_api_contract.sql
+git add -- docs/test/test-log.md
+git diff --cached --check
+git diff --cached --stat
+git commit -m 'feat(user): implement user persistence and service [GREEN]'
+```
+
+若 V2 已在前一个独立提交中提交，本次 `git add` 找不到新 V2 变更是正常的。不得提交 `backend/target`、数据库密码、IDEA 私有配置或真实令牌。
+
+#### 7.0.7 完成 User 后才进入下一模块
+
+User Green 后按本文件第 8 节继续：
+
+```text
+Merchant → Restaurant → Item → Shopping → Order
+```
+
+每个模块遵循相同闭环：确认已有 Red → 最少 Entity/DAO/XML/ServiceImpl → 目标测试 Green → 公共回归 → 独立提交。不要为了追求一次完整测试全绿而同时把六个模块一起写完。
+
 ### 7.1 建立 B 分支并保存正式 Red
 
 ```powershell
@@ -382,7 +667,12 @@ V2 至少完成以下对齐：
 ```powershell
 Set-Location 'D:\Projects\SchoolWorks\SW_2609\SE_Practicum\backend'
 $env:SPRING_PROFILES_ACTIVE = 'test'
-.\mvnw.cmd test-compile
+.\mvnw.cmd "-DskipTests" spring-boot:run
+```
+
+看到 `Started BackendApplication` 后按 `Ctrl+C` 停止，再查询迁移历史：
+
+```powershell
 mysql -u delivery_app -p delivery_test -e "SELECT installed_rank, version, script, success FROM flyway_schema_history ORDER BY installed_rank;"
 ```
 
