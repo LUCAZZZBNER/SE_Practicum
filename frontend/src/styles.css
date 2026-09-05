@@ -1,0 +1,54 @@
+:root {
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #1f2937;
+  background: #f5f7fa;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 320px; }
+.app-shell { min-height: 100vh; }
+.app-header { display: flex; align-items: center; justify-content: space-between; background: #ffffff; border-bottom: 1px solid #e5e7eb; }
+.brand, .header-user { display: flex; align-items: center; gap: 8px; }
+.brand { color: #2563eb; font-weight: 700; }
+.brand a { color: inherit; text-decoration: none; }
+.header-user { color: #6b7280; }
+.header-user a { color: inherit; text-decoration: none; }
+.app-aside { background: #ffffff; border-right: 1px solid #e5e7eb; }
+.app-aside .el-menu { border-right: 0; }
+.app-main { max-width: 1200px; width: 100%; margin: 0 auto; }
+.page-heading { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 24px; }
+.page-heading h1 { margin: 0; font-size: 24px; }
+.page-heading span { color: #909399; font-size: 13px; }
+.search-box { max-width: 560px; margin-bottom: 20px; }
+.store-list { display: grid; gap: 16px; }
+.store-item { border-radius: 8px; }
+.store-info { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 18px; }
+.store-info h2 { margin: 0 0 8px; font-size: 18px; }
+.store-info p { margin: 0; color: #6b7280; }
+.content-stack { display: grid; gap: 20px; }
+.form-page { max-width: 640px; }
+.narrow-form { max-width: 640px; }
+.action-bar { display: flex; align-items: center; justify-content: flex-end; gap: 12px; }
+.auth-page { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 32px 20px; background: #eef2f7; }
+.auth-panel { width: min(960px, 100%); }
+.auth-intro { margin-bottom: 24px; }
+.auth-intro h1 { margin: 0 0 10px; font-size: 30px; }
+.auth-intro p { margin: 0; color: #606266; line-height: 1.7; }
+.auth-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+.auth-card { border-radius: 8px; }
+.auth-card h2, .auth-form-card h1 { margin: 0 0 12px; font-size: 22px; }
+.auth-card p { min-height: 48px; margin: 0 0 20px; color: #606266; line-height: 1.6; }
+.auth-actions { display: flex; gap: 12px; flex-wrap: wrap; }
+.auth-form-card { width: min(560px, 100%); border-radius: 8px; }
+
+@media (max-width: 640px) {
+  .app-aside { width: 64px !important; }
+  .app-aside .el-menu-item span { display: none; }
+  .app-main { padding: 18px; }
+  .brand span { display: none; }
+  .page-heading { display: block; }
+  .page-heading h1 { margin-bottom: 6px; }
+  .action-bar { align-items: stretch; flex-direction: column; }
+  .auth-grid { grid-template-columns: 1fr; }
+  .auth-intro h1 { font-size: 24px; }
+}
