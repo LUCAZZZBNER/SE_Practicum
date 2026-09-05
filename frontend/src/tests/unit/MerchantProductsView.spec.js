@@ -89,7 +89,7 @@ describe('MerchantProductsView', () => {
     const wrapper = mountView()
     await flushPromises()
 
-    await wrapper.findAll('button')[2].trigger('click')
+    await wrapper.findAll('button')[3].trigger('click')
 
     expect(mocks.updateProduct).toHaveBeenCalledWith(1, {
       status: 'OFF_SALE',
