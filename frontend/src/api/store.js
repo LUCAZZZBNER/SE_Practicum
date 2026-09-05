@@ -1,11 +1,11 @@
 import http from './http'
 
 export function listStores(params) {
-  return http.get('/stores', { params })
+  return http.get('/shops', { params })
 }
 
 export function getStoreDetail(storeId) {
-  return http.get(`/stores/${storeId}`)
+  return http.get(`/shops/${storeId}`)
 }
 
 export function updateStoreStatus(storeId, data) {

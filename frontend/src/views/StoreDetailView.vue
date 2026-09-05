@@ -1,17 +1,41 @@
 <script setup>
+import { onMounted, reactive } from 'vue'
+import { useRoute } from 'vue-router'
+import { ElMessage } from 'element-plus'
+import { getStoreDetail } from '../api/store'
+
+const route = useRoute()
+const store = reactive({
+  name: '',
+  description: '',
+  status: '',
+})
 const categories = ['热销', '主食', '饮品']
 const products = [
   { id: 1, name: '招牌牛肉饭', category: '主食', price: 18.8, stock: 20, status: '在售' },
   { id: 2, name: '冰柠檬茶', category: '饮品', price: 6.0, stock: 35, status: '在售' },
   { id: 3, name: '鸡腿套餐', category: '热销', price: 24.8, stock: 0, status: '售罄' },
 ]
+
+async function loadStoreDetail() {
+  try {
+    const data = await getStoreDetail(Number(route.params.id))
+    store.name = data.name || ''
+    store.description = data.description || ''
+    store.status = data.status || ''
+  } catch (error) {
+    ElMessage.error(error?.message || '店铺详情加载失败')
+  }
+}
+
+onMounted(loadStoreDetail)
 </script>
 
 <template>
   <section class="content-stack">
-    <el-descriptions title="示例快餐店" border>
-      <el-descriptions-item label="店铺状态">营业中</el-descriptions-item>
-      <el-descriptions-item label="配送时间">约 30 分钟</el-descriptions-item>
+    <el-descriptions :title="store.name" border>
+      <el-descriptions-item label="店铺状态">{{ store.status }}</el-descriptions-item>
+      <el-descriptions-item label="店铺简介">{{ store.description }}</el-descriptions-item>
       <el-descriptions-item label="分类数量">3</el-descriptions-item>
     </el-descriptions>
 
