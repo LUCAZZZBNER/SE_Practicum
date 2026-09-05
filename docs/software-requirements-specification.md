@@ -625,7 +625,7 @@ GET /api/v1/products/{productId}
 
 用户可以调整自己购物车项的数量。
 
-**接口**：`PATCH /api/v1/cart-items/{cartItemId}`。
+**接口**：`PATCH /api/v1/cart-items/{itemId}`。
 
 **规则**：数量必须为正整数且不能超过当前库存；购物车项不存在或不属于当前用户时不能修改；若商品已下架或店铺不可营业，系统应提示用户而不是默默提交。
 
@@ -633,7 +633,7 @@ GET /api/v1/products/{productId}
 
 用户可以删除自己的购物车项。
 
-**接口**：`DELETE /api/v1/cart-items/{cartItemId}`。
+**接口**：`DELETE /api/v1/cart-items/{itemId}`。
 
 **规则**：删除购物车项不影响商品库存和历史订单；重复删除已不存在项目时返回明确结果，不得删除其他用户项目。
 
@@ -1023,18 +1023,14 @@ GET /api/v1/products/{productId}
 | GET    | `/api/v1/shops`                   | UC-SHOP-003        | 店铺列表       |
 | GET    | `/api/v1/shops/{shopId}`          | UC-SHOP-004        | 店铺详情       |
 | PATCH  | `/api/v1/shops/{shopId}`          | UC-SHOP-002        | 修改店铺状态   |
-| POST   | `/api/v1/shops/{shopId}/categories` | UC-PRODUCT-001   | 新增商品分类   |
-| GET    | `/api/v1/shops/{shopId}/categories` | UC-PRODUCT-001   | 查询商品分类   |
-| PATCH  | `/api/v1/categories/{categoryId}` | UC-PRODUCT-001     | 修改商品分类   |
-| DELETE | `/api/v1/categories/{categoryId}` | UC-PRODUCT-001     | 逻辑删除分类   |
 | GET    | `/api/v1/shops/{shopId}/products` | UC-PRODUCT-005     | 店铺商品列表   |
 | GET    | `/api/v1/products/{productId}`    | UC-PRODUCT-005     | 商品详情       |
 | POST   | `/api/v1/products`                | UC-PRODUCT-002     | 新增商品       |
 | PATCH  | `/api/v1/products/{productId}`    | UC-PRODUCT-003/004 | 修改商品       |
 | POST   | `/api/v1/cart-items`              | UC-CART-001        | 加入购物车     |
 | GET    | `/api/v1/cart-items`              | UC-CART-002        | 查询购物车     |
-| PATCH  | `/api/v1/cart-items/{cartItemId}` | UC-CART-003        | 修改数量       |
-| DELETE | `/api/v1/cart-items/{cartItemId}` | UC-CART-004        | 删除购物车项   |
+| PATCH  | `/api/v1/cart-items/{itemId}`     | UC-CART-003        | 修改数量       |
+| DELETE | `/api/v1/cart-items/{itemId}`     | UC-CART-004        | 删除购物车项   |
 | POST   | `/api/v1/orders`                  | UC-ORDER-001       | 创建订单       |
 | GET    | `/api/v1/orders`                  | UC-ORDER-002       | 订单列表       |
 | GET    | `/api/v1/orders/{orderId}`        | UC-ORDER-003       | 订单详情       |
