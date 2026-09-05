@@ -158,7 +158,7 @@
 
 | 项目     | 当前结果                                                         | 准备阶段处理                                              |
 | -------- | ---------------------------------------------------------------- | --------------------------------------------------------- |
-| Git      | 已完成 A+B 集成，当前位于 `feature/abc-pre-tdd-integration`   | 提交本文档后把共同 Red 基线发布到 `develop`               |
+| Git      | A+B 共同 Red 基线已发布到远程 `develop`，合并提交 `8723448`   | 三人拉取 `develop` 后分别创建个人 TDD 分支                 |
 | Java     | 已安装 `D:\Dev\Java\JDK17`，已用 17 完成编译和测试           | 本机不重复安装；其他成员各自确认 JDK 17                   |
 | Maven    | Wrapper 已固定自动下载 Maven 3.9.16                            | 三人统一使用 `backend/mvnw.cmd`，不要求全局安装 Maven     |
 | Node     | 能找到 Node 24.19.0                                              | C 改用带 npm 的 Node LTS 环境，版本统一即可               |
@@ -2219,7 +2219,7 @@ B 的最终准备验收：
 - [ ] 后端 143 个公共层/Controller 测试通过，完整测试仅保留 26 个约定的 Service Red；
 - [ ] 准备日志已提交；
 - [ ] 没有提前提交业务 Mapper 或 ServiceImpl；
-- [ ] PR 已合并，`develop` 工作区干净。
+- [ ] 共同 Red 基线已发布到远程 `develop`，本地工作区干净。
 
 #### 8.3.20A：共同 Red 基线发布操作手册
 
@@ -2338,18 +2338,23 @@ mysql -u delivery_app -p delivery_dev -e "SELECT version, script, success FROM f
 
 ##### 19A.6 推送集成分支并正式合入 develop
 
+2026-09-05 已执行完成：共同 Red 基线已直接推送到远程 `develop`，合并提交为 `8723448`。远程 `origin/develop` 已包含 A 的接口契约、B 的数据库基础、143 个绿色基础测试、26 个预期 Service Red 以及本执行文档。没有额外推送远程集成分支，因为最终共享入口已经统一为 `develop`。
+
+以下命令保留为本次发布记录；当前电脑不要重复执行这次合并：
+
 ```powershell
 Set-Location 'D:\Projects\SchoolWorks\SW_2609\SE_Practicum'
 git status --short
 git fetch origin --prune
-git merge --no-ff origin/develop -m 'merge: sync develop before publishing shared red baseline'
-git status --short
-git push -u origin feature/abc-pre-tdd-integration
+git switch develop
+git pull --ff-only origin develop
+git merge --no-ff feature/abc-pre-tdd-integration -m 'merge: publish shared pre-tdd red baseline'
+git push origin develop
 ```
 
-如果合并最新 `origin/develop` 后产生了新提交，必须重新执行 19A.5 的编译、143 个基础测试和完整测试。结果仍须为 `143 Passed + 26 Errors`，且 26 个 Error 只能由缺少 ServiceImpl 引起。
+如果将来重新发布新的共同基线，合并最新 `origin/develop` 后必须重新执行 19A.5 的编译、143 个基础测试和完整测试。结果仍须为 `143 Passed + 26 Errors`，且 26 个 Error 只能由缺少 ServiceImpl 引起。
 
-团队已明确接受 Red 基线，因此接着发布到 `develop`：
+团队已明确接受 Red 基线。若在另一份克隆中重做同样的发布流程，可执行：
 
 ```powershell
 git switch develop
