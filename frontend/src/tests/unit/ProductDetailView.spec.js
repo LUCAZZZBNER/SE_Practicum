@@ -104,7 +104,7 @@ describe('ProductDetailView', () => {
     await flushPromises()
 
     const buttons = wrapper.findAll('button')
-    expect(buttons[1].element.disabled).toBe(true)
+    expect(buttons[0].element.disabled).toBe(true)
     expect(mocks.addCartItem).not.toHaveBeenCalled()
   })
 
