@@ -1,229 +1,187 @@
 # 轻量级外卖服务平台后端架构设计
 
-## 1. 架构目标
+## 1. 架构目标与范围
 
-后端采用 Java 17、Spring Boot 和 Spring Modulith，以单进程、单数据库部署。`user`、`merchant`、`restaurant`、`item`、`shopping`、`order` 是手册规定的六个核心业务领域，而不是模块数量上限；实现可按职责继续拆分或增加模块。设计目标是：模块边界可自动验证；HTTP、业务和持久化职责清晰；核心下单流程具备事务一致性；后续规则变化可以局部扩展，而不需要大面积改动。
+后端是 Java 17、Spring Boot 单体应用，采用简单 MVC 分层和单数据库部署。六个业务模块 `user`、`merchant`、`restaurant`、`item`、`shopping`、`order` 保持独立目录、数据所有权和用例边界；这六个模块是阶段 1 的固定基线。支付、优惠、通知等后续能力在具有独立职责和数据所有权时可以增加模块。
 
-业务边界见[功能分析](../feature-analysis.md)，外部 HTTP 契约见[后端 API 设计](../api/backend-api-design.md)。
+本设计与[后端 API 设计](../api/backend-api-design.md)配套：API 文档定义 `/api/v1` 路径、资源名称、权限、字段、状态码和错误码，本文件定义代码组织和调用规则；两者冲突时以 API 契约为准。本文只描述目标架构，不表示功能已经实现。
 
-`BackendApplication` 是唯一启动入口。六个核心领域及后续新增的独立业务模块使用 `@ApplicationModule` 声明边界。框架配置、统一响应、异常处理、认证上下文等技术代码放入 `com.delivery.backend.config`、`security`、`web` 等包，并配置 `spring.modulith.detection-strategy=explicitly-annotated`，避免纯技术包被误识别为业务模块。
+不使用 Spring Modulith。项目不声明 `@ApplicationModule`、`@NamedInterface` 或 `ApplicationModules.verify()`，也不依赖 Modulith 的模块检测和事件边界。模块隔离通过包结构、依赖约定、代码评审和测试实现。
 
-## 2. 模块关系
+### 1.1 技术栈
 
-依赖只能沿箭头方向发生，禁止反向引用或循环依赖：
-
-```text
-merchant   ──→ user
-restaurant ──→ merchant
-item       ──→ merchant, restaurant
-shopping   ──→ user, restaurant, item
-order      ──→ user, restaurant, item, shopping
-```
-
-其中 `A ──→ B` 表示 A 可以调用 B 的公开接口。
-
-六个核心领域的基线依赖如下：
-
-| 调用方 | 允许依赖 |
+| 层次 | 选型与约束 |
 | --- | --- |
-| `user` | 无业务模块 |
-| `merchant` | `user::api` |
-| `restaurant` | `merchant::api` |
-| `item` | `merchant::api`, `restaurant::api` |
-| `shopping` | `user::api`, `restaurant::api`, `item::api` |
-| `order` | `user::api`, `restaurant::api`, `item::api`, `shopping::api` |
+| 语言与运行时 | Java 17 |
+| 应用框架 | Spring Boot 4.1.1、Spring MVC（`spring-boot-starter-webmvc`） |
+| 构建工具 | Maven，使用仓库提供的 `./mvnw` |
+| 持久化与数据库连接 | MyBatis 负责 Entity/数据库记录映射和 SQL 执行，MySQL Connector/J 提供数据库连接；每个模块只使用自己的 Mapper/DAO |
+| JSON 与校验 | Spring MVC 的 JSON 转换和 Bean Validation；请求校验在 Controller 层完成 |
+| 测试 | JUnit 5、Spring Boot Test、MockMvc；数据库集成测试使用项目配置的数据源 |
+| 开发辅助 | Lombok（仅用于减少样板代码，不承载业务规则） |
+| 认证 | HS256 JWT Bearer 访问令牌；令牌解析和当前主体由 `security` 基础设施提供，用户与商家角色独立 |
 
-每个模块通过 `package-info.java` 的 `allowedDependencies` 固化该表，并由 `ApplicationModules.of(BackendApplication.class).verify()` 在测试中验证。
+Spring Modulith 不属于目标技术栈；即使构建文件或本地环境暂时保留相关旧依赖，也不得在新代码或架构判断中使用它。
 
-新增模块必须拥有单一、可说明的业务职责及明确的数据或流程所有权，并提供命名公开接口。调用方将该接口加入 `allowedDependencies`；新依赖不得形成环。支付、优惠、通知等后续能力可以成为独立模块，无需塞入六个核心领域之一。
+## 2. 总体结构
 
-## 3. 模块内部结构
-
-所有业务模块使用相同结构，而不是建立全局 `controller/service/mapper` 目录：
+请求经过统一的 Web 和安全基础设施后进入对应业务模块：
 
 ```text
-com.delivery.backend.<module>/
-├── package-info.java             # @ApplicationModule、允许依赖
-├── api/
-│   ├── package-info.java         # @NamedInterface("api")
-│   ├── <Module>Facade.java       # 模块唯一用例入口
-│   ├── command/                  # 不可变 Command
-│   ├── query/                    # 查询条件
-│   ├── view/                     # 跨边界只读 DTO
-│   └── event/                    # 可选领域事件
-├── web/                          # Controller、Request、Response
-├── application/                  # Facade 实现、事务和用例编排
-├── domain/                       # Entity、值对象、规则、仓储端口
-└── infrastructure/persistence/   # MyBatis Mapper、PO、仓储实现
+HTTP /api/v1
+    ↓
+Controller（请求校验、认证、响应包装）
+    ↓
+Service 接口 → ServiceImpl（业务规则、事务、跨模块编排）
+    ↓
+DAO 接口 → DAO 实现（SQL、分页、锁和持久化）
+    ↓
+Database
 ```
 
-调用方向固定为 `Controller → Facade/Application Service → Domain/Repository Port → Persistence Adapter`。Controller 只处理协议转换、Bean Validation 和当前身份；业务判断位于领域对象或应用服务；Mapper 只执行数据访问。模块外不得引用 `web`、`application`、`domain` 或 `infrastructure` 包。
+推荐的包布局如下；每个模块都必须有自己的 Controller、Service（接口和实现）以及 DAO，不建立全局的 `controller`、`service` 或 `dao` 大目录：
 
-`api` 包使用 Spring Modulith 命名接口。例如：
-
-```java
-@org.springframework.modulith.NamedInterface("api")
-package com.delivery.backend.user.api;
+```text
+com.delivery.backend/
+├── common/                         # ApiResponse、Page、异常、结果映射
+├── security/                       # token 解析、CurrentPrincipal、权限拦截器
+├── config/                         # 数据源、事务、JSON 和 Bean Validation 配置
+├── user/
+│   ├── controller/                 # UserController
+│   ├── service/                    # UserService + UserServiceImpl
+│   ├── dao/                        # UserDao + 实现
+│   ├── entity/                     # UserEntity
+│   └── dto/                        # Request/Response/内部传输对象
+├── merchant/                       # 同样的 controller/service/dao/entity/dto
+├── restaurant/
+├── item/
+├── shopping/
+└── order/
 ```
 
-现有模块根包中的 `*Module`、`*Summary` 和状态枚举应在实现相应用例时迁移为 `api` 下的 facade 或只读契约；不应继续扩大根包暴露面。
+Controller 只负责 HTTP 方法、路径参数、Bean Validation、当前主体和 `ApiResponse<T>`；不得写库存、状态迁移或归属判断。Service 接口是模块的业务入口，`ServiceImpl` 实现规则、事务和对其他模块 Service 接口的调用。DAO/Mapper 只负责 MyBatis 持久化，不调用其他模块，也不返回 HTTP 对象。Entity 只在所属模块内部使用；跨模块传递不可变 DTO 或标量 ID，禁止共享 Entity、DAO 或数据库 Mapper。
 
-## 4. 六个核心业务领域设计
+统一异常处理（例如 `@RestControllerAdvice`）将参数、认证、权限、资源不存在、冲突和未预期异常映射为 API 文档规定的 `code`、`msg`、`data` 和 HTTP 状态；不得返回堆栈、密码、令牌或数据库细节。
 
-### 4.1 User
+`security` 基础设施使用 HS256 验证 JWT 签名及 `exp`，读取 `sub` 和 `role` 后生成不可变 `CurrentPrincipal`。拦截器只处理 `/api/v1/**`：公开接口可跳过认证，可选认证接口在令牌存在时验证令牌，其余接口要求 Bearer 令牌并检查 `USER` 或 `MERCHANT` 角色。验证后的主体通过请求属性 `currentPrincipal` 交给 Controller；Controller 只把其中的可信 ID 传给 Service，不接受请求体中的主体 ID 代替认证。签名密钥由 `JWT_SECRET` 配置，默认有效期为 7200 秒并可由 `JWT_EXPIRATION_SECONDS` 调整；部署环境必须覆盖开发占位密钥。
 
-**数据所有权**：`users`；密码摘要和账号状态仅由本模块修改。
+## 3. 模块依赖与协作规则
 
-**公开 facade**：
+模块间允许调用对方公开的 Service 接口和 DTO，禁止直接引用对方的 Controller、ServiceImpl、DAO、Entity 或包内实现。依赖方向按业务需要保持无环：
 
-```java
-public interface UserFacade {
-    UserView register(RegisterUserCommand command);
-    AuthSession login(LoginCommand command);
-    UserView getCurrent(long userId);
-    UserView updateCurrent(long userId, UpdateUserCommand command);
-    UserSnapshot requireActive(long userId);
-}
+```text
+merchant   （独立账号，无业务模块依赖）
+restaurant → merchant
+item       → merchant, restaurant
+shopping   → user, restaurant, item
+order      → user, restaurant, item, shopping
 ```
 
-前四个方法服务用户 HTTP 用例；其他模块只调用 `requireActive`，且只能得到 `id`、`account`、`status` 等非敏感快照。
+商家注册和登录使用自己的账号表与 `MerchantService`，不要求先创建普通用户；因此商家和用户的认证会话、角色和密码摘要相互独立。通用认证解析属于 `security` 基础设施，不构成商家对用户业务模块的依赖。
 
-**内部接口**：`UserRepository` 提供按 ID/账号查询、账号存在性检查和保存；`PasswordHasher` 负责摘要与校验；`TokenIssuer` 负责令牌签发。`UserRegistrationService`、`AuthenticationService` 和 `ProfileService` 分别编排注册、登录和资料维护。
+新增模块必须说明单一业务职责、拥有的表和公开 Service 接口；调用方只依赖该接口，并在文档中补充依赖方向。不得为了复用 DAO 或 Entity 而增加反向依赖或循环依赖。
 
-### 4.2 Merchant
+## 4. 六个核心模块
 
-**数据所有权**：`merchants`；一个 `userId` 最多关联一个商家。
+### 4.1 `user` 用户模块
 
-```java
-public interface MerchantFacade {
-    MerchantView register(long userId, RegisterMerchantCommand command);
-    MerchantView getCurrent(long userId);
-    MerchantSnapshot requireActiveMerchant(long userId);
-}
-```
+数据所有权：`users`，包括账号、昵称、联系方式、密码摘要、状态和时间字段。
 
-注册先调用 `UserFacade.requireActive`。`requireActiveMerchant` 是店铺、商品管理的跨模块入口，返回 `merchantId`、`userId` 和状态，不暴露商家实体。
+Controller 对应：`POST /users`、`POST /users/login`、`GET /users/me`、`PATCH /users/me`。`UserService`/`UserServiceImpl` 负责注册、登录、当前资料查询和局部更新，并签发 `USER` 会话。对外只返回 API 定义的 `User` 和 `AuthSession`，绝不返回密码摘要。
 
-**内部接口**：`MerchantRepository` 提供按 ID/用户 ID 查询、重复检查和保存；`MerchantRegistrationService` 负责创建档案；`MerchantAccessPolicy` 统一判断 `ACTIVE`/`SUSPENDED` 权限。
+可供其他模块调用的只读方法应返回 `UserSnapshot`（ID、状态等必要字段），用于校验用户存在且为 `ACTIVE`。`UserDao` 负责账号唯一查询、按 ID 查询和保存；密码哈希、令牌签发等可由本模块 Service 调用安全基础设施完成。
 
-### 4.3 Restaurant
+### 4.2 `merchant` 商家模块
 
-**数据所有权**：`shops`。Java 使用 Restaurant 命名，HTTP 和数据库使用 Shop 语义，避免与商家 Merchant 混淆。
+数据所有权：`merchants`，账号与普通用户独立，`account` 全局唯一，状态为 `ACTIVE` 或 `SUSPENDED`。
 
-```java
-public interface RestaurantFacade {
-    ShopView create(long userId, CreateShopCommand command);
-    ShopView update(long userId, long shopId, UpdateShopCommand command);
-    PageView<ShopView> list(ShopQuery query);
-    ShopView get(long shopId);
-    ShopSnapshot requireOwned(long userId, long shopId);
-    ShopSnapshot requireOrderable(long shopId);
-}
-```
+Controller 对应：`POST /merchants`、`POST /merchants/login`、`GET /merchants/me`、`PATCH /merchants/me`。`MerchantService`/`MerchantServiceImpl` 负责独立注册、登录、资料查询和更新；注册成功返回 `201`，登录会话带 `MERCHANT` 角色。暂停商家不能管理店铺、分类或商品，但历史数据可读。
 
-`create`、`update` 和 `requireOwned` 调用 `MerchantFacade.requireActiveMerchant`；`requireOrderable` 供购物车和订单模块校验 `OPEN` 状态。
+公开的 `requireActiveMerchant(merchantId)` 或同等方法只返回商家快照，供店铺和商品模块进行经营权限校验。`MerchantDao` 只处理账号/ID 查询、唯一性检查和保存。
 
-**内部接口**：`ShopRepository` 提供分页、名称冲突检查、查询和保存；`ShopOwnershipPolicy` 校验归属；`ShopStatusPolicy` 管理合法状态与可下单规则；`ShopCommandService`、`ShopQueryService` 分离写用例和只读查询。
+### 4.3 `restaurant` 店铺模块
 
-### 4.4 Item
+数据所有权：`shops`，每条记录保存所属 `merchantId`、名称、简介、状态和时间字段；状态为 `OPEN`、`CLOSED` 或 `TEMPORARILY_CLOSED`。
 
-**数据所有权**：`categories`、`products` 和产品库存；历史成交价格不属于本模块。
+Controller 对应：`POST /shops`、`GET /shops`、`GET /shops/{shopId}`、`PATCH /shops/{shopId}`。`RestaurantService`/`RestaurantServiceImpl` 校验商家状态和店铺归属，处理公开列表、`mine=true` 列表、详情和状态更新。列表分页从 1 开始，默认 `createdAt desc`，排序字段仅 `name`、`createdAt`。
 
-```java
-public interface ItemFacade {
-    CategoryView createCategory(long userId, long shopId, CreateCategoryCommand command);
-    CategoryView updateCategory(long userId, long categoryId, UpdateCategoryCommand command);
-    void deleteCategory(long userId, long categoryId);
-    List<CategoryView> listCategories(long shopId);
-    ProductView createProduct(long userId, CreateProductCommand command);
-    ProductView updateProduct(long userId, long productId, UpdateProductCommand command);
-    PageView<ProductView> listProducts(ProductQuery query, Viewer viewer);
-    ProductView getProduct(long productId, Viewer viewer);
-    ProductSnapshot requirePurchasable(long productId, int quantity);
-    List<ProductSnapshot> reserveForOrder(List<PurchaseRequest> requests);
-    void restoreStock(List<StockAdjustment> adjustments);
-}
-```
+对 `shopping` 和 `order` 提供 `requireOrderable(shopId)`，只有 `OPEN` 店铺可加入购物车或结算；店铺关闭不删除商品和历史订单。`RestaurantDao` 负责分页过滤、归属查询、名称冲突检查和保存。
 
-管理操作通过 Merchant 和 Restaurant facade 校验经营身份及店铺归属。`reserveForOrder` 按 product ID 固定顺序锁定行、校验版本/上架状态/库存、原子扣减并返回名称和成交价格快照；任一商品失败则抛出异常并由外层事务回滚。
+### 4.4 `item` 分类与商品模块
 
-**内部接口**：`CategoryRepository`、`ProductRepository`、`StockRepository`；`ProductAccessPolicy`、`PurchasabilityPolicy`、`PricingPolicy`；分类、商品命令服务和商品查询服务。持久化更新库存必须使用行锁或带版本条件的原子 SQL，绝不执行“先读后无条件写”。
+数据所有权：`categories`、`products` 及库存、商品版本。订单明细中的名称、单价和数量快照由 `order` 模块拥有。
 
-### 4.5 Shopping
+Controller 对应分类和商品的全部 API：
 
-**数据所有权**：`cart_items`；同一用户和商品建立唯一约束。
+- `POST/GET /shops/{shopId}/categories`、`PATCH/DELETE /categories/{categoryId}`；
+- `POST /products`、`GET /shops/{shopId}/products`、`GET /products/{productId}`、`PATCH /products/{productId}`。
 
-```java
-public interface ShoppingFacade {
-    CartItemView add(long userId, AddCartItemCommand command);
-    CartView getCart(long userId);
-    CartItemView changeQuantity(long userId, long cartItemId, int quantity);
-    void remove(long userId, long cartItemId);
-    CheckoutCart loadForCheckout(long userId, List<Long> cartItemIds);
-    void removeAfterCheckout(long userId, List<Long> cartItemIds);
-}
-```
+`ItemService`/`ItemServiceImpl` 负责分类和商品 CRUD、逻辑删除、上下架、价格/库存校验以及版本冲突。商家写操作必须同时校验 `MerchantService` 的 `ACTIVE` 状态和 `RestaurantService` 的店铺归属。公众商品查询只返回 `ON_SALE`，店主通过 `includeOffSale=true` 才能查看下架商品。
 
-所有操作先调用 `UserFacade.requireActive`。新增和修改数量通过 Restaurant、Item facade 校验店铺和商品；读取购物车时组合最新商品摘要并标记不可用项。跨模块 `CheckoutCart` 只包含 `cartItemId`、`productId`、`shopId`、`quantity`，不把购物车展示价格当作成交价。
+下单所需的库存操作也属于本模块 Service：按稳定的 product ID 顺序锁定或使用带版本条件的原子更新，重新校验上架状态、价格版本和库存，成功后返回成交快照；取消订单时只恢复一次。`ItemDao` 是唯一可修改产品库存的 DAO。
 
-**内部接口**：`CartItemRepository` 提供本人范围查询、合并数量、批量查询和删除；`CartOwnershipPolicy` 校验归属；`CartCommandService`、`CartQueryService`、`CheckoutCartService` 承担各用例。
+### 4.5 `shopping` 购物车模块
 
-### 4.6 Order
+数据所有权：`cart_items`，以 `(userId, productId)` 唯一约束防止重复项。
 
-**数据所有权**：`orders`、`order_lines`、`order_idempotency`。订单明细保存商品名称、单价、数量快照。
+Controller 对应：`POST /cart-items`、`GET /cart-items`、`PATCH /cart-items/{cartItemId}`、`DELETE /cart-items/{cartItemId}`。`ShoppingService`/`ShoppingServiceImpl` 只允许用户操作本人项；加入同一商品合并数量，数量必须为正且不超过最新库存。读取购物车时调用店铺和商品 Service 组合最新 `CartProduct`，计算仅供展示的 `total` 并标注失效原因。
 
-```java
-public interface OrderFacade {
-    OrderView create(long userId, String idempotencyKey, CreateOrderCommand command);
-    PageView<OrderSummaryView> listMine(long userId, OrderQuery query);
-    OrderView getMine(long userId, long orderId);
-    OrderView cancel(long userId, long orderId);
-}
-```
+为订单提供 `loadForCheckout(userId, cartItemIds)` 和 `removeAfterCheckout(...)` 等内部 Service 方法。结算快照只含购物车项 ID、商品 ID、店铺 ID、数量和客户端确认的商品版本，不含可被信任的金额；购物车清理仅删除已成功提交的项。`ShoppingDao` 负责本人范围查询、合并数量、批量读取和删除。
 
-Order 是结算流程的编排者，不允许其他模块直接创建订单记录。`OrderRepository` 提供订单和明细保存、本人查询以及带锁状态读取；`IdempotencyRepository` 保存用户、幂等键、请求摘要和订单 ID；`OrderNumberGenerator` 生成全局唯一业务编号；`OrderStatePolicy` 管理合法迁移；`OrderPricingService` 只根据 Item 返回的快照计算总额。
+### 4.6 `order` 订单模块
 
-## 5. 关键跨模块流程
+数据所有权：`orders`、`order_lines`、`order_idempotency`。`order_lines` 保存下单时的商品名称、单价、数量等不可变快照。
+
+Controller 对应用户订单和商家订单 API：
+
+- `POST /orders`、`GET /orders`、`GET /orders/{orderId}`、`POST /orders/{orderId}/cancel`（用户）；
+- `GET /merchant/orders`、`GET /merchant/orders/{orderId}`（商家，只读本人店铺）。
+
+`OrderService`/`OrderServiceImpl` 是结算编排者，负责幂等键、用户/商家归属、订单状态迁移、金额计算和快照保存。用户列表默认 `createdAt desc`，允许按 `status` 和白名单 `createdAt`、`total` 过滤排序；商家列表支持 `shopId`、`status` 及 API 规定的分页排序参数。
+
+## 5. 关键业务流程
 
 ### 5.1 创建订单
 
-`OrderApplicationService.create` 是事务边界，按以下顺序同步调用：
+`OrderServiceImpl.create` 开启一个数据库事务并按顺序执行：
 
 ```text
-校验并占用幂等键
-  → UserFacade.requireActive
-  → ShoppingFacade.loadForCheckout
-  → 校验选中项来自同一店铺
-  → RestaurantFacade.requireOrderable
-  → ItemFacade.reserveForOrder（锁定、校验版本并扣库存）
-  → 保存 Order 与 OrderLine 快照
-  → ShoppingFacade.removeAfterCheckout
-  → 提交事务并记录幂等结果
+校验并占用用户幂等键
+  → UserService.requireActive
+  → ShoppingService.loadForCheckout
+  → 校验选中项属于同一店铺
+  → RestaurantService.requireOrderable
+  → ItemService.reserveForOrder（锁定、版本校验、扣库存）
+  → OrderDao 保存订单和明细快照
+  → ShoppingService.removeAfterCheckout
+  → 保存幂等结果并提交
 ```
 
-六个模块共用同一数据源和 Spring 事务管理器，因此任何异常都会回滚订单、明细、库存、购物车和幂等记录。模块事件不能替代该同步一致性链路。
+请求必须携带 `X-Idempotency-Key`；客户端金额、数量不作为成交依据。价格/版本变化、库存不足、混合店铺或闭店时抛出 API 规定的冲突错误，事务回滚，库存和购物车保持不变。相同用户和幂等键重试返回首次结果，不生成第二张订单；同键不同请求返回 `1603`。
 
 ### 5.2 取消订单
 
-Order 模块锁定订单并验证所有者和 `PENDING_PAYMENT → CANCELLED` 迁移，调用 `ItemFacade.restoreStock`，再更新订单状态和取消时间。状态条件更新保证并发请求只有一个成功，库存仅恢复一次；失败时整个事务回滚。
+`OrderServiceImpl.cancel` 锁定订单，校验用户归属和 `PENDING_PAYMENT → CANCELLED` 迁移，以条件更新保证并发请求只有一个成功；成功后调用 `ItemService.restoreStock`，库存恢复和订单状态更新在同一事务中完成。重复或非法状态返回 `1602`，订单及明细永不删除。
 
-## 6. 数据与边界规则
+### 5.3 商家查看订单
 
-- 每张表由一个模块拥有；其他模块不得引用其 Mapper、PO 或 Repository。
-- 跨模块关联只保存标量 ID，不建立跨模块实体对象图。删除采用逻辑删除，订单历史不级联删除。
-- Controller 使用 Request/Response；应用层使用 Command/View；持久化层使用 PO。三类对象不得混用。
-- 统一 `ApiResponse<T>`、`PageView<T>`、业务异常映射和 `CurrentPrincipal` 属于技术基础设施，不承载业务规则。
-- 密码、令牌、数据库异常和堆栈不得写入接口响应。账号、库存和状态冲突映射为稳定业务码。
+商家订单查询先由 `MerchantService` 校验令牌和 `ACTIVE` 状态，再由 `OrderServiceImpl` 通过订单所属 `shopId` 与 `RestaurantService` 校验店铺归属。无权资源按 API 契约返回 403 或 404，不泄漏其他商家是否拥有该订单。
 
-## 7. 领域事件与扩展
+## 6. 数据、事务和横向约束
 
-可发布 `MerchantRegistered`、`ShopStatusChanged`、`ProductChanged`、`OrderCreated`、`OrderCancelled` 事件，用于日志、缓存失效或后续通知。事件类放在发布模块的 `api.event` 中，使用只读 ID 和必要快照。阶段 1 的库存、购物车和订单一致性仍使用同步接口；非关键监听器应在事务提交后执行，失败不能反向破坏已完成业务。
+- 每张表由一个模块拥有；跨模块关联只保存标量 ID，不建立跨模块 Entity 对象图。删除采用逻辑删除，订单历史不级联删除。
+- ServiceImpl 是事务边界，DAO 不开启跨用例事务。订单创建和取消使用同一数据源和事务管理器，任何异常都回滚相关写入。
+- Controller 将 HTTP 输入绑定并校验为 Service 接口定义的请求/命令 DTO，Service 返回不含持久化细节的结果 DTO；DAO 使用 Entity/Record。Service DTO 是模块的公开边界，可由本模块 Controller 和其他模块调用方使用，但 Entity/Record 不得进入 Controller、响应或跨模块调用。
+- 所有响应使用 `ApiResponse` 的 `code`、`msg`、`data` 外壳；分页对象字段固定为 `items`、`page`、`pageSize`、`total`、`totalPages`。
+- 统一分页默认 `pageSize=10`、最大 100；排序字段采用服务端白名单。金额使用 `BigDecimal`，时间使用 ISO 8601 UTC。
+- 日志不得记录密码、令牌或完整联系方式；异常响应不得暴露堆栈和数据库细节。
 
-## 8. 测试与架构守卫
+## 7. 测试与架构守卫
 
-- `ApplicationModules.verify()`：验证核心及新增模块的结构、允许依赖和无循环。
-- 每个 facade 使用 JUnit 5 编写领域/应用服务单元测试，覆盖正常、异常、边界和权限路径。
-- 每个 Controller 使用 MockMvc 验证请求校验、认证、状态码、业务码和 JSON 契约。
-- 使用数据库集成测试验证账号唯一约束、购物车唯一约束、乐观锁和库存原子更新。
-- 下单与取消必须有事务回滚、并发库存、重复幂等键和重复取消测试。
-- 核心接口覆盖率 100%，关键业务方法覆盖率不低于 90%；需求变化时先补测试，再扩展策略或 facade 实现。
+- 每个功能切片遵循“定义接口行为 → 编写正常、失败、边界和权限测试 → 执行并保存红态证据 → 最小实现 → 完整回归测试 → 重构”的顺序；功能代码提交前不得存在失败、跳过或无断言测试。
+- 为六个模块编写面向 Service 接口的 JUnit 5 行为契约测试：测试代码声明并调用 Service 接口，覆盖正常、失败、边界和权限路径，并断言业务输出、错误码及事务后的可观察状态。实现接入后由同一套测试验证实际 ServiceImpl，不另写“接口存在”或“实现类存在”测试，也不因实现方式变化而改写预期行为；提交前所有相关测试必须 100% 通过。
+- 为每个 Controller 使用 MockMvc 验证 `/api/v1` 路径、请求校验、认证、状态码、业务码和统一 JSON 外壳；提交前所有 Controller 测试必须 100% 通过。
+- 为各模块 DAO/Mapper 接口编写数据访问测试，并使用数据库集成测试验证账号/购物车唯一约束、逻辑删除、乐观锁或原子库存更新、事务回滚和幂等重试。
+- 下单与取消必须覆盖并发库存、价格版本变化、混合店铺、重复取消和商家订单归属。
+- 不再运行或维护 Spring Modulith 的模块验证；以包依赖检查、禁止跨模块 DAO/Entity 引用的静态检查和集成测试作为架构守卫。
+- 核心 API 覆盖率必须为 100%，关键业务方法覆盖率不得低于 90%；提交前完整测试套件通过率必须为 100%。测试类、红/绿执行日志、覆盖率报告和需求变更后的回归证据统一记录在 `docs/test/`。
