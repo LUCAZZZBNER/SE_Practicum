@@ -1,36 +1,71 @@
 <script setup>
+import { computed, onMounted, ref } from 'vue'
+import { ElMessage } from 'element-plus'
 import ConfirmAction from '../components/common/ConfirmAction.vue'
 import EmptyState from '../components/common/EmptyState.vue'
+import { createOrder } from '../api/order'
+import { getCart, removeCartItem, updateCartItem } from '../api/cart'
 
-const cartItems = [
-  { id: 1, name: '招牌牛肉饭', store: '示例快餐店', price: 18.8, quantity: 2, stock: 20 },
-  { id: 2, name: '冰柠檬茶', store: '示例快餐店', price: 6.0, quantity: 1, stock: 35 },
-]
+const cartItems = ref([])
+const loading = ref(false)
+
+const total = computed(() => {
+  return cartItems.value.reduce((sum, item) => sum + Number(item.subtotal || 0), 0)
+})
+
+async function loadCart() {
+  loading.value = true
+  try {
+    const data = await getCart()
+    cartItems.value = data?.items || []
+  } catch (error) {
+    ElMessage.error(error?.message || '购物车加载失败')
+  } finally {
+    loading.value = false
+  }
+}
+
+async function changeQuantity(item) {
+  await updateCartItem(item.id, { quantity: item.quantity + 1 })
+}
+
+async function removeItem(item) {
+  await removeCartItem(item.id)
+}
+
+async function submitOrder() {
+  await createOrder({ items: cartItems.value.map((item) => ({ cartItemId: item.id })) })
+}
+
+onMounted(loadCart)
 </script>
 
 <template>
   <section class="content-stack">
-    <EmptyState v-if="cartItems.length === 0" description="购物车暂为空" />
+    <EmptyState v-if="!loading && cartItems.length === 0" description="购物车暂为空" />
 
-    <el-table v-else :data="cartItems" border>
-      <el-table-column prop="name" label="商品" />
-      <el-table-column prop="store" label="店铺" />
-      <el-table-column prop="price" label="单价" width="100" />
-      <el-table-column prop="quantity" label="数量" width="120" />
-      <el-table-column prop="stock" label="库存" width="100" />
-      <el-table-column label="操作" width="180">
-        <template #default>
-          <el-button size="small">修改数量</el-button>
-          <ConfirmAction title="确认删除该购物车项？" type="danger">
+    <div v-else class="cart-list">
+      <div v-for="item in cartItems" :key="item.id" class="cart-row">
+        <div class="cart-meta">
+          <div class="cart-name">{{ item.product.name }}</div>
+          <div class="cart-detail">店铺：{{ item.product.shopId }}</div>
+          <div class="cart-detail">单价：{{ item.product.price }}</div>
+          <div class="cart-detail">数量：{{ item.quantity }}</div>
+          <div class="cart-detail">库存：{{ item.product.stock }}</div>
+        </div>
+
+        <div class="cart-actions">
+          <el-button size="small" @click="changeQuantity(item)">修改数量</el-button>
+          <ConfirmAction title="确认删除该购物车项？" type="danger" @confirm="removeItem(item)">
             <el-button size="small" type="danger">删除</el-button>
           </ConfirmAction>
-        </template>
-      </el-table-column>
-    </el-table>
+        </div>
+      </div>
+    </div>
 
     <div v-if="cartItems.length > 0" class="action-bar">
-      <span>合计：43.60 元</span>
-      <el-button type="primary">创建订单</el-button>
+      <span>合计：{{ total.toFixed(2) }} 元</span>
+      <el-button type="primary" @click="submitOrder">创建订单</el-button>
     </div>
   </section>
 </template>
