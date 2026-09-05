@@ -1,3 +1,16 @@
+<script setup>
+const order = {
+  id: 10001,
+  store: '示例快餐店',
+  status: '待支付',
+  amount: 43.6,
+  items: [
+    { name: '招牌牛肉饭', quantity: 2, price: 18.8 },
+    { name: '冰柠檬茶', quantity: 1, price: 6.0 },
+  ],
+}
+</script>
+
 <template>
   <section class="content-stack">
     <el-steps :active="1" finish-status="success">
@@ -7,16 +20,18 @@
     </el-steps>
 
     <el-descriptions title="订单信息" border>
-      <el-descriptions-item label="订单号">10001</el-descriptions-item>
-      <el-descriptions-item label="店铺">示例快餐店</el-descriptions-item>
-      <el-descriptions-item label="状态">待支付</el-descriptions-item>
-      <el-descriptions-item label="金额">43.60 元</el-descriptions-item>
+      <el-descriptions-item label="订单号">{{ order.id }}</el-descriptions-item>
+      <el-descriptions-item label="店铺">{{ order.store }}</el-descriptions-item>
+      <el-descriptions-item label="状态">{{ order.status }}</el-descriptions-item>
+      <el-descriptions-item label="金额">{{ order.amount.toFixed(2) }} 元</el-descriptions-item>
     </el-descriptions>
 
-    <el-table :data="[{ name: '招牌牛肉饭', quantity: 2, price: 18.8 }, { name: '冰柠檬茶', quantity: 1, price: 6.0 }]" border>
-      <el-table-column prop="name" label="商品" />
-      <el-table-column prop="quantity" label="数量" width="100" />
-      <el-table-column prop="price" label="成交单价" width="120" />
-    </el-table>
+    <div class="order-items">
+      <div v-for="item in order.items" :key="item.name" class="order-item">
+        <span>{{ item.name }}</span>
+        <span>数量：{{ item.quantity }}</span>
+        <span>成交单价：{{ item.price }}</span>
+      </div>
+    </div>
   </section>
 </template>
