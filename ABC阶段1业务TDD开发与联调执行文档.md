@@ -2,9 +2,9 @@
 
 > 更新日期：2026-09-06
 >
-> 当前状态：本轮同步检查时，本地和远程 `develop` 的共同基线为 `69efde1`。后端阶段 1 实现已经完成并全绿；团队已确认仓库中最新前端就是 `a633dd6` 这一批前端提交，不再等待 C 提供另一版代码。B 的 Node.js、npm、前端依赖、现有测试和生产构建也已验证可用。
+> 当前状态：2026-09-06 本轮同步检查时，本地和远程 `develop` 的共同基线为 `90fd50c`。后端阶段 1 实现已经完成并全绿；C 的三批前端契约修正 `a611687`、`0b01546`、`90fd50c` 已进入 `develop`。B 已验证最新前端 25 个测试文件、79 个测试全部通过，生产构建成功。
 >
-> 当前唯一下一阶段：立即对最新前端做接口契约 Red/Green。A 固定前端 API 契约，C 修正前端并接入真实后端，B 准备联调环境并只处理联调证明存在的后端缺陷；三人完成 30 个接口的真实联调、证据记录和最终验收。
+> 当前唯一下一阶段：A 为最新审计仍缺少的必要功能补 Red，C 完成剩余最小 Green，B 保持数据库和后端稳定；随后三人在同一台电脑完成 30 个接口的真实联调、证据记录和最终验收。
 
 本文已经删除建 B 分支、保存初始 Red、创建 ServiceImpl 外壳、编写 V2、逐模块重复提交和反复 Push 等已完成步骤。那些内容可从 Git 历史查看，不再作为待办重复执行。
 
@@ -54,7 +54,7 @@
 - 后端 Controller、Service 契约和 DAO 集成测试全部通过；
 - `feature/b-tdd` 已通过合并提交进入远程 `develop`。
 
-2026-09-06 再次执行 `git fetch` 和 `git pull --ff-only origin develop`，结果为 `Already up to date`；该次同步检查时，本地 `develop` 与 `origin/develop` 的共同基线为 `69efde1`。当前仓库中最后一条修改 `frontend` 的提交是 `a633dd6 test: add auth home view tests`。团队已经确认这就是 C 的最新交付，因此第 5 节列出的前端契约问题属于最新前端本身，既不是 B 合并造成的回退，也不是等待下一次拉取能够解决的问题。
+2026-09-06 第一次同步检查时，共同基线为 `69efde1`，当时最后一条前端提交是 `a633dd6`，由此确认 B 的后端合并没有覆盖或回退 C 的前端。随后 C 将 `a611687`、`0b01546`、`90fd50c` 三批修正推入 `develop`；B 再次执行 `git pull --ff-only origin develop`，以 fast-forward 拉取到 `90fd50c`。第 5 节已经按这批最新源码重新审计，旧结论不能代替当前结论。
 
 后端代码当前基线是远程 `develop`。不要再次创建 V2、ServiceImpl 外壳或 `feature/b-tdd`，也不要再次制造最初的 26 个 Red。
 
@@ -114,31 +114,56 @@ Refactor：自动测试仍全绿时整理重复代码和命名
 
 ---
 
-## 5. 当前前端已经确认的契约问题
+## 5. 最新前端审计结果：大部分契约已修正，仍有必要缺口
 
-这些问题已经从当前 `frontend` 源码确认，不需要再次讨论是否存在：
+### 5.1 本轮已经修复并验证的内容
 
-| 文件/页面 | 当前问题 | 必须对齐 |
-| --- | --- | --- |
-| `src/api/cart.js` | 使用 `/cart`、`/cart/items` | 全部改为 `/cart-items` |
-| `src/api/product.js` | 商品列表使用 `/products` | 列表使用 `/shops/{shopId}/products`；补分类接口 |
-| `src/api/store.js` | 使用 `/stores/{id}/status` | 改为 `PATCH /shops/{shopId}`；补创建店铺和本人店铺列表 |
-| `src/api/order.js` | 创建订单没有幂等请求头；缺取消和商家订单接口 | 加 `X-Idempotency-Key`；补齐 6 个订单接口 |
-| `MerchantStoreView.vue` | 使用 `notice`、`TEMP_CLOSED` | 改为 `description`、`TEMPORARILY_CLOSED` |
-| `MerchantProductsView.vue` | 查询缺 `shopId`；新增提交空对象；更新不带 `version` | 按 API 传完整字段和当前版本 |
-| `CartView.vue` | 下单项没有 `productVersion` | 提交 `cartItemId` 和 `item.product.version` |
-| `OrderDetailView.vue` | 仍是硬编码示例订单 | 改为按路由 ID 调用真实订单详情 |
-| `OrdersView.vue` | 使用 `store`、`amount` 等旧展示字段 | 使用 `shopName`、`total`、`orderNumber` 等 API 字段 |
-| `vite.config.js` | 开发服务器没有 `/api` 代理 | 增加到 `http://localhost:8080` 的开发代理 |
-| 商家页面 | 没有商家订单列表和详情路由 | 增加最小页面或复用订单展示组件 |
+`develop` 从 `9dbab0d` 前进到 `90fd50c`，新增或修改 27 个前端文件。下列旧问题已经解决，不要重复返工：
 
-前端单元测试使用 mock 是正常的；需要删除的是页面中的硬编码业务假数据，而不是测试中的 mock。
+- 购物车四个 API 已统一为 `/cart-items`；
+- 商品列表已使用 `/shops/{shopId}/products`；
+- 店铺修改已使用 `PATCH /shops/{shopId}`；
+- 已新增四个分类 API；
+- 已补齐用户订单四个、商家订单两个 API；
+- 创建订单已携带 `cartItemId`、`productVersion` 和 `X-Idempotency-Key`；
+- 店铺字段已改为 `description`，状态已改为 `TEMPORARILY_CLOSED`；
+- 商品下架已携带当前 `version`；
+- 用户订单详情已改为按路由 ID 查询，订单列表已使用 `orderNumber`、`shopName`、`total`；
+- 已新增商家订单列表、详情页面和路由；
+- Vite 已把 `/api` 代理到 `http://localhost:8080`；
+- 用户和商家资料页已经调用各自独立的 API。
+
+2026-09-06 在 B 的电脑执行最新前端自动验证：
+
+```text
+npm.cmd run test:run：25 个测试文件通过，79 个测试通过
+npm.cmd run build：成功，1710 个模块完成生产构建
+```
+
+### 5.2 当前仍然确认存在的最小必要问题
+
+这些结论来自 `90fd50c` 前端源码与后端 Controller、SRS、API 文档的逐项对照，不是猜测：
+
+| 优先级 | 当前问题 | 证据 | 最小修正 |
+| --- | --- | --- | --- |
+| 必须 | 缺少创建店铺 | `store.js` 只有列表、详情、修改；无 `POST /shops`。无店铺时 `MerchantStoreView.vue` 只显示“未找到店铺” | 增加 `createShop(data)`；无店铺时显示名称、简介表单并调用它 |
+| 必须 | 分类列表响应读取错误 | 后端返回 `Category[]`；`ProductDetailView.vue`、`StoreDetailView.vue` 却读取 `categories?.items` | 直接把返回值作为数组使用 |
+| 必须 | 分类管理没有页面操作 | `MerchantProductsView.vue` 的“新增分类”按钮没有事件，也没有修改、删除入口 | 在现有商品管理页增加最小分类新增、改名、删除操作 |
+| 必须 | 商品新增和编辑不可用 | “新增商品”立即发送 `categoryId: null`、空名称、`price: 0`，必然得到 400；“编辑”按钮没有事件 | 增加最小表单，提交合法 `shopId/categoryId/name/price/stock`；编辑时带 `version` |
+| 必须 | 用户无法从页面取消订单 | `cancelOrder()` API 已存在，但 `OrderDetailView.vue` 没有取消按钮 | 仅在允许状态显示取消按钮，调用后刷新订单 |
+| 必须 | 同一次结算不能正确复用幂等键 | `CartView.vue` 每次点击都执行 `crypto.randomUUID()` | 一次结算先生成并保存 key；超时重试复用；成功或购物车变化后再清除 |
+| 必须 | 401 不会清理失效登录 | `http.js` 只显示错误；API 文档要求 401 时清除令牌并回到登录流程 | 清除 `access_token`、`user_role`，进入登录入口，并增加测试 |
+| 必须 | 当前契约测试没有覆盖全部 30 个接口 | `apiContracts.spec.js` 只有 5 个测试块，实际断言 19 个接口调用；未覆盖用户/商家 8 个、创建店铺 1 个、商品新增/修改 2 个 | A 补齐剩余 11 个接口调用断言及上述页面行为 Red |
+
+另外，店铺详情页的“加入购物车”按钮目前没有事件。最小方案二选一：接入现有 `addCartItem()`，或者删除该无效按钮并只保留“详情”，由商品详情页完成加入购物车。不要保留一个点击后没有任何效果的按钮。
+
+前端单元测试使用 mock 是正常的；问题在于现有 mock 断言接受了无效请求，例如测试明确期待新增商品提交空字段，因此测试虽绿，真实后端仍会返回 400。不能为保持旧测试绿色而保留错误业务行为。
 
 ---
 
-## 6. 第一步：确认共同基线并立即开始前端契约修正
+## 6. 第一步：同步 `90fd50c` 后补齐剩余 Red
 
-B 的电脑已经完成本节同步。A、C 在各自电脑仍需执行：
+B 的电脑已经拉取并验证到 `90fd50c`。A、C 在各自电脑执行：
 
 ```powershell
 git status --short
@@ -153,24 +178,24 @@ git status --short
 
 - `develop` 与 `origin/develop` 指向同一提交；
 - `git status --short` 没有输出；
-- 能看到合并 `feature/b-tdd` 的提交；
+- 能看到 `a611687`、`0b01546`、`90fd50c` 三批前端修正；
 - 不再复制文件或压缩包手工同步。
 
-B 当前不再等待 C Push。确认最新前端后，三人立即按下面顺序并行准备：
+B 当前不再等待新的前端 Push。三人按下面顺序完成剩余工作：
 
-1. A 阅读第 5 节问题表和 API 文档，开始第 7 节前端契约 Red；
-2. C 从最新 `develop` 创建修正分支，阅读 A 正在固定的断言，不再按旧路径继续扩展页面；
-3. B 完成 6.1、6.2 的记录和环境准备，之后进入第 9 节联调机角色；
-4. A 的 Red 推送后，C 将它同步到个人分支并完成第 8 节 Green；
-5. 三人不再等待不存在的“下一版前端”。
+1. A 依据第 5.2 节补齐剩余 Red，不重写已经通过的 19 个接口断言；
+2. C 从最新 `develop` 创建修正分支，只完成第 5.2 节的最小必要 Green；
+3. B 保持数据库与后端稳定，准备第 9 节真实联调环境；
+4. A 的补充 Red 进入共同基线后，C 同步并逐项变绿；
+5. 三人不再重复检查已经修正的旧路径。
 
 C 创建本阶段工作分支：
 
 ```powershell
-git switch -c feature/c-api-integration
+git switch -c feature/c-integration-fixes
 ```
 
-A 只有在需要新增/修正测试时才创建 `test/a-api-contract`；B 只有在真实联调发现后端缺陷时才创建 `fix/b-integration`。没有代码改动的人不创建空分支和空提交。
+A 只有在补充当前缺少的测试时才创建 `test/a-contract-completion`；B 只有在真实联调发现后端缺陷时才创建 `fix/b-integration`。没有代码改动的人不创建空分支和空提交。
 
 ### 6.1 先补最终后端 Green 记录
 
@@ -194,8 +219,9 @@ A 只有在需要新增/修正测试时才创建 `test/a-api-contract`；B 只�
 Node.js v24.19.0
 npm 11.17.0
 npm ci：成功，安装并审计 179 个依赖包
-npm run test:run：22 个测试文件通过，67 个测试通过
-npm run build：成功，Vite 生产构建完成
+npm.cmd run test:run：初次基线为 22 个测试文件、67 个测试通过
+拉取 `90fd50c` 后：25 个测试文件、79 个测试通过
+npm.cmd run build：两次均成功；最新一次转换 1710 个模块
 ```
 
 依赖安装过程中显示的 deprecated、allow-scripts、5 vulnerabilities 和大于 500 kB 的 chunk 均为警告，没有导致测试或构建失败。当前阶段不要执行 `npm audit fix --force`，以免强制升级依赖并改动已经锁定的版本。
@@ -219,41 +245,198 @@ winget install --id OpenJS.NodeJS.LTS -e
 
 安装完成后必须关闭旧 PowerShell 并重新打开，再执行上面的验证命令。如果 PowerShell 的脚本执行策略拦截 `npm.ps1`，直接使用文中所写的 `npm.cmd`，不需要修改系统执行策略。
 
-这一步只证明“C 当前交付版的前端自身测试和构建通过”，不能宣布联调完成。当前 67 个测试大量 mock 了 API 模块，没有真正调用 Spring Boot，因此不会自动发现第 5 节已经确认的错误路径、字段、版本号、幂等请求头和缺失功能。下一步仍必须由 A 完成第 7 节契约 Red，再由 C 完成第 8 节 Green。
+这一步只证明“C 当前交付版的前端自身测试和构建通过”，不能宣布联调完成。当前 79 个测试大量 mock 了 API 模块，没有真正调用 Spring Boot；其中 `apiContracts.spec.js` 的 5 个测试块合计只断言了 19 个接口调用，不是覆盖了全部 30 个接口。下一步仍必须由 A 完成第 7 节补充 Red，再由 C 完成第 8 节剩余 Green。
 
 ---
 
-## 7. 第二步：A 先建立前端接口契约 Red
+## 7. 第二步：A 只补当前缺少的 Red
 
-A 在 `test/a-api-contract` 上更新现有前端测试或新增一个小型 API 契约测试文件，至少固定以下内容：
+### 7.1 接口契约测试究竟测什么
 
-1. Axios `baseURL` 为 `/api/v1`；
-2. 用户和商家登录路径互相独立；
-3. 四个购物车方法全部使用 `/cart-items`；
-4. 商品列表必须带 `shopId` 组成 `/shops/{shopId}/products`；
-5. 店铺 PATCH 使用 `/shops/{shopId}`；
-6. 四个分类方法路径正确；
-7. 创建订单把 `X-Idempotency-Key` 放进请求头；
-8. 创建订单 body 的每项同时具有 `cartItemId`、`productVersion`；
-9. 用户取消订单和商家订单查询方法存在且路径正确；
-10. 页面使用 API 文档中的状态枚举及响应字段。
+接口契约测试检查的是“前端准备发送的请求是否和后端规定完全一致”，不是检查页面样式，也不直接访问 MySQL。每个接口至少核对：
+
+1. HTTP 方法：`GET`、`POST`、`PATCH`、`DELETE`；
+2. 路径：例如用户登录必须是 `/users/login`；
+3. Path 参数：例如订单 ID 必须进入 `/orders/1001`；
+4. Query 参数：分页、筛选和排序必须放在 Axios 的 `params` 中；
+5. Body：字段名、嵌套结构和值是否符合 API 文档；
+6. Header：Bearer Token 和创建订单的 `X-Idempotency-Key`；
+7. 返回结构的使用方式：分页对象读取 `.items`，直接数组不能读取 `.items`。
+
+以前端用户登录为例，测试调用真实的前端 API 函数：
+
+```javascript
+loginCustomer({
+  account: 'user01',
+  password: '123456',
+})
+
+expect(mocks.post).toHaveBeenCalledWith('/users/login', {
+  account: 'user01',
+  password: '123456',
+})
+```
+
+如果实现误写为 `/user/login`，测试立即失败；写成 `/users/login` 才通过。
+
+### 7.2 为什么契约测试仍然使用 mock
+
+这里仅 mock 最底层的 `api/http.js`，不 mock 正在检查的 `loginCustomer()`、`createShop()` 等 API 函数：
+
+```text
+测试
+  → 真实调用前端 API 函数
+  → API 函数调用假的 http.get/post/patch/delete
+  → 测试检查假的 http 方法实际收到了什么
+```
+
+这与页面测试把整个 API 模块替换掉不同。页面测试如果直接伪造 `createProduct()` 成功，可能看不到内部路径；契约测试观察底层 HTTP 调用，所以能发现错误的方法、路径、参数、Body 和 Header。
+
+### 7.3 Red 是什么，怎样才算有效
+
+Red 不是故意写坏测试，而是先把 SRS/API 文档中的正确要求写成断言，让当前缺失或错误实现暴露为测试失败。例如当前没有 `createShop()`：
+
+```javascript
+import { createShop } from '../../api/store'
+
+it('uses POST /shops to create a shop', () => {
+  const body = { name: '测试店铺', description: '测试简介' }
+
+  createShop(body)
+
+  expect(mocks.post).toHaveBeenCalledWith('/shops', body)
+})
+```
+
+当前代码会因为没有导出 `createShop` 而失败，这是有效 Red。C 随后只需增加正确封装，测试变绿：
+
+```javascript
+export function createShop(data) {
+  return http.post('/shops', data)
+}
+```
+
+有效 Red 必须同时满足：
+
+1. 预期来自 SRS、`backend-api-design.md` 或后端 Controller，而不是凭记忆；
+2. 失败原因是当前业务缺失或契约错误；
+3. 原有 79 个测试仍然通过，新增测试失败；
+4. 记录测试名称、期望、实际结果和根因；
+5. 不能用错误导入、测试文件找不到、环境没装好等非业务错误冒充 Red；
+6. 不能先修改实现再补一条从未失败过的测试。
+
+### 7.4 先补剩余 11 个接口调用断言
+
+不要删除或重写已经通过的 `apiContracts.spec.js`。A 在 `test/a-contract-completion` 上扩充它，先把当前未覆盖的 11 个接口调用固定下来：
+
+1. `POST /users`、`POST /users/login`、`GET /users/me`、`PATCH /users/me`；
+2. `POST /merchants`、`POST /merchants/login`、`GET /merchants/me`、`PATCH /merchants/me`；
+3. `POST /shops`，请求体包含合法 `name` 和可选 `description`；
+4. `POST /products`，请求体包含合法 `shopId`、`categoryId`、`name`、`price`、`stock`；
+5. `PATCH /products/{productId}`，修改时携带当前 `version`。
+
+用户四个接口的最小断言示例：
+
+```javascript
+registerCustomer(registerBody)
+expect(mocks.post).toHaveBeenCalledWith('/users', registerBody)
+
+loginCustomer(loginBody)
+expect(mocks.post).toHaveBeenCalledWith('/users/login', loginBody)
+
+getProfile()
+expect(mocks.get).toHaveBeenCalledWith('/users/me')
+
+updateProfile(profileBody)
+expect(mocks.patch).toHaveBeenCalledWith('/users/me', profileBody)
+```
+
+商家的四个接口使用同样方法，但路径必须是 `/merchants`、`/merchants/login`、`/merchants/me`，不能和用户账号体系混用。这八个函数当前看起来已经正确，所以新增断言可能直接通过；直接通过的测试属于补覆盖，不是假 Red。当前可以确定失败的接口级 Red 是缺少 `createShop()`。
+
+商品新增和修改至少固定：
+
+```javascript
+const createBody = {
+  shopId: 7,
+  categoryId: 21,
+  name: '牛肉饭',
+  price: 18.8,
+  stock: 20,
+}
+createProduct(createBody)
+expect(mocks.post).toHaveBeenCalledWith('/products', createBody)
+
+const patchBody = { price: 20, stock: 18, version: 3 }
+updateProduct(11, patchBody)
+expect(mocks.patch).toHaveBeenCalledWith('/products/11', patchBody)
+```
+
+### 7.5 再补页面行为 Red
+
+然后为第 5.2 节的页面缺口补最小行为测试：
+
+1. 分类列表的 mock 直接返回数组，页面必须正确展示，不能再用 `.items`；
+2. 商家没有店铺时能够填写表单并创建，而不是只报错；
+3. 分类新增、修改、删除按钮会分别调用正确 API；
+4. 商品新增表单不会提交空名称、空分类或 0 元价格，编辑会携带 `version`；
+5. 允许取消的用户订单显示取消按钮并调用 `cancelOrder(orderId)`；
+6. 同一次结算重试两次时，两次请求使用同一个 `X-Idempotency-Key`；
+7. HTTP 401 会删除 `access_token` 和 `user_role`；
+8. 店铺详情不再保留无点击行为的“加入购物车”按钮。
+
+分类响应测试必须按后端真实的直接数组编写：
+
+```javascript
+listCategories.mockResolvedValue([
+  { id: 21, name: '主食', sortOrder: 0 },
+  { id: 22, name: '饮品', sortOrder: 1 },
+])
+```
+
+页面渲染后断言能看到“主食”和“饮品”。如果测试继续伪造 `{ items: [...] }`，只会保护错误实现，不算有效契约测试。
+
+新增商品测试必须先在表单填写合法数据，再断言：
+
+```javascript
+expect(createProduct).toHaveBeenCalledWith({
+  shopId: 7,
+  categoryId: 21,
+  name: '牛肉饭',
+  price: 18.8,
+  stock: 20,
+})
+```
+
+不能继续断言 `categoryId: null`、空名称和 `price: 0`，因为后端会返回 400。
+
+取消订单测试让详情接口返回 `PENDING_PAYMENT` 订单，断言页面出现取消按钮；点击后必须调用：
+
+```javascript
+expect(cancelOrder).toHaveBeenCalledWith(10001)
+```
+
+幂等测试模拟同一次结算第一次网络超时、第二次重试，读取两次 `createOrder` 的 Header，要求两次 `X-Idempotency-Key` 完全相同。测试开始前可 mock `crypto.randomUUID()` 返回固定值，但断言重点是同一次结算只生成一次，而不是每次点击都重新生成。
+
+401 测试先向 `localStorage` 写入令牌和角色，再调用响应失败拦截器，最后断言两项都被删除。该测试还应确认用户被带回统一登录入口，不能留在需要登录的页面不断收到 401。
+
+### 7.6 运行、记录并提交 Red
 
 运行：
 
 ```powershell
 Set-Location 'D:\Projects\SchoolWorks\SW_2609\SE_Practicum\frontend'
-npm ci
-npm run test:run
+npm.cmd ci
+npm.cmd run test:run
 ```
 
-预期新测试因当前旧路径或缺方法而失败，这才是有效 Red。A 记录失败用例和根因后提交：
+预期新增测试因为缺 `createShop`、页面操作或错误响应读取而失败，这才是有效 Red。原有 79 个测试必须继续通过。A 记录失败用例和根因后提交：
 
 ```powershell
 Set-Location '..'
 git add -- frontend/src/tests docs/test/test-log.md
 git diff --cached --check
-git commit -m 'test(frontend): align api clients with frozen contract [RED]'
-git push -u origin test/a-api-contract
+git commit -m 'test(frontend): cover remaining stage-one contracts [RED]'
+git push -u origin test/a-contract-completion
 ```
 
 A 的 Red 合入 `develop` 后，C 在个人分支同步：
@@ -263,38 +446,23 @@ git fetch origin
 git rebase origin/develop
 ```
 
-如果 A 已经把这些断言写在现有测试里并能证明当前 Red，就不重复新建第二套相同测试。
+如果现有测试已经覆盖某项且断言符合 SRS/API 文档，就不重复新建第二套相同测试。不能继续保留“期待提交空商品数据”这种与后端校验相反的测试。
 
 ---
 
-## 8. 第三步：C 完成最小前端 Green
+## 8. 第三步：C 完成剩余最小前端 Green
 
-### 8.1 修正开发代理
+### 8.1 已经完成，不要重复修改
 
-保留 `src/api/http.js` 的：
+`baseURL=/api/v1`、Vite `/api` 代理、购物车路径、分类四个 API、商品列表路径、店铺 PATCH、订单六个 API、订单基本字段、用户/商家资料和商家订单页面已经完成。除非新的 Red 或真实联调能够证明有错，否则不再改这些部分。
 
-```text
-baseURL = /api/v1
-```
+### 8.2 只补剩余 API 和规则
 
-在 `vite.config.js` 的 `server` 中增加 `/api` 代理到：
-
-```text
-http://localhost:8080
-```
-
-这样浏览器访问 `http://localhost:5173` 时，请求仍写 `/api/v1/...`，由 Vite 转发到后端，避免额外增加 CORS 配置。
-
-### 8.2 修正 API 封装
-
-按下面顺序修改，避免页面和封装同时失控：
-
-1. `user.js`、`merchant.js`：确认独立登录和个人资料 8 个接口；
-2. `store.js`：补 `createShop`、`listShops`、`getShop`、`updateShop`；
-3. `product.js`：补四个分类方法，修正按店铺查询商品；
-4. `cart.js`：四个方法统一为 `/cart-items`；
-5. `order.js`：补齐用户订单 4 个、商家订单 2 个方法；
-6. `index.js`：导出所有新增方法。
+1. 在 `store.js` 增加 `createShop(data)`，调用 `POST /shops`；
+2. 分类列表直接处理后端返回的数组；
+3. 订单页保存“本次结算”的幂等键，同一请求重试复用，成功或购物车内容变化后清除；
+4. `http.js` 收到 401 时清除失效登录信息并回到登录入口；
+5. 如果继续保留 `api/index.js` 作为统一出口，把 `category.js` 和 `merchant.js` 一并导出；当前页面使用直接导入时，这一点不单独阻塞联调。
 
 创建订单封装应接收独立的 `idempotencyKey`，请求形式为：
 
@@ -311,18 +479,16 @@ X-Idempotency-Key: <本次结算键>
 
 同一次结算的网络重试必须复用同一个 key；新的结算才生成新 key。不要把固定 key 写死在源码里。
 
-### 8.3 修正页面字段和缺失页面
+### 8.3 只补剩余页面操作
 
 按依赖顺序处理：
 
-1. 用户/商家注册、登录和资料页；
-2. 商家店铺创建、本人店铺列表和店铺修改；
-3. 分类新增、列表、修改、删除；
-4. 商品新增、列表、详情和带 version 的修改；
-5. 用户店铺/分类/商品浏览；
-6. 购物车增删改查；
-7. 用户创建、查询、查看和取消订单；
-8. 商家订单列表和详情。
+1. 商家无店铺时显示创建表单；已有店铺时继续使用现有修改表单；
+2. 在现有商品管理页提供最小分类新增、改名、删除操作；
+3. 用最小表单完成合法商品新增和带 `version` 的编辑；
+4. 用户订单详情页增加取消操作；
+5. 店铺详情页把无效“加入购物车”按钮接入 API，或者删除它并只从商品详情加入购物车；
+6. 操作成功后刷新当前列表或详情，让页面与后端状态一致。
 
 页面只实现阶段 1 必需操作。不要增加支付页、地图、配送员、优惠券、退款或 WebSocket。
 
@@ -330,11 +496,11 @@ X-Idempotency-Key: <本次结算键>
 
 ```powershell
 Set-Location 'D:\Projects\SchoolWorks\SW_2609\SE_Practicum\frontend'
-npm run test:run
-npm run build
+npm.cmd run test:run
+npm.cmd run build
 ```
 
-所有 A 新增的契约测试和原有页面测试必须 Green，构建目录能够正常生成。不要通过删除测试、`skip` 或放宽断言解决失败。
+所有 A 新增的契约测试和原有 79 个测试必须 Green，构建目录能够正常生成。新总数应大于 79；不要通过删除测试、`skip`、保留错误 mock 或放宽断言解决失败。
 
 C 完成整个前端接入后只做一次 Green 提交：
 
@@ -497,9 +663,9 @@ mysql -u delivery_app -p delivery_test -e "SELECT installed_rank, version, scrip
 
 ```powershell
 Set-Location 'D:\Projects\SchoolWorks\SW_2609\SE_Practicum\frontend'
-npm ci
-npm run test:run
-npm run build
+npm.cmd ci
+npm.cmd run test:run
+npm.cmd run build
 ```
 
 要求：全部 Vitest 测试通过且 Vite 构建成功。当前已经有前端测试体系，不再额外引入另一套大型框架。
@@ -517,7 +683,7 @@ npm run build
 
 ---
 
-## 13. C 合并后怎样交付
+## 13. 剩余 Green 完成后怎样交付
 
 C 在个人分支先同步最新后端：
 
@@ -530,10 +696,10 @@ git rebase origin/develop
 重新执行前端测试和构建；若 rebase 包含后端修复，还要执行后端完整测试。全部通过后：
 
 ```powershell
-git push -u origin feature/c-api-integration
+git push -u origin feature/c-integration-fixes
 git switch develop
 git pull --ff-only origin develop
-git merge --no-ff feature/c-api-integration
+git merge --no-ff feature/c-integration-fixes
 ```
 
 在合并后的 `develop` 上执行第 12 节最终验收。全部通过才推送：
