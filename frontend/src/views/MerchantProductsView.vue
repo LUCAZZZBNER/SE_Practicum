@@ -2,23 +2,42 @@
 import { onMounted, ref } from 'vue'
 import ConfirmAction from '../components/common/ConfirmAction.vue'
 import { createProduct, listProducts, updateProduct } from '../api/product'
+import { listCategories } from '../api/store'
+import { useMerchantShopStore } from '../stores/merchantShop'
 
 const products = ref([])
+const categories = ref([])
+const shopStore = useMerchantShopStore()
 
 async function loadProducts() {
-  const data = await listProducts()
+    if (!shopStore.selectedShopId) return
+    const categoryData = await listCategories(shopStore.selectedShopId)
+    categories.value = categoryData || []
+    const data = await listProducts(shopStore.selectedShopId, { page: 1, pageSize: 100, includeOffSale: true })
   products.value = data?.items || []
 }
 
 async function offShelf(product) {
-  await updateProduct(product.id, { status: 'OFF_SALE' })
+  await updateProduct(product.id, { status: 'OFF_SALE', version: product.version })
+  await loadProducts()
 }
 
 async function addProduct() {
-  await createProduct({})
+  if (!shopStore.selectedShopId || categories.value.length === 0) return
+  await createProduct({
+    shopId: shopStore.selectedShopId,
+    categoryId: categories.value[0].id,
+    name: '新商品',
+    price: 0.01,
+    stock: 0,
+  })
+  await loadProducts()
 }
 
-onMounted(loadProducts)
+onMounted(async () => {
+  await shopStore.loadShops()
+  await loadProducts()
+})
 </script>
 
 <template>
@@ -33,7 +52,7 @@ onMounted(loadProducts)
     <div v-else class="product-list">
       <div v-for="product in products" :key="product.id" class="product-row">
         <div>商品：{{ product.name }}</div>
-        <div>分类：{{ product.category }}</div>
+        <div>分类：{{ categories.find((category) => category.id === product.categoryId)?.name || product.categoryId }}</div>
         <div>价格：{{ product.price }}</div>
         <div>库存：{{ product.stock }}</div>
         <div>状态：{{ product.status }}</div>

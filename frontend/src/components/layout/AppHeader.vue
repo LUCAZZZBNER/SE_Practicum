@@ -1,5 +1,14 @@
 <script setup>
 import { ShoppingCart, User } from '@element-plus/icons-vue'
+import { clearSession } from '../../auth/session'
+import { useRouter } from 'vue-router'
+
+const router = useRouter()
+
+function logout() {
+  clearSession()
+  router.push('/')
+}
 
 defineProps({
   title: {
@@ -22,7 +31,7 @@ defineProps({
     <div class="header-user">
       <el-icon><User /></el-icon>
       <span>{{ statusText }}</span>
-      <router-link to="/">退出</router-link>
+      <a href="/" @click.prevent="logout">退出</a>
     </div>
   </el-header>
 </template>

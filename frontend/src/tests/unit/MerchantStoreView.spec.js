@@ -4,7 +4,9 @@ import MerchantStoreView from '../../views/MerchantStoreView.vue'
 
 const mocks = vi.hoisted(() => ({
   getStoreDetail: vi.fn(),
-  updateStoreStatus: vi.fn(),
+  updateStore: vi.fn(),
+  listStores: vi.fn(),
+  createStore: vi.fn(),
   messageSuccess: vi.fn(),
   messageError: vi.fn(),
 }))
@@ -22,7 +24,9 @@ vi.mock('element-plus', () => ({
 
 vi.mock('../../api/store', () => ({
   getStoreDetail: mocks.getStoreDetail,
-  updateStoreStatus: mocks.updateStoreStatus,
+  updateStore: mocks.updateStore,
+  listStores: mocks.listStores,
+  createStore: mocks.createStore,
 }))
 
 function mountView() {
@@ -60,7 +64,9 @@ function mountView() {
 
 beforeEach(() => {
   mocks.getStoreDetail.mockReset()
-  mocks.updateStoreStatus.mockReset()
+  mocks.updateStore.mockReset()
+  mocks.listStores.mockReset()
+  mocks.listStores.mockResolvedValue({ items: [{ id: 7, name: '示例快餐店' }] })
   mocks.messageSuccess.mockReset()
   mocks.messageError.mockReset()
 })
@@ -71,7 +77,7 @@ describe('MerchantStoreView', () => {
       id: 7,
       name: '示例快餐店',
       status: 'OPEN',
-      notice: '欢迎下单',
+      description: '欢迎下单',
     })
 
     const wrapper = mountView()
@@ -89,9 +95,9 @@ describe('MerchantStoreView', () => {
       id: 7,
       name: '示例快餐店',
       status: 'OPEN',
-      notice: '欢迎下单',
+      description: '欢迎下单',
     })
-    mocks.updateStoreStatus.mockResolvedValue({})
+    mocks.updateStore.mockResolvedValue({})
 
     const wrapper = mountView()
     await flushPromises()
@@ -101,10 +107,10 @@ describe('MerchantStoreView', () => {
     await inputs[1].setValue('临时休息')
     await wrapper.find('button').trigger('click')
 
-    expect(mocks.updateStoreStatus).toHaveBeenCalledWith(7, {
+    expect(mocks.updateStore).toHaveBeenCalledWith(7, {
       name: '新店铺名',
       status: 'OPEN',
-      notice: '临时休息',
+      description: '临时休息',
     })
   })
 
@@ -113,9 +119,9 @@ describe('MerchantStoreView', () => {
       id: 7,
       name: '示例快餐店',
       status: 'OPEN',
-      notice: '欢迎下单',
+      description: '欢迎下单',
     })
-    mocks.updateStoreStatus.mockRejectedValue(new Error('保存失败'))
+    mocks.updateStore.mockRejectedValue(new Error('保存失败'))
 
     const wrapper = mountView()
     await flushPromises()

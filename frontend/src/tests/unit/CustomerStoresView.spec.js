@@ -98,7 +98,7 @@ describe('CustomerStoresView', () => {
     const wrapper = mountView()
     await flushPromises()
 
-    expect(wrapper.find('button').element.disabled).toBe(true)
+    expect(wrapper.findAll('button').at(-1).element.disabled).toBe(true)
     expect(mocks.routerPush).not.toHaveBeenCalled()
   })
 })

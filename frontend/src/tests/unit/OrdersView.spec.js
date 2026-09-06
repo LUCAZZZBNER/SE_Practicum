@@ -58,8 +58,9 @@ describe('OrdersView', () => {
       items: [
         {
           id: 10001,
-          store: '示例快餐店',
-          amount: 43.6,
+          orderNumber: '10001',
+          shopName: '示例快餐店',
+          total: 43.6,
           status: '待支付',
           createdAt: '2026-09-03 10:30',
         },
@@ -96,8 +97,9 @@ describe('OrdersView', () => {
       items: [
         {
           id: 10001,
-          store: '示例快餐店',
-          amount: 43.6,
+          orderNumber: '10001',
+          shopName: '示例快餐店',
+          total: 43.6,
           status: '待支付',
           createdAt: '2026-09-03 10:30',
         },

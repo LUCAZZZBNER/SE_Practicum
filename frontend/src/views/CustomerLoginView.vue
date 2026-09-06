@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import AuthFormCard from '../components/common/AuthFormCard.vue'
 import { loginCustomer } from '../api/user'
+import { saveSession } from '../auth/session'
 
 const router = useRouter()
 const form = reactive({
@@ -18,8 +19,7 @@ async function submitLogin() {
       password: form.password,
     })
 
-    localStorage.setItem('access_token', data.accessToken)
-    localStorage.setItem('user_role', data.roles?.[0] || 'USER')
+    saveSession(data)
     ElMessage.success('登录成功')
     router.push('/customer/stores')
   } catch (error) {

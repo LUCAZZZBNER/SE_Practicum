@@ -8,6 +8,8 @@ import { getCart, removeCartItem, updateCartItem } from '../api/cart'
 
 const cartItems = ref([])
 const loading = ref(false)
+const selectedIds = ref([])
+const idempotencyKey = ref(null)
 
 const total = computed(() => {
   return cartItems.value.reduce((sum, item) => sum + Number(item.subtotal || 0), 0)
@@ -27,14 +29,40 @@ async function loadCart() {
 
 async function changeQuantity(item) {
   await updateCartItem(item.id, { quantity: item.quantity + 1 })
+  idempotencyKey.value = null
+  await loadCart()
 }
 
 async function removeItem(item) {
   await removeCartItem(item.id)
+  selectedIds.value = selectedIds.value.filter((id) => id !== item.id)
+  idempotencyKey.value = null
+  await loadCart()
 }
 
 async function submitOrder() {
-  await createOrder({ items: cartItems.value.map((item) => ({ cartItemId: item.id })) })
+  const selected = cartItems.value.filter((item) => selectedIds.value.includes(item.id) && item.available)
+  if (selected.length === 0) {
+    ElMessage.error('请选择可结算的购物车项')
+    return
+  }
+  const shops = new Set(selected.map((item) => item.product.shopId))
+  if (shops.size !== 1) {
+    ElMessage.error('一次结算只能选择同一店铺的商品')
+    return
+  }
+  if (!idempotencyKey.value) idempotencyKey.value = crypto.randomUUID()
+  try {
+    const order = await createOrder(selected.map((item) => ({
+      cartItemId: item.id,
+      productVersion: item.product.version,
+    })), idempotencyKey.value)
+    idempotencyKey.value = null
+    ElMessage.success(`订单 ${order.orderNumber} 创建成功`)
+    await loadCart()
+  } catch (error) {
+    ElMessage.error(error?.message || '创建订单失败')
+  }
 }
 
 onMounted(loadCart)
@@ -46,6 +74,7 @@ onMounted(loadCart)
 
     <div v-else class="cart-list">
       <div v-for="item in cartItems" :key="item.id" class="cart-row">
+        <el-checkbox v-model="selectedIds" :label="item.id" :disabled="!item.available">选择</el-checkbox>
         <div class="cart-meta">
           <div class="cart-name">{{ item.product.name }}</div>
           <div class="cart-detail">店铺：{{ item.product.shopId }}</div>

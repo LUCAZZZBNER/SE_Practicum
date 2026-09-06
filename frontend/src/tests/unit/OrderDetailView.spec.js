@@ -1,6 +1,14 @@
-import { mount } from '@vue/test-utils'
-import { describe, expect, it } from 'vitest'
+import { flushPromises, mount } from '@vue/test-utils'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import OrderDetailView from '../../views/OrderDetailView.vue'
+
+const mocks = vi.hoisted(() => ({ getOrderDetail: vi.fn(), cancelOrder: vi.fn() }))
+vi.mock('vue-router', () => ({ useRoute: () => ({ params: { id: '10001' } }) }))
+vi.mock('element-plus', () => ({ ElMessage: { error: vi.fn(), success: vi.fn() } }))
+vi.mock('../../api/order', () => ({
+  getOrderDetail: mocks.getOrderDetail,
+  cancelOrder: mocks.cancelOrder,
+}))
 
 function mountView() {
   return mount(OrderDetailView, {
@@ -34,11 +42,26 @@ function mountView() {
 }
 
 describe('OrderDetailView', () => {
-  it('renders order status, summary and item details', () => {
+  beforeEach(() => {
+    mocks.getOrderDetail.mockResolvedValue({
+      id: 10001,
+      orderNumber: '10001',
+      shopName: '示例快餐店',
+      status: 'PENDING_PAYMENT',
+      total: 43.6,
+      lines: [
+        { productId: 1, productName: '招牌牛肉饭', quantity: 2, unitPrice: 18.8 },
+        { productId: 2, productName: '冰柠檬茶', quantity: 1, unitPrice: 6 },
+      ],
+    })
+  })
+
+  it('renders order status, summary and item details', async () => {
     const wrapper = mountView()
+    await flushPromises()
 
     expect(wrapper.text()).toContain('已创建')
-    expect(wrapper.text()).toContain('待支付')
+    expect(wrapper.text()).toContain('PENDING_PAYMENT')
     expect(wrapper.text()).toContain('订单信息')
     expect(wrapper.text()).toContain('10001')
     expect(wrapper.text()).toContain('示例快餐店')

@@ -12,10 +12,7 @@ function getDashboardPath(role) {
 }
 
 export function getAuthState() {
-  return {
-    token: localStorage.getItem('access_token'),
-    role: localStorage.getItem('user_role'),
-  }
+  return getSession()
 }
 
 export function resolveNavigation(to, auth = getAuthState()) {
@@ -56,3 +53,4 @@ export function installRouteGuards(router) {
     return true
   })
 }
+import { getSession } from '../auth/session'

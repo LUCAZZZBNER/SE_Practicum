@@ -1,11 +1,11 @@
 import http from './http'
 
-export function listProducts(params) {
-  return http.get('/products', { params })
+export function listProducts(shopId, params) {
+  return http.get(`/shops/${shopId}/products`, { params })
 }
 
-export function getProductDetail(productId) {
-  return http.get(`/products/${productId}`)
+export function getProductDetail(productId, params) {
+  return http.get(`/products/${productId}`, { params })
 }
 
 export function createProduct(data) {

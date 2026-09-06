@@ -6,12 +6,20 @@ const mocks = vi.hoisted(() => ({
   listProducts: vi.fn(),
   updateProduct: vi.fn(),
   createProduct: vi.fn(),
+  listStores: vi.fn(),
+  listCategories: vi.fn(),
 }))
 
 vi.mock('../../api/product', () => ({
   listProducts: mocks.listProducts,
   updateProduct: mocks.updateProduct,
   createProduct: mocks.createProduct,
+}))
+
+vi.mock('../../api/store', () => ({
+  listStores: mocks.listStores,
+  listCategories: mocks.listCategories,
+  createStore: vi.fn(),
 }))
 
 function mountView() {
@@ -39,6 +47,10 @@ beforeEach(() => {
   mocks.listProducts.mockReset()
   mocks.updateProduct.mockReset()
   mocks.createProduct.mockReset()
+  mocks.listStores.mockReset()
+  mocks.listCategories.mockReset()
+  mocks.listStores.mockResolvedValue({ items: [{ id: 7, name: '示例快餐店' }] })
+  mocks.listCategories.mockResolvedValue([{ id: 5, name: '主食' }])
 })
 
 describe('MerchantProductsView', () => {
@@ -48,10 +60,11 @@ describe('MerchantProductsView', () => {
         {
           id: 1,
           name: '招牌牛肉饭',
-          category: '主食',
+          categoryId: 5,
           price: 18.8,
           stock: 20,
-          status: '上架',
+          status: 'ON_SALE',
+          version: 3,
         },
       ],
       total: 1,
@@ -65,7 +78,7 @@ describe('MerchantProductsView', () => {
     expect(wrapper.text()).toContain('主食')
     expect(wrapper.text()).toContain('18.8')
     expect(wrapper.text()).toContain('20')
-    expect(wrapper.text()).toContain('上架')
+    expect(wrapper.text()).toContain('ON_SALE')
     expect(wrapper.text()).toContain('新增商品')
     expect(wrapper.text()).toContain('新增分类')
   })
@@ -76,10 +89,11 @@ describe('MerchantProductsView', () => {
         {
           id: 1,
           name: '招牌牛肉饭',
-          category: '主食',
+          categoryId: 5,
           price: 18.8,
           stock: 20,
-          status: '上架',
+          status: 'ON_SALE',
+          version: 3,
         },
       ],
       total: 1,
@@ -93,6 +107,7 @@ describe('MerchantProductsView', () => {
 
     expect(mocks.updateProduct).toHaveBeenCalledWith(1, {
       status: 'OFF_SALE',
+      version: 3,
     })
   })
 

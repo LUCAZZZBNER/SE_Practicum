@@ -1,11 +1,12 @@
 <script setup>
-import { Goods, Setting, User } from '@element-plus/icons-vue'
+import { Goods, List, Setting, User } from '@element-plus/icons-vue'
 import AppHeader from '../components/layout/AppHeader.vue'
 import AppSidebar from '../components/layout/AppSidebar.vue'
 
 const menuItems = [
   { path: '/merchant/store', label: '店铺管理', icon: Setting },
   { path: '/merchant/products', label: '商品管理', icon: Goods },
+  { path: '/merchant/orders', label: '订单管理', icon: List },
   { path: '/merchant/profile', label: '个人信息', icon: User },
 ]
 </script>

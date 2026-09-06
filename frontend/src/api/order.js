@@ -1,7 +1,9 @@
 import http from './http'
 
-export function createOrder(data) {
-  return http.post('/orders', data)
+export function createOrder(items, idempotencyKey) {
+  return http.post('/orders', { items }, {
+    headers: { 'X-Idempotency-Key': idempotencyKey },
+  })
 }
 
 export function listOrders(params) {
@@ -10,4 +12,16 @@ export function listOrders(params) {
 
 export function getOrderDetail(orderId) {
   return http.get(`/orders/${orderId}`)
+}
+
+export function cancelOrder(orderId) {
+  return http.post(`/orders/${orderId}/cancel`)
+}
+
+export function listMerchantOrders(params) {
+  return http.get('/merchant/orders', { params })
+}
+
+export function getMerchantOrderDetail(orderId) {
+  return http.get(`/merchant/orders/${orderId}`)
 }

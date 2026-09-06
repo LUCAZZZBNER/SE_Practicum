@@ -17,6 +17,18 @@ export default [
         meta: { title: '商品管理' },
       },
       {
+        path: 'orders',
+        name: 'MerchantOrders',
+        component: () => import('../../views/MerchantOrdersView.vue'),
+        meta: { title: '订单管理' },
+      },
+      {
+        path: 'orders/:id',
+        name: 'MerchantOrderDetail',
+        component: () => import('../../views/MerchantOrderDetailView.vue'),
+        meta: { title: '订单详情' },
+      },
+      {
         path: 'profile',
         name: 'MerchantProfile',
         component: () => import('../../views/ProfileView.vue'),

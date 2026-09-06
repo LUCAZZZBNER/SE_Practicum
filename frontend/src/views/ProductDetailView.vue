@@ -3,10 +3,14 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { getProductDetail } from '../api/product'
+import { addCartItem } from '../api/cart'
 
 const route = useRoute()
 const loading = ref(false)
 const product = reactive({
+  id: 0,
+  shopId: 0,
+  categoryId: 0,
   name: '',
   shopName: '',
   categoryName: '',
@@ -14,6 +18,7 @@ const product = reactive({
   stock: 0,
   status: '',
 })
+const quantity = ref(1)
 
 const unavailable = computed(() => product.stock <= 0 || product.status === 'OFF_SALE')
 
@@ -21,6 +26,9 @@ async function loadProductDetail() {
   loading.value = true
   try {
     const data = await getProductDetail(Number(route.params.id))
+    product.id = data.id
+    product.shopId = data.shopId
+    product.categoryId = data.categoryId
     product.name = data.name || ''
     product.shopName = data.shopName || ''
     product.categoryName = data.categoryName || ''
@@ -31,6 +39,15 @@ async function loadProductDetail() {
     ElMessage.error(error?.message || '商品详情加载失败')
   } finally {
     loading.value = false
+  }
+}
+
+async function addToCart() {
+  try {
+    await addCartItem({ productId: product.id, quantity: quantity.value })
+    ElMessage.success('已加入购物车')
+  } catch (error) {
+    ElMessage.error(error?.message || '加入购物车失败')
   }
 }
 
@@ -50,8 +67,8 @@ onMounted(loadProductDetail)
       </el-descriptions>
 
       <div class="action-bar">
-        <el-input-number :model-value="1" :min="1" :max="product.stock" />
-        <el-button type="primary" :disabled="unavailable">加入购物车</el-button>
+        <el-input-number v-model="quantity" :min="1" :max="Math.max(product.stock, 1)" />
+        <el-button type="primary" :disabled="unavailable" @click="addToCart">加入购物车</el-button>
       </div>
     </template>
   </section>

@@ -5,6 +5,7 @@ import { listStores } from '../api/store'
 
 const stores = ref([])
 const loading = ref(false)
+const keyword = ref('')
 
 async function loadStores() {
   loading.value = true
@@ -12,6 +13,7 @@ async function loadStores() {
     const data = await listStores({
       page: 1,
       pageSize: 10,
+      keyword: keyword.value || undefined,
     })
     stores.value = data?.items || []
   } catch (error) {
@@ -19,6 +21,10 @@ async function loadStores() {
   } finally {
     loading.value = false
   }
+}
+
+function searchStores() {
+  loadStores()
 }
 
 function isOpen(store) {
@@ -30,7 +36,8 @@ onMounted(loadStores)
 
 <template>
   <section>
-    <el-input clearable placeholder="搜索店铺或商品" class="search-box" />
+    <el-input v-model="keyword" clearable placeholder="搜索店铺" class="search-box" @keyup.enter="searchStores" />
+    <el-button @click="searchStores">搜索</el-button>
 
     <div v-if="loading" class="store-list">加载中...</div>
     <div v-else-if="stores.length === 0" class="store-list">暂无店铺</div>
