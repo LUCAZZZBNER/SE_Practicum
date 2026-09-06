@@ -6,6 +6,7 @@ import AppSidebar from '../components/layout/AppSidebar.vue'
 const menuItems = [
   { path: '/merchant/store', label: '店铺管理', icon: Setting },
   { path: '/merchant/products', label: '商品管理', icon: Goods },
+  { path: '/merchant/orders', label: '店铺订单', icon: Goods },
   { path: '/merchant/profile', label: '个人信息', icon: User },
 ]
 </script>
