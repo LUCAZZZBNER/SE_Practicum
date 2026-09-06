@@ -1,1050 +1,536 @@
-# ABC 阶段 1 业务 TDD 开发与联调执行文档
+# ABC 阶段 1 前后端联调、验收与交付执行文档
 
-> 当前阶段：前期架构、接口契约、数据库 V1 和共同 Red 基线已经发布；现在进入业务 TDD、数据库 V2、前端接入和联调阶段。
+> 更新日期：2026-09-06
 >
-> 当前共同基线：远程 `develop`；2026-09-05 发布时为 169 个测试，其中 143 个公共层/Controller 测试通过，26 个 Service 契约测试因实现尚不存在而处于预期 Red。
+> 当前状态：后端阶段 1 实现已经完成，`feature/b-tdd` 已合并并推送到远程 `develop`。后端完整测试已经由 B 在本机 MySQL 环境中验证通过。
 >
-> 本文替代原《最小必要范围-ABC前期准备与TDD执行文档》。旧文档中的 22 接口、共用登录、HttpSession、`/shops/{shopId}/status`、排除订单取消/幂等/乐观锁等结论全部作废。
+> 当前唯一下一阶段：A 冻结并检查契约，C 按契约修正前端并接入真实后端，B 只处理联调发现的后端缺陷；三人完成 30 个接口的真实联调、证据记录和最终验收。
+
+本文已经删除建 B 分支、保存初始 Red、创建 ServiceImpl 外壳、编写 V2、逐模块重复提交和反复 Push 等已完成步骤。那些内容可从 Git 历史查看，不再作为待办重复执行。
 
 ---
 
-## 1. 先确定什么说了算
+## 1. 什么文档说了算
 
-出现冲突时，严格按以下优先级处理：
+发生冲突时按以下顺序处理：
 
 1. 根目录课程要求 `26271学期-软件工程综合实践.md`；
-2. `docs/software-requirements-specification.md`，决定阶段 1 必须实现的业务；
-3. `docs/api/backend-api-design.md`，决定 HTTP 路径、字段、权限、状态码和错误码；
-4. 已冻结的 Controller、Service 接口和 Service 契约测试，作为可执行契约；
-5. `docs/architecture/backend-architecture-design.md`，决定四层结构、包边界和调用方向；
-6. 本执行文档，决定三个人按什么顺序操作；
-7. 数据库设计、准备日志和旧执行手册，只记录实现或历史，不能缩小前六项已经确定的需求。
+2. `docs/software-requirements-specification.md`，简称 SRS，规定阶段 1 必须实现的业务；
+3. `docs/api/backend-api-design.md`，规定 HTTP 路径、请求字段、响应字段、权限、状态码和错误码；
+4. Controller、Service 接口及自动化测试，作为可执行契约；
+5. `docs/architecture/backend-architecture-design.md`，规定四层结构、包边界和调用方向；
+6. 本文只规定执行顺序，不能修改或缩小前面的需求。
 
-如果 Service 测试与 SRS/API 冲突，A 先修正测试和接口并提交新的 Red，B 不得通过修改业务含义来迁就错误测试。如果数据库 V1 与 SRS/API 冲突，保留 V1，通过 V2 修正，禁止重写已经发布的 V1。
+任何人不得为了让页面或测试通过而擅自修改 SRS/API。发现测试与 SRS/API 相反时，由 A 判断并修正测试；发现实现与 SRS/API 不一致时，修正实现。
 
-### 1.1 已确认的冲突及最终结论
+### 1.1 已冻结的关键结论
 
-| 主题 | 已作废的旧结论 | 当前唯一结论 |
-| --- | --- | --- |
-| 商家账号 | 商家依附 `users`，与用户共用登录 | 商家使用独立账号、密码、状态和登录接口 |
-| 用户登录 | 用户和商家共用 `POST /users/login` | 用户使用 `POST /users/login`，商家使用 `POST /merchants/login` |
-| 认证 | `HttpSession` | JWT Bearer：`Authorization: Bearer <accessToken>` |
-| 店铺修改 | `PATCH /shops/{shopId}/status` | `PATCH /shops/{shopId}`，可局部修改名称、简介和状态 |
-| 购物车路径 | `/cart/items` 或其他写法 | `/api/v1/cart-items` |
-| 接口数量 | 22 个最小接口 | 30 个阶段 1 HTTP 接口 |
-| 分类 | 只新增和查询 | 还必须修改、排序和逻辑删除 |
-| 商品 | 不做版本控制 | PATCH 必须使用 `version` 做乐观锁 |
-| 订单 | 不做幂等和取消 | 创建必须使用 `X-Idempotency-Key`；必须支持取消待支付订单 |
-| 订单状态 | 只有 `PENDING_PAYMENT` | 模型支持全部文档状态；阶段 1 实际状态变化至少包含 `PENDING_PAYMENT → CANCELLED` |
-| V1 | 被当作最终业务数据库 | V1 只是已发布的初始结构，业务实现前必须新增 V2 对齐契约 |
+| 主题 | 阶段 1 唯一结论 |
+| --- | --- |
+| 用户和商家 | 两套独立账号、独立注册、独立登录 |
+| 认证 | JWT Bearer：`Authorization: Bearer <accessToken>` |
+| 店铺修改 | `PATCH /api/v1/shops/{shopId}` |
+| 购物车 | `/api/v1/cart-items`，不是 `/cart` 或 `/cart/items` |
+| 商品 | PATCH 必须携带当前 `version`，成功后版本递增 |
+| 订单 | 创建必须携带 `X-Idempotency-Key` 和每项 `productVersion` |
+| 取消订单 | 只允许 `PENDING_PAYMENT → CANCELLED`，库存只能恢复一次 |
+| 数据库 | 保留 V1，通过 V2 对齐契约，禁止修改已发布的 V1 |
+| 范围 | 30 个阶段 1 接口；不增加支付、退款、骑手、配送、优惠券和消息功能 |
 
 ---
 
-## 2. 当前项目已经完成什么
+## 2. 当前已经完成，不要重做
 
-已经完成：
+截至 2026-09-06，以下内容已经完成：
 
-- Java 17、Spring Boot、Maven Wrapper；
-- Spring MVC 四层代码骨架；
-- MyBatis、Flyway、MySQL Driver；
-- `delivery_dev`、`delivery_test` 本机数据库和 V1 迁移；
-- 6 个 Controller、6 个 Service 接口；
-- JWT Bearer、安全拦截器、统一响应和异常映射；
-- 143 个公共层/Controller 绿色测试；
-- 26 个 Service 业务契约 Red 测试；
-- A+B 基线已经合入远程 `develop`。
+- Java 17、Spring Boot、Maven Wrapper、MyBatis、Flyway 和 MySQL Driver；
+- 简单四层 MVC 结构；
+- 6 个 Controller 和 30 个 HTTP 映射；
+- 6 个 Service 接口和 6 个 ServiceImpl；
+- User、Merchant、Restaurant、Item、Shopping、Order 的 Entity、DAO 和 Mapper XML；
+- JWT Bearer、安全拦截器、统一响应及异常映射；
+- V1、V2 在测试数据库中成功迁移；
+- 用户/商家独立账号、分类逻辑删除、商品乐观锁、原子库存、购物车、订单幂等及取消事务；
+- 后端 Controller、Service 契约和 DAO 集成测试全部通过；
+- `feature/b-tdd` 已通过合并提交进入远程 `develop`。
 
-尚未完成：
+后端代码当前基线是远程 `develop`。不要再次创建 V2、ServiceImpl 外壳或 `feature/b-tdd`，也不要再次制造最初的 26 个 Red。
 
-- ServiceImpl；
-- Entity/Record；
-- DAO/MyBatis Mapper 和 XML SQL；
-- 对齐 SRS/API 的 V2 数据库迁移；
-- DAO/数据库/事务测试；
-- 30 个接口的真实业务响应；
-- 前端按 JWT 和 30 个接口接入；
-- 全量测试全绿和最终联调证据。
-
-### 2.1 当前架构是不是四层
-
-是简单四层 MVC：
+### 2.1 当前四层架构
 
 ```text
-HTTP
+HTTP 请求
   ↓
-Controller：路径、参数校验、读取可信登录主体、包装响应
+Controller：路径、参数校验、可信登录主体、响应包装
   ↓
-Service 接口 / ServiceImpl：业务规则、权限、事务、跨模块编排
+Service / ServiceImpl：业务规则、权限、事务、跨模块编排
   ↓
-DAO/MyBatis Mapper：SQL、分页、条件更新、数据库记录映射
+DAO / MyBatis Mapper：SQL、分页、条件更新、记录映射
   ↓
 MySQL：表、索引、唯一约束、外键、CHECK、Flyway 历史
 ```
 
-每个业务模块内部拥有自己的 `controller/service/dao/entity`，禁止建立全局大目录。Controller 不能写业务判断；DAO 不能调用别的模块；跨模块只能调用对方 Service 接口，不能直接调用对方 DAO 或使用对方 Entity。
+每个业务模块内部拥有自己的 `controller/service/dao/entity`。Controller 不写业务规则，DAO 不调用其他模块；跨模块只调用对方 Service 接口。
 
 ---
 
-## 3. 30 个必须实现的 HTTP 接口
+## 3. 必须联调的 30 个接口
 
-原文计数必须区分两种口径，任何人不得擅自修改原作者文档：
+| 模块 | 数量 | 接口 |
+| --- | ---: | --- |
+| User | 4 | `POST /users`、`POST /users/login`、`GET/PATCH /users/me` |
+| Merchant | 4 | `POST /merchants`、`POST /merchants/login`、`GET/PATCH /merchants/me` |
+| Shop | 4 | `POST /shops`、`GET /shops`、`GET/PATCH /shops/{shopId}` |
+| Category | 4 | `POST/GET /shops/{shopId}/categories`、`PATCH/DELETE /categories/{categoryId}` |
+| Product | 4 | `POST /products`、`GET /shops/{shopId}/products`、`GET/PATCH /products/{productId}` |
+| Cart | 4 | `POST/GET /cart-items`、`PATCH/DELETE /cart-items/{cartItemId}` |
+| Order | 6 | `POST/GET /orders`、`GET /orders/{orderId}`、`POST /orders/{orderId}/cancel`、`GET /merchant/orders`、`GET /merchant/orders/{orderId}` |
 
-- `backend-api-design.md` 明确定义 30 个 HTTP 接口；
-- SRS 第 8.4 节“核心接口清单”原文列出 26 个；
-- 但 SRS 的 FR-PRODUCT-001 正文另外明确写出 4 个分类接口，因此整份 SRS 中出现的唯一接口路径合计仍为 30 个；
-- 这 4 个分类接口同时存在于 API 文档、现有 `ItemController` 和契约测试。
-
-因此当前实现以 `backend-api-design.md` 的 30 个 HTTP 接口为准，SRS 用于对齐业务规则；SRS 第 8.4 节的 26 行保持原样，只把它视为汇总漏项。如果团队不接受这一解释，由 SRS/API 原作者 A 明确确认后再修改源文档；B 不自行删接口或替原作者补写 SRS。
-
-### 3.1 用户 4 个
-
-| 方法 | 路径 | 权限 | 负责人链路 |
-| --- | --- | --- | --- |
-| POST | `/api/v1/users` | Public | A 测试/契约，B 实现，C 注册页 |
-| POST | `/api/v1/users/login` | Public | A 测试/契约，B 实现，C 用户登录页 |
-| GET | `/api/v1/users/me` | User | A 测试/契约，B 实现，C 个人中心 |
-| PATCH | `/api/v1/users/me` | User | A 测试/契约，B 实现，C 资料修改 |
-
-### 3.2 商家 4 个
-
-| 方法 | 路径 | 权限 |
-| --- | --- | --- |
-| POST | `/api/v1/merchants` | Public |
-| POST | `/api/v1/merchants/login` | Public |
-| GET | `/api/v1/merchants/me` | Merchant |
-| PATCH | `/api/v1/merchants/me` | Merchant |
-
-### 3.3 店铺 4 个
-
-| 方法 | 路径 | 权限 |
-| --- | --- | --- |
-| POST | `/api/v1/shops` | Merchant |
-| GET | `/api/v1/shops` | Public；`mine=true` 时 Merchant |
-| GET | `/api/v1/shops/{shopId}` | Public |
-| PATCH | `/api/v1/shops/{shopId}` | Merchant |
-
-### 3.4 分类 4 个
-
-| 方法 | 路径 | 权限 |
-| --- | --- | --- |
-| POST | `/api/v1/shops/{shopId}/categories` | Merchant |
-| GET | `/api/v1/shops/{shopId}/categories` | Public |
-| PATCH | `/api/v1/categories/{categoryId}` | Merchant |
-| DELETE | `/api/v1/categories/{categoryId}` | Merchant |
-
-### 3.5 商品 4 个
-
-| 方法 | 路径 | 权限 |
-| --- | --- | --- |
-| POST | `/api/v1/products` | Merchant |
-| GET | `/api/v1/shops/{shopId}/products` | Public/可选 Merchant |
-| GET | `/api/v1/products/{productId}` | Public/可选 Merchant |
-| PATCH | `/api/v1/products/{productId}` | Merchant |
-
-### 3.6 购物车 4 个
-
-| 方法 | 路径 | 权限 |
-| --- | --- | --- |
-| POST | `/api/v1/cart-items` | User |
-| GET | `/api/v1/cart-items` | User |
-| PATCH | `/api/v1/cart-items/{cartItemId}` | User |
-| DELETE | `/api/v1/cart-items/{cartItemId}` | User |
-
-### 3.7 用户订单 4 个、商家订单 2 个
-
-| 方法 | 路径 | 权限 |
-| --- | --- | --- |
-| POST | `/api/v1/orders` | User |
-| GET | `/api/v1/orders` | User |
-| GET | `/api/v1/orders/{orderId}` | User |
-| POST | `/api/v1/orders/{orderId}/cancel` | User |
-| GET | `/api/v1/merchant/orders` | Merchant |
-| GET | `/api/v1/merchant/orders/{orderId}` | Merchant |
-
-不得为了少写代码删除任何一项，也不得增加支付、退款、骑手、配送调度、优惠券、消息通知等阶段 1 之外的功能。
+表中路径均位于 `/api/v1` 下。准确请求和响应字段不得从本表猜测，必须查看 `docs/api/backend-api-design.md`。
 
 ---
 
-## 4. TDD 在本项目中怎样执行
+## 4. 现在怎样继续 TDD
 
-TDD 固定为：
+后端第一轮 TDD 已经完成。接下来对“前端接入”和“联调缺陷”继续使用：
 
 ```text
-Red：测试先存在，并确认因目标行为未实现而失败
+Red：先用测试或可复现记录证明旧路径、旧字段或缺陷确实存在
   ↓
-Green：只写让当前测试通过的最少代码
+Green：只修改让该契约通过的最少代码
   ↓
-Refactor：测试保持全绿时整理重复代码和命名
+Refactor：自动测试仍全绿时整理重复代码和命名
 ```
 
-当前 26 个 Service 契约测试已经在实现之前进入 Git 历史，因此第一轮 Red 证据已经存在。B 不用等待 A 重新写相同测试，可以开始 Green；但如果发现 SRS/API 中的重要规则没有测试，先通知 A 补一个独立 Red 提交，再由 B 实现。
+为了减少无意义操作，本阶段不要求每个小按钮都单独提交。只保留三个有意义的节点：
 
-每个业务切片都必须保留两个独立提交：
+1. A 提交一组前端接口契约 Red；
+2. C 提交前端真实接入 Green；
+3. 三人提交联调记录和最终验收结果。
 
-```text
-test(user): cover duplicate registration [RED]
-feat(user): implement duplicate registration rule [GREEN]
-```
-
-严禁把新增测试和使它通过的完整实现放在同一个提交里。严禁删除断言、改成跳过或降低正确要求来制造绿色。
-
-### 4.1 当前 Red 的特殊问题
-
-现有契约测试使用 `@SpringBootTest`，而所有 Controller 都要求 6 个 Service Bean。当前第一个错误是缺少 `ItemService`，会遮住目标模块的真实失败。
-
-B 的第一个实现提交应当为六个接口建立最小可注入外壳：
-
-```text
-user/service/impl/UserServiceImpl.java
-merchant/service/impl/MerchantServiceImpl.java
-restaurant/service/impl/RestaurantServiceImpl.java
-item/service/impl/ItemServiceImpl.java
-shopping/service/impl/ShoppingServiceImpl.java
-order/service/impl/OrderServiceImpl.java
-```
-
-每个类使用 `@Service` 并实现对应接口；尚未进入当前切片的方法先明确抛出 `UnsupportedOperationException`，不能返回伪造成功对象。这个提交只让 Spring 上下文可启动，不算任何业务 Green。
+若联调发现新的后端缺陷，则该缺陷单独保留一个 Red 和一个 Green；不能先改实现再补测试，也不能删除断言制造绿色。
 
 ---
 
-## 5. 三个人的固定职责
+## 5. 当前前端已经确认的契约问题
 
-### 5.1 A：契约、Controller、测试和评审
+这些问题已经从当前 `frontend` 源码确认，不需要再次讨论是否存在：
 
-A 负责：
+| 文件/页面 | 当前问题 | 必须对齐 |
+| --- | --- | --- |
+| `src/api/cart.js` | 使用 `/cart`、`/cart/items` | 全部改为 `/cart-items` |
+| `src/api/product.js` | 商品列表使用 `/products` | 列表使用 `/shops/{shopId}/products`；补分类接口 |
+| `src/api/store.js` | 使用 `/stores/{id}/status` | 改为 `PATCH /shops/{shopId}`；补创建店铺和本人店铺列表 |
+| `src/api/order.js` | 创建订单没有幂等请求头；缺取消和商家订单接口 | 加 `X-Idempotency-Key`；补齐 6 个订单接口 |
+| `MerchantStoreView.vue` | 使用 `notice`、`TEMP_CLOSED` | 改为 `description`、`TEMPORARILY_CLOSED` |
+| `MerchantProductsView.vue` | 查询缺 `shopId`；新增提交空对象；更新不带 `version` | 按 API 传完整字段和当前版本 |
+| `CartView.vue` | 下单项没有 `productVersion` | 提交 `cartItemId` 和 `item.product.version` |
+| `OrderDetailView.vue` | 仍是硬编码示例订单 | 改为按路由 ID 调用真实订单详情 |
+| `OrdersView.vue` | 使用 `store`、`amount` 等旧展示字段 | 使用 `shopName`、`total`、`orderNumber` 等 API 字段 |
+| `vite.config.js` | 开发服务器没有 `/api` 代理 | 增加到 `http://localhost:8080` 的开发代理 |
+| 商家页面 | 没有商家订单列表和详情路由 | 增加最小页面或复用订单展示组件 |
 
-1. 维护 SRS/API 与 Controller/Service 签名一致；
-2. 每个切片开始前确认成功、失败、边界、权限和事务规则；
-3. 缺测试时先新增 Red 并提交 Red 日志；
-4. 维护 Controller、统一错误码、JWT 和 MockMvc 测试；
-5. 评审 B 是否把业务放在 ServiceImpl、把 SQL 放在 DAO；
-6. 每次 Green 后运行相关契约测试和公共回归；
-7. 最终生成 JaCoCo 报告并记录覆盖率。
-
-A 不替 B 编写数据库 SQL、DAO 或完整 ServiceImpl。
-
-### 5.2 B：V2、Entity、DAO、ServiceImpl 和事务
-
-B 负责：
-
-1. 新增 V2，不修改 V1；
-2. 每个模块建立 Entity/Record；
-3. 每个模块建立 MyBatis DAO/Mapper 接口和 XML；
-4. 编写 DAO 数据库集成测试；
-5. 实现 6 个 ServiceImpl；
-6. 完成密码摘要、JWT 签发、权限、归属、状态和唯一性规则；
-7. 完成订单创建/取消事务、幂等、库存扣减/恢复；
-8. 让现有 26 个 Service 契约测试逐步变绿。
-
-MyBatis 的 Mapper 接口本身就是 DAO。除非确实需要组合多个 Mapper，不要再加一层只转发调用的 `DaoImpl`。
-
-### 5.3 C：前端、真实接口接入和联调记录
-
-C 负责：
-
-1. 安装带 npm 的 Node LTS，执行 `npm ci`；
-2. Axios `baseURL` 使用 `/api/v1`；
-3. 分开实现用户登录和商家登录；
-4. 保存 Bearer Token，在受保护请求中发送 `Authorization`；
-5. 按 30 个接口修正所有路径和字段；
-6. 只在对应后端切片 Green 后移除该页面假数据；
-7. 验证 401/403/404/409 提示；
-8. 保存每个切片的构建、联调和人工验收记录。
-
-C 不得继续按 HttpSession、共用登录、`/cart/items` 或 `/shops/{id}/status` 开发。
+前端单元测试使用 mock 是正常的；需要删除的是页面中的硬编码业务假数据，而不是测试中的 mock。
 
 ---
 
-## 6. 所有人开工前的 Git 操作
+## 6. 第一步：三个人同步最终后端基线
 
-每个人先保存自己的未提交内容。工作区不是空的就停止，不要覆盖别人的文件。
+三个人都在自己的项目根目录执行：
 
 ```powershell
-Set-Location '自己的项目根目录'
 git status --short
 git fetch origin --prune
 git switch develop
 git pull --ff-only origin develop
-git status --short
-```
-
-然后分别创建自己的分支，只执行属于自己的一条：
-
-```powershell
-# A
-git switch -c feature/a-tdd
-
-# B
-git switch -c feature/b-tdd
-
-# C
-git switch -c feature/c-tdd
-```
-
-确认：
-
-```powershell
-git branch --show-current
 git log -3 --oneline --decorate
-```
-
-任何人都不直接在 `develop` 写业务代码。每次准备合并前都先拉取最新 `origin/develop` 到个人分支并回归。
-
----
-
-## 7. B 的第一阶段：建立可开发的数据库和 ServiceImpl 基础
-
-### 7.0 B 现在从这里开始：无需等待任何人
-
-当前 A 已经交付 6 个 Controller、30 个 HTTP 映射、6 个业务 Service 接口、JWT/异常公共层、143 个绿色公共测试和 26 个 Service Red 测试。B 的输入已经齐全，不再等待 A 发需求单，也不等待 C 完成前端。
-
-B 只在以下情况暂停对应切片并找 A：
-
-1. API 路径/字段与现有 Controller 或 Service 签名无法同时满足；
-2. SRS 的业务规则与现有契约测试断言相反；
-3. 为了让测试通过必须删除断言、跳过测试或改变公开接口；
-4. 当前切片缺少关键成功、失败或边界 Red，无法判断正确行为。
-
-数据库字段不足、Mapper 不存在、ServiceImpl 不存在都属于 B 的正常工作，不是等待 A 的理由。
-
-#### 7.0.1 确认当前起点并创建 B 分支
-
-先关闭正在占用项目文件的程序，不要删除 `target` 以外的任何文件。打开新的 PowerShell：
-
-```powershell
-Set-Location 'D:\Projects\SchoolWorks\SW_2609\SE_Practicum'
-git status --short --branch
-git fetch origin --prune
-git switch develop
-git pull --ff-only origin develop
 git status --short
-git log -3 --oneline --decorate
-git branch --list feature/b-tdd
 ```
 
 要求：
 
-- 第一次 `git status` 不得出现自己未提交的代码；
-- 本地 `develop` 必须与 `origin/develop` 一致；
-- 若最后一条没有输出，创建新分支：
+- `develop` 与 `origin/develop` 指向同一提交；
+- `git status --short` 没有输出；
+- 能看到合并 `feature/b-tdd` 的提交；
+- 不再复制文件或压缩包手工同步。
+
+C 创建本阶段工作分支：
 
 ```powershell
-git switch -c feature/b-tdd
+git switch -c feature/c-api-integration
 ```
 
-- 若最后一条已经显示 `feature/b-tdd`，不要重复创建，执行：
+A 只有在需要新增/修正测试时才创建 `test/a-api-contract`；B 只有在真实联调发现后端缺陷时才创建 `fix/b-integration`。没有代码改动的人不创建空分支和空提交。
 
-```powershell
-git switch feature/b-tdd
-git merge --ff-only develop
-```
+### 6.1 先补最终后端 Green 记录
 
-最后确认：
+执行过后端完整测试的人，把真实结果追加到 `docs/test/test-log.md`：
 
-```powershell
-git branch --show-current
-git status --short
-```
+- 日期和时间；
+- 分支及提交号；
+- `mvnw.cmd clean test` 命令；
+- Tests、Failures、Errors、Skipped 的真实数量；
+- `BUILD SUCCESS`；
+- V1、V2 的 `success=1`；
+- 不记录任何数据库密码。
 
-必须输出 `feature/b-tdd`，且工作区为空。后续所有 B 业务代码都在这个分支完成，禁止直接在 `develop` 编写。
-
-#### 7.0.2 设置当前终端并保存 Red 基线
-
-仍在同一 PowerShell 中执行：
-
-```powershell
-Set-Location 'D:\Projects\SchoolWorks\SW_2609\SE_Practicum\backend'
-$env:JAVA_HOME = 'D:\Dev\Java\JDK17'
-$env:Path = "$env:JAVA_HOME\bin;$env:Path"
-$env:DELIVERY_DB_USERNAME = 'delivery_app'
-$env:DELIVERY_DB_PASSWORD = Read-Host '输入本机 delivery_app 密码' -MaskInput
-$env:SPRING_PROFILES_ACTIVE = 'test'
-
-java -version
-.\mvnw.cmd -version
-.\mvnw.cmd clean test
-```
-
-判断：
-
-- Java 和 Maven 都必须显示 Java 17；
-- 应发现 169 个测试；
-- 143 个公共层/Controller 测试应通过；
-- 26 个 Service 契约测试应因没有 ServiceImpl Bean 而报错；
-- 如果出现 `Access denied`、`Unknown database`、连接拒绝、Flyway checksum、编译失败或公共测试失败，先处理环境问题，不能把它登记为预期 Red。
-
-在 `docs/test/test-log.md` 人工追加以下真实信息：日期、分支、HEAD 提交号、命令、169/143/26 结果、第一个根因。不要粘贴数据库密码，不要把失败写成通过。
-
-#### 7.0.3 用 IDEA 建立六个最小 ServiceImpl 外壳
-
-需要新建的文件和现有接口如下：
-
-| 新文件 | 实现接口 | 需要实现的方法数 |
-| --- | --- | ---: |
-| `user/service/impl/UserServiceImpl.java` | `UserService` | 5 |
-| `merchant/service/impl/MerchantServiceImpl.java` | `MerchantService` | 5 |
-| `restaurant/service/impl/RestaurantServiceImpl.java` | `RestaurantService` | 6 |
-| `item/service/impl/ItemServiceImpl.java` | `ItemService` | 10 |
-| `shopping/service/impl/ShoppingServiceImpl.java` | `ShoppingService` | 6 |
-| `order/service/impl/OrderServiceImpl.java` | `OrderService` | 6 |
-
-IDEA 中对每个模块执行：
-
-1. 在现有 `service` 目录上右键，选择 New → Package；
-2. 包名输入 `impl`；
-3. 在 `impl` 上右键，选择 New → Java Class；
-4. 类名输入对应的 `UserServiceImpl` 等名称；
-5. 在类声明后写 `implements UserService`；
-6. 按 `Alt+Enter`，选择 Implement methods，勾选全部接口方法；
-7. 类上添加 `@Service`，导入 `org.springframework.stereotype.Service`；
-8. 每个尚未开发的方法删除 IDE 生成的 `return null`、`return 0` 或 `return false`；
-9. 方法体统一改为：
-
-```java
-throw new UnsupportedOperationException("Pending TDD implementation");
-```
-
-10. 此时不注入 DAO、不写 SQL、不返回假业务对象，也不修改 Service 接口。
-
-六个外壳完成后编译：
-
-```powershell
-Set-Location 'D:\Projects\SchoolWorks\SW_2609\SE_Practicum\backend'
-.\mvnw.cmd clean test-compile
-.\mvnw.cmd clean test
-```
-
-验收：
-
-- 不再出现 `No qualifying bean of type ...Service`；
-- Spring 测试上下文能够创建；
-- 26 个业务测试仍可处于 Red，但根因应变成明确的 `Pending TDD implementation`；
-- 143 个公共测试必须继续通过。
-
-如果仍提示某个 Service Bean 不存在，检查实现类是否有 `@Service`、包是否位于 `com.delivery.backend` 下面、类是否实现了正确接口。
-
-#### 7.0.4 单独提交外壳，不夹带业务实现
-
-```powershell
-Set-Location 'D:\Projects\SchoolWorks\SW_2609\SE_Practicum'
-git status --short
-git diff --check
-git add -- backend/src/main/java/com/delivery/backend/user/service/impl
-git add -- backend/src/main/java/com/delivery/backend/merchant/service/impl
-git add -- backend/src/main/java/com/delivery/backend/restaurant/service/impl
-git add -- backend/src/main/java/com/delivery/backend/item/service/impl
-git add -- backend/src/main/java/com/delivery/backend/shopping/service/impl
-git add -- backend/src/main/java/com/delivery/backend/order/service/impl
-git diff --cached --check
-git diff --cached --stat
-git commit -m 'chore(service): add injectable tdd implementation shells'
-git status --short
-```
-
-`git status --short` 应为空。这个提交只解决可注入问题，不标记 `[GREEN]`，因为业务断言还没有通过。
-
-#### 7.0.5 在写业务前创建 V2
-
-先确认 V1 未被改动：
-
-```powershell
-git diff --exit-code origin/develop -- backend/src/main/resources/db/migration/V1__create_core_tables.sql
-```
-
-没有输出才继续。检查当前两库迁移历史和业务数据：
-
-```powershell
-mysql -u delivery_app -p delivery_test -e "SELECT version, script, success FROM flyway_schema_history ORDER BY installed_rank;"
-mysql -u delivery_app -p delivery_dev -e "SELECT version, script, success FROM flyway_schema_history ORDER BY installed_rank;"
-mysql -u delivery_app -p delivery_test -e "SELECT (SELECT COUNT(*) FROM users) users, (SELECT COUNT(*) FROM merchants) merchants, (SELECT COUNT(*) FROM shops) shops, (SELECT COUNT(*) FROM products) products, (SELECT COUNT(*) FROM cart_items) cart_items, (SELECT COUNT(*) FROM orders) orders;"
-```
-
-当前尚未正式开发，业务表原则上应为空。如果存在不能丢失的数据，不要删库、截表或强行增加非空列，先确认数据来源和回填策略。
-
-在 IDEA 中新建：
-
-```text
-backend/src/main/resources/db/migration/V2__align_schema_with_api_contract.sql
-```
-
-V2 具体清单见 7.4。SQL 完成后不要手工复制到 MySQL 执行，由 Flyway 运行。先使用 test Profile：
-
-```powershell
-Set-Location 'D:\Projects\SchoolWorks\SW_2609\SE_Practicum\backend'
-$env:SPRING_PROFILES_ACTIVE = 'test'
-.\mvnw.cmd "-DskipTests" spring-boot:run
-```
-
-看到 `Started BackendApplication` 后，按 `Ctrl+C` 正常停止，再检查：
-
-```powershell
-mysql -u delivery_app -p delivery_test -e "SELECT installed_rank, version, script, success FROM flyway_schema_history ORDER BY installed_rank;"
-```
-
-必须看到 V1、V2 各一条且 `success=1`。再运行一次相同启动命令，确认不会重复执行 V2。
-
-然后验证开发库：
-
-```powershell
-$env:SPRING_PROFILES_ACTIVE = 'dev'
-.\mvnw.cmd "-DskipTests" spring-boot:run
-```
-
-看到启动成功后按 `Ctrl+C`，检查：
-
-```powershell
-mysql -u delivery_app -p delivery_dev -e "SELECT installed_rank, version, script, success FROM flyway_schema_history ORDER BY installed_rank;"
-```
-
-如果 V2 失败，不要删除 `flyway_schema_history`、不要执行 `flyway repair`、不要直接改 V1；先保存完整错误并检查失败的 DDL。只有尚未发布且失败迁移没有成功记录时，才修正 V2 后重新验证。
-
-#### 7.0.6 第一个真实 Green：User 模块
-
-V2 成功后只开发 User，不同时开发 Merchant/Shop/Item。需要建立：
-
-```text
-backend/src/main/java/com/delivery/backend/user/entity/UserEntity.java
-backend/src/main/java/com/delivery/backend/user/dao/UserDao.java
-backend/src/main/resources/mapper/user/UserDao.xml
-backend/src/main/java/com/delivery/backend/user/service/impl/UserServiceImpl.java
-```
-
-如果 `pom.xml` 还没有 `spring-security-crypto`，先按 7.3 添加，使用 BCrypt 保存摘要。禁止自己实现明文、可逆加密或简单 MD5 密码方案。
-
-按以下四个现有 Red 逐个实现，不一次写完其他模块：
-
-1. 注册成功：
-
-```powershell
-.\mvnw.cmd "-Dtest=UserServiceContractTests#registrationReturnsAnActiveNonSensitiveUser" test
-```
-
-只实现插入用户、默认 `ACTIVE`、返回非敏感 UserView。
-
-2. 重复账号和确认密码：
-
-```powershell
-.\mvnw.cmd "-Dtest=UserServiceContractTests#duplicateAccountAndPasswordMismatchAreRejectedWithoutPartialRegistration" test
-```
-
-实现密码一致校验、账号唯一查询/约束异常映射，并保证失败不留下记录。
-
-3. 用户登录：
-
-```powershell
-.\mvnw.cmd "-Dtest=UserServiceContractTests#loginReturnsAUserBearerSessionAndRejectsBadCredentials" test
-```
-
-实现 BCrypt 匹配、禁用状态判断、调用 `JwtTokenService.issue(..., Role.USER)`，错误凭据返回 `BAD_CREDENTIALS`。
-
-4. 本人信息和有效性：
-
-```powershell
-.\mvnw.cmd "-Dtest=UserServiceContractTests#currentProfileUpdateAndActiveSnapshotAreScopedToTheUserId" test
-```
-
-实现按 ID 查询、局部更新、资源不存在和 `requireActive`。
-
-四个场景分别变绿后运行整个用户模块和公共回归：
-
-```powershell
-.\mvnw.cmd "-Dtest=UserServiceContractTests,UserControllerTests,DefaultJwtTokenServiceTests,AuthenticationInterceptorTests,GlobalExceptionHandlerTests" test
-```
-
-User 模块必须全部通过。其他未实现模块继续 Red 是当前阶段允许的。提交前：
-
-```powershell
-Set-Location 'D:\Projects\SchoolWorks\SW_2609\SE_Practicum'
-git status --short
-git diff --check
-git add -- backend/pom.xml
-git add -- backend/src/main/java/com/delivery/backend/user
-git add -- backend/src/main/resources/mapper/user
-git add -- backend/src/main/resources/db/migration/V2__align_schema_with_api_contract.sql
-git add -- docs/test/test-log.md
-git diff --cached --check
-git diff --cached --stat
-git commit -m 'feat(user): implement user persistence and service [GREEN]'
-```
-
-若 V2 已在前一个独立提交中提交，本次 `git add` 找不到新 V2 变更是正常的。不得提交 `backend/target`、数据库密码、IDEA 私有配置或真实令牌。
-
-#### 7.0.7 完成 User 后才进入下一模块
-
-User Green 后按本文件第 8 节继续：
-
-```text
-Merchant → Restaurant → Item → Shopping → Order
-```
-
-每个模块遵循相同闭环：确认已有 Red → 最少 Entity/DAO/XML/ServiceImpl → 目标测试 Green → 公共回归 → 独立提交。不要为了追求一次完整测试全绿而同时把六个模块一起写完。
-
-#### 7.0.8 暂不逐模块提交，最后在本人 PowerShell 统一运行数据库测试
-
-Codex 可以完成编译和不连接数据库的 Controller 测试，但不能代替 B 输入本机 `delivery_app` 密码。B 可以先连续完成 Merchant、Restaurant、Item、Shopping、Order，最后在自己能够输入密码的 PowerShell 中统一验证。密码只能通过 `Read-Host -MaskInput` 写入当前进程环境，禁止写进配置文件、命令历史、测试代码或 Git。
-
-先打开一个新的 PowerShell，整个测试过程都不要关闭这个窗口，然后执行一次环境准备：
-
-```powershell
-Set-Location 'D:\Projects\SchoolWorks\SW_2609\SE_Practicum\backend'
-
-$env:JAVA_HOME = 'D:\Dev\Java\JDK17'
-$env:Path = "$env:JAVA_HOME\bin;$env:Path"
-$env:DELIVERY_DB_USERNAME = 'delivery_app'
-$env:DELIVERY_DB_PASSWORD = Read-Host '输入本机 delivery_app 密码' -MaskInput
-$env:SPRING_PROFILES_ACTIVE = 'test'
-
-java -version
-.\mvnw.cmd -version
-```
-
-所有模块完成前，如果只想检查目前已经完成的 User、Merchant、Restaurant、Item，运行：
-
-```powershell
-.\mvnw.cmd "-Dtest=UserServiceContractTests,MerchantServiceContractTests,RestaurantServiceContractTests,ItemServiceContractTests,ItemDaoIntegrationTests,UserControllerTests,MerchantControllerTests,RestaurantControllerTests,ItemControllerTests,DefaultJwtTokenServiceTests,AuthenticationInterceptorTests,GlobalExceptionHandlerTests" test
-```
-
-当前阶段这条命令应运行 132 个测试，结果必须是 `Failures: 0`、`Errors: 0`、`Skipped: 0` 和 `BUILD SUCCESS`。未到最终验收时可以跳过这条中间命令，直接继续写下面模块。
-
-Shopping 完成后如需单独验证购物车，运行：
-
-```powershell
-.\mvnw.cmd "-Dtest=ShoppingServiceContractTests,ShoppingControllerTests" test
-```
-
-Item 的数据库原子性测试已经包含在 `ItemDaoIntegrationTests` 中。需要单独验证分类、商品、乐观锁和库存时运行：
-
-```powershell
-.\mvnw.cmd "-Dtest=ItemServiceContractTests,ItemDaoIntegrationTests,ItemControllerTests" test
-```
-
-Order 完成后如需单独验证订单，运行：
-
-```powershell
-.\mvnw.cmd "-Dtest=OrderServiceContractTests,OrderControllerTests" test
-```
-
-六个模块全部实现完后，必须运行最终完整测试；这条命令不能省略：
-
-```powershell
-.\mvnw.cmd clean test
-```
-
-加入 2 个 Item DAO 集成测试后，当前最终总数应至少为 171；如果后续再补必要测试，总数可以增加。最终结果必须同时满足：
-
-```text
-Failures: 0
-Errors: 0
-Skipped: 0
-BUILD SUCCESS
-```
-
-最后确认测试库确实执行了 V1 和 V2：
-
-```powershell
-mysql -u delivery_app -p delivery_test -e "SELECT installed_rank, version, script, success FROM flyway_schema_history ORDER BY installed_rank;"
-```
-
-应看到 `V1__create_core_tables.sql`、`V2__align_schema_with_api_contract.sql` 各一条并且 `success=1`。如果失败，保存从第一个 `[ERROR]` 开始到 `BUILD FAILURE` 的完整输出；不要删除 `flyway_schema_history`、不要改 V1、不要运行 `flyway repair`。测试全部通过后再决定一次性提交和 Push。
-
-### 7.1 建立 B 分支并保存正式 Red
-
-```powershell
-Set-Location 'D:\Projects\SchoolWorks\SW_2609\SE_Practicum'
-git switch develop
-git pull --ff-only origin develop
-git switch -c feature/b-tdd
-
-Set-Location '.\backend'
-$env:JAVA_HOME = 'D:\Dev\Java\JDK17'
-$env:Path = "$env:JAVA_HOME\bin;$env:Path"
-$env:DELIVERY_DB_USERNAME = 'delivery_app'
-$env:DELIVERY_DB_PASSWORD = Read-Host '输入本机 delivery_app 密码' -MaskInput
-$env:SPRING_PROFILES_ACTIVE = 'test'
-.\mvnw.cmd -version
-.\mvnw.cmd clean test
-```
-
-预期基线仍是 169 个测试、143 个通过、26 个 Error，且根因只能是找不到 Service Bean。把命令、时间、提交号和结果追加到 `docs/test/test-log.md`，不得伪造全绿。
-
-### 7.2 新增六个 ServiceImpl 外壳
-
-逐个实现现有 Service 接口，加入 `@Service`。暂未实现的方法抛出：
-
-```java
-throw new UnsupportedOperationException("Pending TDD implementation");
-```
-
-然后运行：
-
-```powershell
-.\mvnw.cmd clean test
-```
-
-预期上下文能够创建，测试应失败在明确的未实现方法。提交：
-
-```powershell
-Set-Location '..'
-git add -- backend/src/main/java
-git diff --cached --check
-git commit -m 'chore(service): add injectable tdd implementation shells'
-```
-
-### 7.3 增加密码摘要的最小依赖
-
-用户和商家密码必须保存摘要，不能明文保存。若 `pom.xml` 尚无密码编码器，只添加 `spring-security-crypto`，不要引入整套 Spring Security Web 认证来替换现有 JWT 拦截器。
-
-修改后验证：
-
-```powershell
-Set-Location '.\backend'
-.\mvnw.cmd dependency:tree "-Dincludes=org.springframework.security:spring-security-crypto"
-.\mvnw.cmd test-compile
-```
-
-### 7.4 编写 V2，不修改 V1
-
-文件固定为：
-
-```text
-backend/src/main/resources/db/migration/V2__align_schema_with_api_contract.sql
-```
-
-V2 至少完成以下对齐：
-
-| 表 | 必须变更 | 原因 |
-| --- | --- | --- |
-| `merchants` | 去掉对 `users.user_id` 的账号依附；增加独立 `account`、`password_hash`、`phone`、`status`、`updated_at`；账号唯一 | 商家独立注册和登录 |
-| `shops` | 把“每个商家只能一店”的唯一约束改为同一商家店名唯一；根据查询规则保留有效性/逻辑删除字段 | `mine=true` 和同商家店名冲突规则 |
-| `product_categories` | 增加 `sort_order`、`created_at`、`updated_at`、逻辑删除标记 | 分类排序、修改、逻辑删除 |
-| `products` | 增加非空 `version`，初始为 1；更新时做条件更新并递增 | 商品 PATCH 乐观锁和价格确认 |
-| `orders` | 增加 `idempotency_key`、请求指纹、`shop_name` 快照、`updated_at`、`cancelled_at`；扩展状态约束；建立 `(user_id,idempotency_key)` 唯一约束 | 幂等、历史快照和取消 |
-| `order_items` | 保留商品名称、单价、数量快照；需要的查询索引补齐 | 历史订单不受商品修改影响 |
-
-规则：
-
-- 先确认开发库和测试库当前没有真实业务数据；若有数据，停止并先制定回填方式；
-- V2 必须能从已经执行过 V1 的数据库升级；
-- 不在 MySQL 中手工改表后再补 SQL；
-- 不删除 `flyway_schema_history`；
-- 不修改 V1 的任何字符，否则已执行环境会 checksum 失败；
-- V2 在 `delivery_test` 通过后再用于 `delivery_dev`。
-
-验证测试库：
-
-```powershell
-Set-Location 'D:\Projects\SchoolWorks\SW_2609\SE_Practicum\backend'
-$env:SPRING_PROFILES_ACTIVE = 'test'
-.\mvnw.cmd "-DskipTests" spring-boot:run
-```
-
-看到 `Started BackendApplication` 后按 `Ctrl+C` 停止，再查询迁移历史：
-
-```powershell
-mysql -u delivery_app -p delivery_test -e "SELECT installed_rank, version, script, success FROM flyway_schema_history ORDER BY installed_rank;"
-```
-
-应看到 V1、V2 各一条且 `success=1`。再重复启动一次，确认 V2 不会重复执行。然后切换 dev Profile 验证开发库。
-
-V2 与 DAO 基础建议使用单独提交：
-
-```powershell
-Set-Location 'D:\Projects\SchoolWorks\SW_2609\SE_Practicum'
-git add -- backend/src/main/resources/db/migration backend/pom.xml
-git diff --cached --check
-git commit -m 'feat(database): align schema with api contract [GREEN]'
-```
+不要凭记忆填写数量，应从 Maven 最后输出或 `backend/target/surefire-reports` 读取。
 
 ---
 
-## 8. B 的六个模块实现顺序
+## 7. 第二步：A 先建立前端接口契约 Red
 
-固定依赖顺序：
+A 在 `test/a-api-contract` 上更新现有前端测试或新增一个小型 API 契约测试文件，至少固定以下内容：
 
-```text
-user → merchant → restaurant → item → shopping → order
-```
+1. Axios `baseURL` 为 `/api/v1`；
+2. 用户和商家登录路径互相独立；
+3. 四个购物车方法全部使用 `/cart-items`；
+4. 商品列表必须带 `shopId` 组成 `/shops/{shopId}/products`；
+5. 店铺 PATCH 使用 `/shops/{shopId}`；
+6. 四个分类方法路径正确；
+7. 创建订单把 `X-Idempotency-Key` 放进请求头；
+8. 创建订单 body 的每项同时具有 `cartItemId`、`productVersion`；
+9. 用户取消订单和商家订单查询方法存在且路径正确；
+10. 页面使用 API 文档中的状态枚举及响应字段。
 
-不要同时铺开六个模块。每完成一个模块，先运行该模块测试，再运行公共测试，提交后再进入下一个模块。
-
-### 8.1 User
-
-建立：
-
-```text
-user/entity/UserEntity.java
-user/dao/UserDao.java
-resources/mapper/user/UserDao.xml
-user/service/impl/UserServiceImpl.java
-```
-
-DAO 最少提供：按 account 查询、按 id 查询、插入、局部更新。ServiceImpl 最少完成：
-
-- 注册字段校验和两次密码一致；
-- 账号唯一，冲突映射 `ACCOUNT_EXISTS`；
-- BCrypt 摘要保存；
-- 默认 `ACTIVE`；
-- 登录校验摘要和状态，签发 `USER` JWT；
-- 本人资料查询/局部更新；
-- `requireActive`；
-- 永不返回 `password_hash`。
-
-测试：
+运行：
 
 ```powershell
-.\mvnw.cmd "-Dtest=UserServiceContractTests,UserControllerTests" test
-```
-
-通过后提交：
-
-```powershell
-git commit -m 'feat(user): implement user persistence and service [GREEN]'
-```
-
-### 8.2 Merchant
-
-建立 MerchantEntity、MerchantDao、XML 和 MerchantServiceImpl。最少完成：
-
-- 与 users 完全独立的账号、摘要和状态；
-- 独立注册、独立 `/merchants/login`；
-- 默认 `ACTIVE`，`SUSPENDED` 拒绝登录和写操作；
-- 签发 `MERCHANT` JWT；
-- 本人资料查询/局部更新；
-- `requireActive`；
-- 账号冲突映射 `MERCHANT_ACCOUNT_EXISTS`。
-
-测试：
-
-```powershell
-.\mvnw.cmd "-Dtest=MerchantServiceContractTests,MerchantControllerTests" test
-```
-
-### 8.3 Restaurant
-
-建立 ShopEntity、RestaurantDao、XML 和 RestaurantServiceImpl。最少完成：
-
-- 创建前调用 `MerchantService.requireActive`；
-- 新店默认 `CLOSED`；
-- 同一商家同名店铺冲突；
-- 公开列表只显示可公开店铺，`mine=true` 只显示当前商家店铺；
-- 分页从 1 开始、pageSize 最大 100；
-- 排序白名单只有 `name`、`createdAt`；
-- 只有店主可 PATCH 名称、简介、状态；
-- `requireOwned` 和 `requireOrderable` 正确报错。
-
-```powershell
-.\mvnw.cmd "-Dtest=RestaurantServiceContractTests,RestaurantControllerTests" test
-```
-
-### 8.4 Item
-
-建立 CategoryEntity、ProductEntity、ItemDao/必要的分类与商品 Mapper、XML 和 ItemServiceImpl。最少完成：
-
-- 分类属于店主店铺，名称唯一，按 `sortOrder asc` 查询；
-- 分类 PATCH 和逻辑删除；被有效商品引用时拒绝删除；
-- 商品创建校验店铺、分类、价格和库存，默认 `OFF_SALE`、version=1；
-- 公众只看到 `ON_SALE`，店主可查看下架商品；
-- PATCH 使用 `WHERE id=? AND version=?` 原子更新并递增 version；
-- 版本过期返回 `RESOURCE_CONFLICT`；
-- 预留库存检查状态、版本和数量，库存不能变负；
-- 恢复库存每次只执行调用要求的数量。
-
-```powershell
-.\mvnw.cmd "-Dtest=ItemServiceContractTests,ItemControllerTests" test
-```
-
-必须补 DAO 测试验证乐观锁和原子扣库存，不仅依赖 Java 先查询再更新。
-
-### 8.5 Shopping
-
-建立 CartItemEntity、ShoppingDao、XML 和 ShoppingServiceImpl。最少完成：
-
-- 仅允许用户操作本人项；
-- `(user_id,product_id)` 唯一；
-- 同商品再次加入时累加数量而不是插入第二行；
-- 每次新增/修改重新检查用户、店铺、商品、库存；
-- 查询使用最新商品价格计算展示 subtotal/total；
-- 删除购物车项是物理删除，不影响商品库存；
-- `loadForCheckout` 只返回指定且属于当前用户的项；
-- `removeAfterCheckout` 只删除成功结算项。
-
-```powershell
-.\mvnw.cmd "-Dtest=ShoppingServiceContractTests,ShoppingControllerTests" test
-```
-
-### 8.6 Order
-
-建立 OrderEntity、OrderItemEntity、OrderDao/Mapper、XML 和 OrderServiceImpl。创建订单必须在一个 `@Transactional` 事务中按顺序执行：
-
-```text
-校验用户和 X-Idempotency-Key
-→ 读取本人选中购物车项
-→ 确认只能来自一个店铺
-→ 确认店铺 OPEN
-→ 按商品 ID 稳定顺序校验 version 并原子扣库存
-→ 服务端按数据库价格计算金额
-→ 保存订单、店铺名称快照和商品明细快照
-→ 删除已结算购物车项
-→ 提交事务
-```
-
-任何一步失败，订单、明细、库存和购物车全部回滚。相同用户、相同幂等键、相同请求返回首次结果；相同键不同请求返回 `IDEMPOTENCY_CONFLICT`。
-
-取消订单必须：
-
-- 只允许订单本人；
-- 只允许 `PENDING_PAYMENT → CANCELLED`；
-- 状态条件更新保证并发取消只有一次成功；
-- 在同一事务恢复库存并写 `cancelled_at`；
-- 第二次取消返回 `ORDER_STATE_CONFLICT`，不能再次恢复库存；
-- 订单和明细永不删除。
-
-用户只能查询本人订单；商家只能查询本人店铺订单。
-
-```powershell
-.\mvnw.cmd "-Dtest=OrderServiceContractTests,OrderControllerTests" test
-```
-
-订单必须补事务回滚、幂等重试、重复取消和库存恢复数据库测试。
-
----
-
-## 9. 每个模块的固定提交和合并流程
-
-模块开发完成后：
-
-```powershell
-Set-Location 'D:\Projects\SchoolWorks\SW_2609\SE_Practicum\backend'
-.\mvnw.cmd clean test
-
-Set-Location '..'
-git status --short
-git diff --check
-git add -- backend docs/test
-git diff --cached --stat
-git diff --cached --check
-git commit -m 'feat(module): describe completed green slice [GREEN]'
-git fetch origin --prune
-git merge --no-ff origin/develop -m 'merge: sync develop before module delivery'
-```
-
-同步 `develop` 后重新运行目标模块和完整测试。由于其他模块可能仍在 Red，完整测试允许保留已登记的未完成模块错误，但当前模块必须全绿，且不能出现编译、数据库、Flyway、公共测试或已完成模块回归。
-
-然后推送个人分支并创建 PR：
-
-```powershell
-git push -u origin HEAD
-```
-
-PR 必须写明：
-
-- 本次实现哪些 SRS/接口；
-- 对应 Red 提交；
-- 目标测试通过数量；
-- 完整测试还剩哪些已知 Red；
-- 是否包含 V2/数据库变更；
-- C 可以开始联调哪些接口。
-
-评审通过后合入 `develop`。其他人执行 `git pull --ff-only origin develop`，不能复制文件手工对齐。
-
----
-
-## 10. C 的联调顺序
-
-C 与后端 Green 顺序一致：
-
-1. 用户注册、用户登录、个人中心；
-2. 商家注册、商家登录、商家资料；
-3. 店铺创建、列表、详情、PATCH；
-4. 分类新增、列表、修改、删除；
-5. 商品新增、列表、详情、PATCH；
-6. 购物车增删改查；
-7. 下单、用户订单列表/详情/取消；
-8. 商家订单列表/详情。
-
-前端首次准备：
-
-```powershell
-node -v
-npm -v
 Set-Location 'D:\Projects\SchoolWorks\SW_2609\SE_Practicum\frontend'
 npm ci
+npm run test:run
+```
+
+预期新测试因当前旧路径或缺方法而失败，这才是有效 Red。A 记录失败用例和根因后提交：
+
+```powershell
+Set-Location '..'
+git add -- frontend/src/tests docs/test/test-log.md
+git diff --cached --check
+git commit -m 'test(frontend): align api clients with frozen contract [RED]'
+git push -u origin test/a-api-contract
+```
+
+A 的 Red 合入 `develop` 后，C 在个人分支同步：
+
+```powershell
+git fetch origin
+git rebase origin/develop
+```
+
+如果 A 已经把这些断言写在现有测试里并能证明当前 Red，就不重复新建第二套相同测试。
+
+---
+
+## 8. 第三步：C 完成最小前端 Green
+
+### 8.1 修正开发代理
+
+保留 `src/api/http.js` 的：
+
+```text
+baseURL = /api/v1
+```
+
+在 `vite.config.js` 的 `server` 中增加 `/api` 代理到：
+
+```text
+http://localhost:8080
+```
+
+这样浏览器访问 `http://localhost:5173` 时，请求仍写 `/api/v1/...`，由 Vite 转发到后端，避免额外增加 CORS 配置。
+
+### 8.2 修正 API 封装
+
+按下面顺序修改，避免页面和封装同时失控：
+
+1. `user.js`、`merchant.js`：确认独立登录和个人资料 8 个接口；
+2. `store.js`：补 `createShop`、`listShops`、`getShop`、`updateShop`；
+3. `product.js`：补四个分类方法，修正按店铺查询商品；
+4. `cart.js`：四个方法统一为 `/cart-items`；
+5. `order.js`：补齐用户订单 4 个、商家订单 2 个方法；
+6. `index.js`：导出所有新增方法。
+
+创建订单封装应接收独立的 `idempotencyKey`，请求形式为：
+
+```text
+POST /api/v1/orders
+X-Idempotency-Key: <本次结算键>
+
+{
+  "items": [
+    { "cartItemId": 31, "productVersion": 3 }
+  ]
+}
+```
+
+同一次结算的网络重试必须复用同一个 key；新的结算才生成新 key。不要把固定 key 写死在源码里。
+
+### 8.3 修正页面字段和缺失页面
+
+按依赖顺序处理：
+
+1. 用户/商家注册、登录和资料页；
+2. 商家店铺创建、本人店铺列表和店铺修改；
+3. 分类新增、列表、修改、删除；
+4. 商品新增、列表、详情和带 version 的修改；
+5. 用户店铺/分类/商品浏览；
+6. 购物车增删改查；
+7. 用户创建、查询、查看和取消订单；
+8. 商家订单列表和详情。
+
+页面只实现阶段 1 必需操作。不要增加支付页、地图、配送员、优惠券、退款或 WebSocket。
+
+### 8.4 每完成一组就验证
+
+```powershell
+Set-Location 'D:\Projects\SchoolWorks\SW_2609\SE_Practicum\frontend'
+npm run test:run
 npm run build
 ```
 
-每接通一个切片：
+所有 A 新增的契约测试和原有页面测试必须 Green，构建目录能够正常生成。不要通过删除测试、`skip` 或放宽断言解决失败。
 
-- 删除该页面对应的假数据；
-- 检查请求路径和字段；
-- 检查 Bearer Token；
-- 检查成功状态码和 `code=0`；
-- 人工触发 400、401、403、404、409；
-- 保存截图和结果到 `docs/test/test-log.md`；
-- 再执行 `npm run build`。
+C 完成整个前端接入后只做一次 Green 提交：
 
-当前项目没有前端自动测试框架。阶段 1 不为了形式额外增加大型前端测试体系；由 A 的后端自动测试、C 的构建和逐接口人工联调共同形成最小证据。若课程明确要求前端自动化测试，再单独加入 Vitest，而不是现在擅自扩展。
-
----
-
-## 11. 新电脑仍需完成的一次性环境准备
-
-Git 只同步源码、Maven 配置和 npm 锁文件，不会同步本机软件、数据库和密码。
-
-| 工具 | 是否随仓库提供 | 要求 |
-| --- | --- | --- |
-| Git | 否 | 可执行 `git --version` |
-| JDK 17 | 否 | `java -version` 和 `mvnw.cmd -version` 都显示 17 |
-| Maven | 是，Wrapper 脚本 | 不用全局安装；首次联网自动下载 Maven 3.9.16 |
-| MySQL Server | 否 | 本机 `localhost:3306`；创建 dev/test 空库和应用账号 |
-| Node.js/npm | 否 | C 必须安装包含 npm 的 Node LTS |
-| IDEA/VS Code | 否 | 可选，不影响构建 |
-| `rg` | 否 | 可选，不影响项目运行 |
-
-每台电脑必须设置自己的：
-
-```text
-DELIVERY_DB_USERNAME
-DELIVERY_DB_PASSWORD
+```powershell
+Set-Location '..'
+git status --short
+git diff --check
+git add -- frontend
+git diff --cached --check
+git diff --cached --stat
+git commit -m 'feat(frontend): integrate stage-one backend api [GREEN]'
 ```
 
-Flyway能自动创建和升级表，但不能安装 MySQL、创建数据库实例或替别人保存密码。真实密码不得提交到 Git。
+---
+
+## 9. 第四步：在同一台联调电脑上启动真实后端和前端
+
+下面两个进程必须在同一台电脑上运行，因为 `localhost` 只代表当前电脑。B 和 C 如果使用不同电脑，C 的 `localhost:8080` 不能访问 B 的后端。
+
+最少工作方案：C 先用前端自动测试完成 Green 并推送个人分支；然后在已经配置好 MySQL 的 B 电脑上拉取该分支，同时启动后端和前端进行真实联调。若 C 的电脑也完成了第 14 节环境准备，也可以直接把 C 的电脑作为联调机。
+
+### 9.1 联调机启动 MySQL 和后端
+
+先查看 MySQL：
+
+```powershell
+Get-Service -Name 'MySQL267'
+Test-NetConnection localhost -Port 3306
+```
+
+如果服务停止，必须在管理员 PowerShell 中执行：
+
+```powershell
+Start-Service -Name 'MySQL267'
+```
+
+然后在普通 PowerShell 中启动开发后端：
+
+```powershell
+Set-Location 'D:\Projects\SchoolWorks\SW_2609\SE_Practicum\backend'
+$env:JAVA_HOME = 'D:\Dev\Java\JDK17'
+$env:Path = "$env:JAVA_HOME\bin;$env:Path"
+$env:DELIVERY_DB_USERNAME = 'delivery_app'
+$env:DELIVERY_DB_PASSWORD = Read-Host '输入本机 delivery_app 密码' -MaskInput
+$env:SPRING_PROFILES_ACTIVE = 'dev'
+.\mvnw.cmd spring-boot:run
+```
+
+这个窗口保持运行。看到 `Started BackendApplication` 后，后端位于 `http://localhost:8080`。密码只存在当前进程，不写入 Git、文档或截图。
+
+### 9.2 同一台联调机启动前端
+
+另开一个普通 PowerShell：
+
+```powershell
+Set-Location 'D:\Projects\SchoolWorks\SW_2609\SE_Practicum\frontend'
+npm ci
+npm run dev
+```
+
+浏览器打开 `http://localhost:5173`。浏览器 Network 面板中的业务请求必须到 `/api/v1/...`，并由开发代理转发到 8080。
 
 ---
 
-## 12. 最终验收标准
+## 10. 第五步：按一个完整故事验证全部 30 个接口
 
-业务阶段完成必须同时满足：
+使用新的测试账号，按以下顺序人工操作。每一步记录“接口、预期、实际、是否通过”；关键节点保存截图。不要直接向数据库插入业务数据，因为那样不能证明接口可用。
 
-- [ ] 30 个接口与 API 文档一致；
-- [ ] 用户和商家独立账号、独立登录；
-- [ ] JWT Bearer 鉴权和资源归属正确；
-- [ ] V1 保持不变，V2 在 dev/test 均成功；
-- [ ] 6 个 ServiceImpl、各模块 Entity 和 DAO/Mapper 完成；
-- [ ] 分类逻辑删除和排序完成；
-- [ ] 商品乐观锁和原子库存完成；
-- [ ] 订单幂等、事务、快照和取消恢复库存完成；
-- [ ] 169 个现有测试以及新增 DAO/数据库测试全部通过；
-- [ ] 0 failures、0 errors、0 skipped；
-- [ ] `mvnw.cmd clean test` 成功并生成 JaCoCo 报告；
-- [ ] `npm ci`、`npm run build` 成功；
-- [ ] C 已删除对应业务假数据并完成 30 接口联调；
-- [ ] Red/Green 提交、测试日志、Bug 记录和截图真实可追踪；
-- [ ] 三人最终代码已合入 `develop`，工作区干净。
+### 10.1 商家准备商品
 
-最终命令：
+1. 商家注册：验证 `POST /merchants`；
+2. 商家登录：验证 `POST /merchants/login`，保存 Merchant Token；
+3. 查看商家资料：验证 `GET /merchants/me`；
+4. 修改商家资料：验证 `PATCH /merchants/me`；
+5. 创建店铺：验证 `POST /shops`，新店应为 `CLOSED`；
+6. 查询本人店铺：验证 `GET /shops?mine=true`；
+7. 查看店铺详情：验证 `GET /shops/{shopId}`；
+8. 修改店铺并设为 `OPEN`：验证 `PATCH /shops/{shopId}`；
+9. 创建将用于商品的分类：验证 `POST /shops/{shopId}/categories`；
+10. 查询分类：验证 `GET /shops/{shopId}/categories`；
+11. 修改分类：验证 `PATCH /categories/{categoryId}`；
+12. 另外创建一个空分类并删除：验证 `DELETE /categories/{categoryId}`；不要删除已有商品引用的分类；
+13. 创建商品：验证 `POST /products`，初始状态应为 `OFF_SALE`；
+14. 按店铺查询商品：验证 `GET /shops/{shopId}/products?includeOffSale=true`；
+15. 查看商品详情：验证 `GET /products/{productId}`；
+16. 携带当前 version 把商品改为 `ON_SALE`：验证 `PATCH /products/{productId}`，返回的新 version 应递增。
+
+### 10.2 用户完成一次下单和取消
+
+17. 用户注册：验证 `POST /users`；
+18. 用户登录：验证 `POST /users/login`，保存 User Token；
+19. 查看用户资料：验证 `GET /users/me`；
+20. 修改用户资料：验证 `PATCH /users/me`；
+21. 浏览营业店铺：验证公开 `GET /shops`；
+22. 浏览该店商品：再次验证公开商品列表只显示 `ON_SALE`；
+23. 加入购物车：验证 `POST /cart-items`；
+24. 查询购物车：验证 `GET /cart-items`，金额来自当前商品价格；
+25. 修改数量：验证 `PATCH /cart-items/{cartItemId}`；
+26. 为验证删除，可删除后重新加入：验证 `DELETE /cart-items/{cartItemId}`；
+27. 使用购物车返回的 `product.version` 和新的幂等键创建订单：验证 `POST /orders`；
+28. 查询用户订单列表和详情：验证 `GET /orders`、`GET /orders/{orderId}`；
+29. 取消待支付订单：验证 `POST /orders/{orderId}/cancel`，状态应为 `CANCELLED`；
+30. 切回 Merchant Token，查询商家订单列表和详情：验证 `GET /merchant/orders`、`GET /merchant/orders/{orderId}`。
+
+步骤数量是操作顺序，不是接口计数；其中部分步骤同时验证同一模块的列表和详情。最终必须在记录表中逐项覆盖第 3 节的全部 30 个唯一接口。
+
+### 10.3 必须补的失败场景
+
+最少人工验证以下失败，不需要增加新功能：
+
+- 不带 Token 访问受保护接口得到 401；
+- User Token 调用商家接口或 Merchant Token 调用用户接口得到 403；
+- 查询别人的资源不能泄露数据；
+- 重复用户/商家账号和同店同名分类得到 409；
+- 使用旧 product version 更新商品得到 409；
+- 库存不足不能创建订单；
+- 同一订单请求使用相同幂等键和相同 body 返回原订单；
+- 相同幂等键配不同 body 得到 `IDEMPOTENCY_CONFLICT`；
+- 第二次取消同一订单得到 `ORDER_STATE_CONFLICT`，库存不能再次增加。
+
+---
+
+## 11. 联调发现问题时三个人怎么处理
+
+1. C 保存浏览器 Network 中的请求方法、URL、请求体、状态码和响应体，隐藏 Token；
+2. A 对照 SRS/API 判断是前端错误、后端错误还是测试错误；
+3. 如果是前端错误，A/C 先建立失败测试，C 修复；
+4. 如果是后端错误，A 先建立最小失败测试并提交 Red，B 从最新 `origin/develop` 建 `fix/b-integration` 修复；
+5. B 只修改导致缺陷的 ServiceImpl/DAO/XML，不扩大需求；
+6. 修复后同时运行目标测试和完整后端测试；C 重新验证原请求；
+7. 把根因、修复提交号和复测结果追加到 `docs/test/test-log.md`。
+
+以下情况不是修改后端的理由：页面仍调用旧路径、页面字段名写错、Token 未发送、MySQL 没启动或 Vite 没配置代理。
+
+---
+
+## 12. 最终自动化验收
+
+### 12.1 后端
+
+```powershell
+Set-Location 'D:\Projects\SchoolWorks\SW_2609\SE_Practicum\backend'
+$env:SPRING_PROFILES_ACTIVE = 'test'
+$env:DELIVERY_DB_USERNAME = 'delivery_app'
+$env:DELIVERY_DB_PASSWORD = Read-Host '输入本机 delivery_app 密码' -MaskInput
+.\mvnw.cmd clean test
+```
+
+要求：`BUILD SUCCESS`，Failures、Errors、Skipped 都为 0，并生成 `backend/target/site/jacoco/index.html`。
+
+确认 Flyway：
+
+```powershell
+mysql -u delivery_app -p delivery_test -e "SELECT installed_rank, version, script, success FROM flyway_schema_history ORDER BY installed_rank;"
+```
+
+必须看到 V1、V2 各一条且 `success=1`。
+
+### 12.2 前端
+
+```powershell
+Set-Location 'D:\Projects\SchoolWorks\SW_2609\SE_Practicum\frontend'
+npm ci
+npm run test:run
+npm run build
+```
+
+要求：全部 Vitest 测试通过且 Vite 构建成功。当前已经有前端测试体系，不再额外引入另一套大型框架。
+
+### 12.3 证据
+
+至少保留：
+
+- 后端完整测试汇总；
+- 前端测试和构建汇总；
+- Flyway V1/V2 查询结果；
+- 30 接口联调清单；
+- 商家建店/上架商品、用户下单/取消、商家查看订单的关键截图；
+- 实际出现过的 Bug、Red、Green 和复测记录。
+
+---
+
+## 13. C 合并后怎样交付
+
+C 在个人分支先同步最新后端：
 
 ```powershell
 Set-Location 'D:\Projects\SchoolWorks\SW_2609\SE_Practicum'
-git switch develop
-git pull --ff-only origin develop
-
-Set-Location '.\backend'
-$env:SPRING_PROFILES_ACTIVE = 'test'
-.\mvnw.cmd clean test
-
-Set-Location '..\frontend'
-npm ci
-npm run build
+git fetch origin --prune
+git rebase origin/develop
 ```
 
-完成以上内容后停止增加功能，进入报告整理和答辩准备。支付、退款、骑手、配送调度、优惠券、消息通知不属于本阶段实现范围。
+重新执行前端测试和构建；若 rebase 包含后端修复，还要执行后端完整测试。全部通过后：
+
+```powershell
+git push -u origin feature/c-api-integration
+git switch develop
+git pull --ff-only origin develop
+git merge --no-ff feature/c-api-integration
+```
+
+在合并后的 `develop` 上执行第 12 节最终验收。全部通过才推送：
+
+```powershell
+git push origin develop
+git status --short
+```
+
+只有 `git push origin develop` 成功且 `git status --short` 为空，阶段 1 才算完成。个人分支要等合并成功后再删除。
+
+---
+
+## 14. 每台新电脑仍需自行准备
+
+Git 会同步源码、Maven Wrapper、`pom.xml`、`package-lock.json` 和迁移 SQL，但不会安装本机软件或同步密码。
+
+| 工具 | 是否随 Git 提供 | 要求 |
+| --- | --- | --- |
+| Git | 否 | `git --version` 可用 |
+| JDK 17 | 否 | `java -version` 和 Maven 都显示 17 |
+| Maven | Wrapper 提供 | 不用全局安装；首次使用需要联网下载 |
+| MySQL Server | 否 | 本机 3306，创建 `delivery_dev`、`delivery_test` 和应用账号 |
+| Node.js/npm | 否 | 安装 Node LTS，`node -v`、`npm -v` 可用 |
+| IDEA/VS Code | 否 | 可选 |
+| `rg` | 否 | 可选，不影响构建 |
+
+真实密码只通过当前终端的 `DELIVERY_DB_PASSWORD` 提供。Flyway 能自动建表和升级表，不能替团队成员安装 MySQL、创建数据库或同步密码。
+
+---
+
+## 15. 最终停止条件
+
+- [x] 后端四层实现完成并合入远程 `develop`；
+- [x] V1/V2 和后端完整测试通过；
+- [ ] 前端所有旧路径和旧字段已按 API 文档修正；
+- [ ] 页面硬编码业务假数据已移除；
+- [ ] 前端测试和构建全部通过；
+- [ ] 30 个接口真实联调全部通过；
+- [ ] 必要的 401/403/404/409、乐观锁、幂等和重复取消已验证；
+- [ ] 测试日志、Bug 记录和关键截图真实可追踪；
+- [ ] A、B、C 的最终代码都已合入并推送远程 `develop`；
+- [ ] 三个人从最新 `develop` 能按第 9 节启动并复现核心流程。
+
+全部勾选后停止增加功能，进入课程报告、个人总结、演示脚本和答辩准备。
