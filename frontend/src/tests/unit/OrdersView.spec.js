@@ -58,8 +58,9 @@ describe('OrdersView', () => {
       items: [
         {
           id: 10001,
-          store: '示例快餐店',
-          amount: 43.6,
+          orderNumber: 'OD202609030001',
+          shopName: '示例快餐店',
+          total: 43.6,
           status: '待支付',
           createdAt: '2026-09-03 10:30',
         },
@@ -71,7 +72,7 @@ describe('OrdersView', () => {
     await flushPromises()
 
     expect(mocks.listOrders).toHaveBeenCalledTimes(1)
-    expect(wrapper.text()).toContain('10001')
+    expect(wrapper.text()).toContain('OD202609030001')
     expect(wrapper.text()).toContain('示例快餐店')
     expect(wrapper.text()).toContain('43.6')
     expect(wrapper.text()).toContain('待支付')
@@ -96,8 +97,9 @@ describe('OrdersView', () => {
       items: [
         {
           id: 10001,
-          store: '示例快餐店',
-          amount: 43.6,
+          orderNumber: 'OD202609030001',
+          shopName: '示例快餐店',
+          total: 43.6,
           status: '待支付',
           createdAt: '2026-09-03 10:30',
         },

@@ -23,9 +23,9 @@ onMounted(loadOrders)
 
   <div v-else class="order-list">
     <div v-for="row in orders" :key="row.id" class="order-row">
-      <div>订单号：{{ row.id }}</div>
-      <div>店铺：{{ row.store }}</div>
-      <div>金额：{{ row.amount }}</div>
+      <div>订单号：{{ row.orderNumber }}</div>
+      <div>店铺：{{ row.shopName }}</div>
+      <div>金额：{{ row.total }}</div>
       <div>状态：{{ row.status }}</div>
       <div>创建时间：{{ row.createdAt }}</div>
       <el-button size="small" type="primary" @click="$router.push(`/customer/orders/${row.id}`)">查看</el-button>

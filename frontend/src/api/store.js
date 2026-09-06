@@ -9,5 +9,5 @@ export function getStoreDetail(storeId) {
 }
 
 export function updateStoreStatus(storeId, data) {
-  return http.patch(`/stores/${storeId}/status`, data)
+  return http.patch(`/shops/${storeId}`, data)
 }

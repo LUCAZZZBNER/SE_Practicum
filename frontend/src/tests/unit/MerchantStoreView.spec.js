@@ -3,14 +3,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import MerchantStoreView from '../../views/MerchantStoreView.vue'
 
 const mocks = vi.hoisted(() => ({
+  listStores: vi.fn(),
   getStoreDetail: vi.fn(),
   updateStoreStatus: vi.fn(),
   messageSuccess: vi.fn(),
   messageError: vi.fn(),
-}))
-
-vi.mock('vue-router', () => ({
-  useRoute: () => ({ params: { id: '7' } }),
 }))
 
 vi.mock('element-plus', () => ({
@@ -21,6 +18,7 @@ vi.mock('element-plus', () => ({
 }))
 
 vi.mock('../../api/store', () => ({
+  listStores: mocks.listStores,
   getStoreDetail: mocks.getStoreDetail,
   updateStoreStatus: mocks.updateStoreStatus,
 }))
@@ -59,6 +57,7 @@ function mountView() {
 }
 
 beforeEach(() => {
+  mocks.listStores.mockReset()
   mocks.getStoreDetail.mockReset()
   mocks.updateStoreStatus.mockReset()
   mocks.messageSuccess.mockReset()
@@ -67,16 +66,20 @@ beforeEach(() => {
 
 describe('MerchantStoreView', () => {
   it('loads merchant store detail and renders current status', async () => {
+    mocks.listStores.mockResolvedValue({
+      items: [{ id: 7 }],
+    })
     mocks.getStoreDetail.mockResolvedValue({
       id: 7,
       name: '示例快餐店',
       status: 'OPEN',
-      notice: '欢迎下单',
+      description: '欢迎下单',
     })
 
     const wrapper = mountView()
     await flushPromises()
 
+    expect(mocks.listStores).toHaveBeenCalledWith({ mine: true, page: 1, pageSize: 100 })
     expect(mocks.getStoreDetail).toHaveBeenCalledWith(7)
     expect(wrapper.text()).toContain('示例快餐店')
     expect(wrapper.text()).toContain('OPEN')
@@ -85,11 +88,14 @@ describe('MerchantStoreView', () => {
   })
 
   it('submits store status change with edited form values', async () => {
+    mocks.listStores.mockResolvedValue({
+      items: [{ id: 7 }],
+    })
     mocks.getStoreDetail.mockResolvedValue({
       id: 7,
       name: '示例快餐店',
       status: 'OPEN',
-      notice: '欢迎下单',
+      description: '欢迎下单',
     })
     mocks.updateStoreStatus.mockResolvedValue({})
 
@@ -104,16 +110,19 @@ describe('MerchantStoreView', () => {
     expect(mocks.updateStoreStatus).toHaveBeenCalledWith(7, {
       name: '新店铺名',
       status: 'OPEN',
-      notice: '临时休息',
+      description: '临时休息',
     })
   })
 
   it('shows backend error when store update fails', async () => {
+    mocks.listStores.mockResolvedValue({
+      items: [{ id: 7 }],
+    })
     mocks.getStoreDetail.mockResolvedValue({
       id: 7,
       name: '示例快餐店',
       status: 'OPEN',
-      notice: '欢迎下单',
+      description: '欢迎下单',
     })
     mocks.updateStoreStatus.mockRejectedValue(new Error('保存失败'))
 
