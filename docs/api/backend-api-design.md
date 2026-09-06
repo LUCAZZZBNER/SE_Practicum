@@ -389,10 +389,10 @@ Content-Type: application/json
 | --- | --- | --- | --- | --- |
 | `POST /products` | Merchant | Body: `shopId`, `categoryId`, `name`, `description?`, `price`, `stock` | `201`, 初始为 `OFF_SALE` 的 `Product` | 1001, 1003, 1004, 1202 |
 | `GET /shops/{shopId}/products` | Public | `categoryId?`, `keyword?`, `page`, `pageSize`, `sortBy?`, `sortOrder?`, `includeOffSale?` | `200`, `Product` 分页 | 1001, 1004 |
-| `GET /products/{productId}` | Public；查看下架商品时 Merchant | Path: `productId` | `200`, `Product` | 1003, 1004 |
-| `PATCH /products/{productId}` | Merchant | Body 可选 `categoryId`, `name`, `description`, `price`, `stock`, `status`, `version` | `200`, `Product` | 1001, 1003, 1004, 1005, 1202 |
+| `GET /products/{productId}` | Public；查看下架商品时 Merchant | Path: `productId`；Query: `includeOffSale?` | `200`, `Product` | 1003, 1004 |
+| `PATCH /products/{productId}` | Merchant | Body 必须包含 `version`，并包含至少一个待修改的 `categoryId`, `name`, `description`, `price`, `stock`, `status` | `200`, `Product` | 1001, 1003, 1004, 1005, 1202 |
 
-商品列表默认按 `createdAt desc`；`sortBy` 白名单为 `name`、`price`、`createdAt`。Public 请求仅返回 `ON_SALE` 商品；`includeOffSale=true` 仅对店主有效。价格必须大于 0，库存不得小于 0。PATCH 中的 `version` 用于乐观锁，版本过期返回 409。
+商品列表默认按 `createdAt desc`；`sortBy` 白名单为 `name`、`price`、`createdAt`。Public 请求仅返回 `ON_SALE` 商品；列表或详情的 `includeOffSale=true` 仅对店主有效。价格必须大于 0，库存不得小于 0。每个商品 PATCH 都必须携带客户端最近读取到的 `version`；该字段不算待修改业务字段，版本缺失返回 400，版本过期返回 409。
 
 ## 10. 购物车接口
 
@@ -452,6 +452,12 @@ Content-Type: application/json
 
 ## 13. 前端调用约束
 
+- 客户端统一以 `/api/v1` 为基础路径；开发代理只能转发请求，不得移除或重复添加该前缀。
+- HTTP 封装层收到成功响应后向业务页面返回 `data`；分页页面读取 `data.items`，不得把统一响应外壳当作业务对象。
+- 店铺管理列表使用 `GET /shops?mine=true`，店铺更新统一使用 `PATCH /shops/{shopId}`；状态值必须原样使用 `OPEN`、`CLOSED`、`TEMPORARILY_CLOSED`。
+- 商品列表必须提供路径参数 `shopId`；商家查看下架商品时传 `includeOffSale=true`。商品更新必须回传当前 `version`。
+- 购物车只能调用 `/cart-items` 及 `/cart-items/{cartItemId}`，不得使用 `/cart` 或 `/cart/items` 别名。
+- 创建订单的请求体固定为 `{ "items": [{ "cartItemId", "productVersion" }] }`，同时单独设置 `X-Idempotency-Key` 请求头。
 - 前端不得以本地角色、店铺状态、商品状态、库存或金额替代后端校验。
 - 收到 401 时清除失效令牌并进入登录流程；403 显示无权限；409 根据业务码提示刷新或重试。
 - 创建订单遇到网络超时时，应使用原幂等键重试，不能生成新键后自动重复提交。

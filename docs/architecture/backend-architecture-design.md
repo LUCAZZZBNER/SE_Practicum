@@ -63,6 +63,8 @@ Controller 只负责 HTTP 方法、路径参数、Bean Validation、当前主体
 
 统一异常处理（例如 `@RestControllerAdvice`）将参数、认证、权限、资源不存在、冲突和未预期异常映射为 API 文档规定的 `code`、`msg`、`data` 和 HTTP 状态；不得返回堆栈、密码、令牌或数据库细节。
 
+浏览器客户端通过同一个 HTTP 封装边界访问后端：基础路径固定为 `/api/v1`，封装层附加 Bearer 令牌、解包统一响应的 `data`，并把非零业务码保留为可识别错误。开发环境的反向代理只负责把 `/api` 请求转发到后端，不改写 `/api/v1`。页面层不得自行拼接旧资源别名；店铺、商品、购物车和订单分别使用 API 文档定义的 `/shops`、店铺作用域 `/shops/{shopId}/products`、`/cart-items` 和 `/orders`。这一边界属于接口集成约束，不改变后端模块依赖方向。
+
 `security` 基础设施使用 HS256 验证 JWT 签名及 `exp`，读取 `sub` 和 `role` 后生成不可变 `CurrentPrincipal`。拦截器只处理 `/api/v1/**`：公开接口可跳过认证，可选认证接口在令牌存在时验证令牌，其余接口要求 Bearer 令牌并检查 `USER` 或 `MERCHANT` 角色。验证后的主体通过请求属性 `currentPrincipal` 交给 Controller；Controller 只把其中的可信 ID 传给 Service，不接受请求体中的主体 ID 代替认证。签名密钥由 `JWT_SECRET` 配置，默认有效期为 7200 秒并可由 `JWT_EXPIRATION_SECONDS` 调整；部署环境必须覆盖开发占位密钥。
 
 ## 3. 模块依赖与协作规则
@@ -117,6 +119,8 @@ Controller 对应分类和商品的全部 API：
 - `POST /products`、`GET /shops/{shopId}/products`、`GET /products/{productId}`、`PATCH /products/{productId}`。
 
 `ItemService`/`ItemServiceImpl` 负责分类和商品 CRUD、逻辑删除、上下架、价格/库存校验以及版本冲突。商家写操作必须同时校验 `MerchantService` 的 `ACTIVE` 状态和 `RestaurantService` 的店铺归属。公众商品查询只返回 `ON_SALE`，店主通过 `includeOffSale=true` 才能查看下架商品。
+
+商品修改采用强制乐观锁：每个 `PATCH /products/{productId}` 请求必须携带最近读取到的 `version`，并至少包含一个待修改业务字段。客户端不能把缺失版本解释为无条件更新。
 
 下单所需的库存操作也属于本模块 Service：按稳定的 product ID 顺序锁定或使用带版本条件的原子更新，重新校验上架状态、价格版本和库存，成功后返回成交快照；取消订单时只恢复一次。`ItemDao` 是唯一可修改产品库存的 DAO。
 
