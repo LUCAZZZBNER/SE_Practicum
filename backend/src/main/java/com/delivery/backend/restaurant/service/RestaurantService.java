@@ -35,6 +35,9 @@ public interface RestaurantService {
 		private String description;
 		@Pattern(regexp = "OPEN|CLOSED|TEMPORARILY_CLOSED")
 		private String status;
+		private boolean nameSpecified;
+		private boolean descriptionSpecified;
+		private boolean statusSpecified;
 
 		public UpdateRequest() {
 		}
@@ -52,6 +55,7 @@ public interface RestaurantService {
 
 		public void setName(String name) {
 			this.name = name;
+			this.nameSpecified = true;
 			markUpdateSpecified();
 		}
 
@@ -61,6 +65,7 @@ public interface RestaurantService {
 
 		public void setDescription(String description) {
 			this.description = description;
+			this.descriptionSpecified = true;
 			markUpdateSpecified();
 		}
 
@@ -70,7 +75,23 @@ public interface RestaurantService {
 
 		public void setStatus(String status) {
 			this.status = status;
+			this.statusSpecified = true;
 			markUpdateSpecified();
+		}
+
+		@JsonIgnore
+		public boolean isNameSpecified() {
+			return nameSpecified;
+		}
+
+		@JsonIgnore
+		public boolean isDescriptionSpecified() {
+			return descriptionSpecified;
+		}
+
+		@JsonIgnore
+		public boolean isStatusSpecified() {
+			return statusSpecified;
 		}
 	}
 

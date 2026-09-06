@@ -1,0 +1,359 @@
+package com.delivery.backend.item.service.impl;
+
+import java.math.BigDecimal;
+import java.util.Comparator;
+import java.util.List;
+
+import org.springframework.dao.DuplicateKeyException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.delivery.backend.common.ApiError;
+import com.delivery.backend.common.BusinessException;
+import com.delivery.backend.common.DeleteResult;
+import com.delivery.backend.common.PageResult;
+import com.delivery.backend.item.dao.ItemDao;
+import com.delivery.backend.item.entity.CategoryEntity;
+import com.delivery.backend.item.entity.ProductEntity;
+import com.delivery.backend.item.service.ItemService;
+import com.delivery.backend.restaurant.service.RestaurantService;
+
+/** Category, product, optimistic-update, and atomic-stock behavior. */
+@Service
+public class ItemServiceImpl implements ItemService {
+
+	private static final int DEFAULT_PAGE = 1;
+	private static final int DEFAULT_PAGE_SIZE = 10;
+	private static final String ON_SALE = "ON_SALE";
+	private static final String OFF_SALE = "OFF_SALE";
+	private final ItemDao itemDao;
+	private final RestaurantService restaurantService;
+
+	public ItemServiceImpl(ItemDao itemDao, RestaurantService restaurantService) {
+		this.itemDao = itemDao;
+		this.restaurantService = restaurantService;
+	}
+
+	@Override
+	@Transactional
+	public CategoryView createCategory(long merchantId, long shopId, CreateCategoryRequest request) {
+		restaurantService.requireOwned(merchantId, shopId);
+		String name = normalizeRequired(request.name());
+		if (itemDao.findCategoryByShopAndName(shopId, name) != null) {
+			throw new BusinessException(ApiError.RESOURCE_CONFLICT);
+		}
+		int sortOrder = request.sortOrder() == null ? 0 : request.sortOrder();
+		if (sortOrder < 0) {
+			throw new BusinessException(ApiError.VALIDATION_ERROR);
+		}
+
+		CategoryEntity category = new CategoryEntity();
+		category.setShopId(shopId);
+		category.setName(name);
+		category.setSortOrder(sortOrder);
+		try {
+			itemDao.insertCategory(category);
+		} catch (DuplicateKeyException exception) {
+			throw new BusinessException(ApiError.RESOURCE_CONFLICT);
+		}
+		return toCategoryView(requireCategory(category.getId()));
+	}
+
+	@Override
+	@Transactional(readOnly = true)
+	public List<CategoryView> listCategories(long shopId) {
+		restaurantService.get(shopId);
+		return itemDao.listCategories(shopId).stream().map(ItemServiceImpl::toCategoryView).toList();
+	}
+
+	@Override
+	@Transactional
+	public CategoryView updateCategory(long merchantId, long categoryId, UpdateCategoryRequest request) {
+		if (!request.isUpdateSpecified()) {
+			throw new BusinessException(ApiError.VALIDATION_ERROR);
+		}
+		CategoryEntity category = requireCategory(categoryId);
+		restaurantService.requireOwned(merchantId, category.getShopId());
+		String name = request.isNameSpecified() ? normalizeRequired(request.name()) : null;
+		if (name != null) {
+			CategoryEntity duplicate = itemDao.findCategoryByShopAndName(category.getShopId(), name);
+			if (duplicate != null && !duplicate.getId().equals(category.getId())) {
+				throw new BusinessException(ApiError.RESOURCE_CONFLICT);
+			}
+		}
+		Integer sortOrder = request.isSortOrderSpecified() ? request.sortOrder() : null;
+		if (sortOrder != null && sortOrder < 0) {
+			throw new BusinessException(ApiError.VALIDATION_ERROR);
+		}
+		try {
+			itemDao.updateCategory(categoryId, request.isNameSpecified(), name,
+					request.isSortOrderSpecified(), sortOrder);
+		} catch (DuplicateKeyException exception) {
+			throw new BusinessException(ApiError.RESOURCE_CONFLICT);
+		}
+		return toCategoryView(requireCategory(categoryId));
+	}
+
+	@Override
+	@Transactional
+	public DeleteResult deleteCategory(long merchantId, long categoryId) {
+		CategoryEntity category = requireCategory(categoryId);
+		restaurantService.requireOwned(merchantId, category.getShopId());
+		if (itemDao.countProductsByCategory(categoryId) > 0) {
+			throw new BusinessException(ApiError.RESOURCE_CONFLICT);
+		}
+		if (itemDao.logicalDeleteCategory(categoryId) != 1) {
+			throw new BusinessException(ApiError.RESOURCE_NOT_FOUND);
+		}
+		return new DeleteResult(categoryId, true);
+	}
+
+	@Override
+	@Transactional
+	public ProductView createProduct(long merchantId, CreateProductRequest request) {
+		restaurantService.requireOwned(merchantId, request.shopId());
+		CategoryEntity category = requireCategory(request.categoryId());
+		if (category.getShopId() != request.shopId()) {
+			throw new BusinessException(ApiError.RESOURCE_CONFLICT);
+		}
+		validatePrice(request.price());
+		if (request.stock() < 0) {
+			throw new BusinessException(ApiError.VALIDATION_ERROR);
+		}
+
+		ProductEntity product = new ProductEntity();
+		product.setShopId(request.shopId());
+		product.setCategoryId(request.categoryId());
+		product.setName(normalizeRequired(request.name()));
+		product.setDescription(request.description());
+		product.setPrice(request.price());
+		product.setStock(request.stock());
+		product.setStatus(OFF_SALE);
+		product.setVersion(1L);
+		itemDao.insertProduct(product);
+		return toProductView(requireProduct(product.getId()));
+	}
+
+	@Override
+	@Transactional(readOnly = true)
+	public PageResult<ProductView> listProducts(long shopId, ProductQuery query) {
+		restaurantService.get(shopId);
+		boolean includeOffSale = Boolean.TRUE.equals(query.includeOffSale());
+		if (includeOffSale) {
+			if (query.merchantId() == null) {
+				throw new BusinessException(ApiError.FORBIDDEN);
+			}
+			restaurantService.requireOwned(query.merchantId(), shopId);
+		}
+		if (query.categoryId() != null) {
+			CategoryEntity category = requireCategory(query.categoryId());
+			if (category.getShopId() != shopId) {
+				throw new BusinessException(ApiError.RESOURCE_NOT_FOUND);
+			}
+		}
+		int page = defaultPage(query.page());
+		int pageSize = defaultPageSize(query.pageSize());
+		String sortBy = validateSortBy(query.sortBy());
+		String sortOrder = validateSortOrder(query.sortOrder());
+		String keyword = normalizeSearch(query.keyword());
+		long offset = (long) (page - 1) * pageSize;
+		List<ProductView> items = itemDao.listProducts(shopId, query.categoryId(), keyword, includeOffSale,
+				sortBy, sortOrder, pageSize, offset).stream().map(ItemServiceImpl::toProductView).toList();
+		long total = itemDao.countProducts(shopId, query.categoryId(), keyword, includeOffSale);
+		int totalPages = total == 0 ? 0 : (int) ((total + pageSize - 1) / pageSize);
+		return new PageResult<>(items, page, pageSize, total, totalPages);
+	}
+
+	@Override
+	@Transactional(readOnly = true)
+	public ProductView getProduct(long productId, boolean includeOffSale, Long merchantId) {
+		ProductEntity product = requireProduct(productId);
+		if (includeOffSale) {
+			if (merchantId == null) {
+				throw new BusinessException(ApiError.FORBIDDEN);
+			}
+			restaurantService.requireOwned(merchantId, product.getShopId());
+		} else if (!ON_SALE.equals(product.getStatus())) {
+			throw new BusinessException(ApiError.RESOURCE_NOT_FOUND);
+		}
+		return toProductView(product);
+	}
+
+	@Override
+	@Transactional
+	public ProductView updateProduct(long merchantId, long productId, UpdateProductRequest request) {
+		if (!request.isUpdateSpecified() || request.version() == null) {
+			throw new BusinessException(ApiError.VALIDATION_ERROR);
+		}
+		ProductEntity product = requireProduct(productId);
+		restaurantService.requireOwned(merchantId, product.getShopId());
+		if (request.isCategoryIdSpecified()) {
+			CategoryEntity category = requireCategory(request.categoryId());
+			if (category.getShopId() != product.getShopId()) {
+				throw new BusinessException(ApiError.RESOURCE_CONFLICT);
+			}
+		}
+		String name = request.isNameSpecified() ? normalizeRequired(request.name()) : null;
+		if (request.isPriceSpecified()) {
+			validatePrice(request.price());
+		}
+		if (request.isStockSpecified() && (request.stock() == null || request.stock() < 0)) {
+			throw new BusinessException(ApiError.VALIDATION_ERROR);
+		}
+		String status = request.isStatusSpecified() ? validateProductStatus(request.status()) : null;
+		int updated = itemDao.updateProduct(productId, request.version(),
+				request.isCategoryIdSpecified(), request.categoryId(),
+				request.isNameSpecified(), name,
+				request.isDescriptionSpecified(), request.description(),
+				request.isPriceSpecified(), request.price(),
+				request.isStockSpecified(), request.stock(),
+				request.isStatusSpecified(), status);
+		if (updated != 1) {
+			throw new BusinessException(ApiError.RESOURCE_CONFLICT);
+		}
+		return toProductView(requireProduct(productId));
+	}
+
+	@Override
+	@Transactional
+	public List<ProductSnapshot> reserveForOrder(List<ReservationRequest> requests) {
+		if (requests == null || requests.isEmpty()) {
+			throw new BusinessException(ApiError.CART_EMPTY);
+		}
+		return requests.stream()
+				.sorted(Comparator.comparingLong(ReservationRequest::productId))
+				.map(this::reserveOne)
+				.toList();
+	}
+
+	@Override
+	@Transactional
+	public void restoreStock(List<StockRestore> restorations) {
+		if (restorations == null) {
+			throw new BusinessException(ApiError.VALIDATION_ERROR);
+		}
+		for (StockRestore restoration : restorations) {
+			if (restoration.quantity() <= 0) {
+				throw new BusinessException(ApiError.VALIDATION_ERROR);
+			}
+			if (itemDao.restoreStock(restoration.productId(), restoration.quantity()) != 1) {
+				throw new BusinessException(ApiError.RESOURCE_NOT_FOUND);
+			}
+		}
+	}
+
+	private ProductSnapshot reserveOne(ReservationRequest request) {
+		if (request.quantity() <= 0 || request.expectedVersion() <= 0) {
+			throw new BusinessException(ApiError.VALIDATION_ERROR);
+		}
+		ProductEntity product = requireProduct(request.productId());
+		if (!ON_SALE.equals(product.getStatus())) {
+			throw new BusinessException(ApiError.PRODUCT_OFF_SALE);
+		}
+		if (product.getVersion() != request.expectedVersion()) {
+			throw new BusinessException(ApiError.PRICE_CHANGED);
+		}
+		if (product.getStock() < request.quantity()) {
+			throw new BusinessException(ApiError.INSUFFICIENT_STOCK);
+		}
+		if (itemDao.reserveStock(product.getId(), request.expectedVersion(), request.quantity()) != 1) {
+			ProductEntity current = requireProduct(product.getId());
+			if (!ON_SALE.equals(current.getStatus())) {
+				throw new BusinessException(ApiError.PRODUCT_OFF_SALE);
+			}
+			if (current.getVersion() != request.expectedVersion()) {
+				throw new BusinessException(ApiError.PRICE_CHANGED);
+			}
+			throw new BusinessException(ApiError.INSUFFICIENT_STOCK);
+		}
+		return new ProductSnapshot(product.getId(), product.getShopId(), product.getName(),
+				product.getPrice(), request.quantity(), product.getVersion());
+	}
+
+	private CategoryEntity requireCategory(long categoryId) {
+		CategoryEntity category = itemDao.findCategoryById(categoryId);
+		if (category == null) {
+			throw new BusinessException(ApiError.RESOURCE_NOT_FOUND);
+		}
+		return category;
+	}
+
+	private ProductEntity requireProduct(long productId) {
+		ProductEntity product = itemDao.findProductById(productId);
+		if (product == null) {
+			throw new BusinessException(ApiError.RESOURCE_NOT_FOUND);
+		}
+		return product;
+	}
+
+	private static CategoryView toCategoryView(CategoryEntity category) {
+		return new CategoryView(category.getId(), category.getShopId(), category.getName(),
+				category.getSortOrder(), category.getCreatedAt(), category.getUpdatedAt());
+	}
+
+	private static ProductView toProductView(ProductEntity product) {
+		return new ProductView(product.getId(), product.getShopId(), product.getCategoryId(),
+				product.getName(), product.getDescription(), product.getPrice(), product.getStock(),
+				product.getStatus(), product.getVersion(), product.getCreatedAt(), product.getUpdatedAt());
+	}
+
+	private static int defaultPage(Integer page) {
+		int result = page == null ? DEFAULT_PAGE : page;
+		if (result < 1) {
+			throw new BusinessException(ApiError.VALIDATION_ERROR);
+		}
+		return result;
+	}
+
+	private static int defaultPageSize(Integer pageSize) {
+		int result = pageSize == null ? DEFAULT_PAGE_SIZE : pageSize;
+		if (result < 1 || result > 100) {
+			throw new BusinessException(ApiError.VALIDATION_ERROR);
+		}
+		return result;
+	}
+
+	private static String validateSortBy(String sortBy) {
+		if (sortBy == null) {
+			return "createdAt";
+		}
+		if (!"name".equals(sortBy) && !"price".equals(sortBy) && !"createdAt".equals(sortBy)) {
+			throw new BusinessException(ApiError.VALIDATION_ERROR);
+		}
+		return sortBy;
+	}
+
+	private static String validateSortOrder(String sortOrder) {
+		if (sortOrder == null) {
+			return "desc";
+		}
+		if (!"asc".equals(sortOrder) && !"desc".equals(sortOrder)) {
+			throw new BusinessException(ApiError.VALIDATION_ERROR);
+		}
+		return sortOrder;
+	}
+
+	private static String validateProductStatus(String status) {
+		if (!ON_SALE.equals(status) && !OFF_SALE.equals(status)) {
+			throw new BusinessException(ApiError.VALIDATION_ERROR);
+		}
+		return status;
+	}
+
+	private static void validatePrice(BigDecimal price) {
+		if (price == null || price.signum() <= 0 || price.stripTrailingZeros().scale() > 2) {
+			throw new BusinessException(ApiError.VALIDATION_ERROR);
+		}
+	}
+
+	private static String normalizeRequired(String value) {
+		if (value == null || value.isBlank()) {
+			throw new BusinessException(ApiError.VALIDATION_ERROR);
+		}
+		return value.trim();
+	}
+
+	private static String normalizeSearch(String value) {
+		return value == null || value.isBlank() ? null : value.trim();
+	}
+}

@@ -30,8 +30,10 @@ class ItemServiceContractTests extends ServiceContractTestSupport {
 	@Test
 	void categoryCrudIsScopedToTheOwningShopAndUsesLogicalDeletion() {
 		Fixture fixture = fixture("item-category");
+		assertBusinessError(ApiError.RESOURCE_CONFLICT, () -> service.createCategory(
+				fixture.merchantId(), fixture.shopId(), new ItemService.CreateCategoryRequest("Meals", 0)));
 		ItemService.CategoryView category = service.createCategory(fixture.merchantId(), fixture.shopId(),
-				new ItemService.CreateCategoryRequest("Meals", 0));
+				new ItemService.CreateCategoryRequest("Sides", 0));
 		assertThat(service.listCategories(fixture.shopId())).extracting(ItemService.CategoryView::id)
 				.contains(category.id());
 

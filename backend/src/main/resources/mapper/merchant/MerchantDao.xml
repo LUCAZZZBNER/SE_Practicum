@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.delivery.backend.merchant.dao.MerchantDao">
+
+    <resultMap id="merchantResultMap" type="com.delivery.backend.merchant.entity.MerchantEntity">
+        <id property="id" column="id"/>
+        <result property="account" column="account"/>
+        <result property="passwordHash" column="password_hash"/>
+        <result property="name" column="name"/>
+        <result property="phone" column="phone"/>
+        <result property="status" column="status"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <sql id="merchantColumns">
+        id, account, password_hash, name, phone, status, created_at, updated_at
+    </sql>
+
+    <select id="findByAccount" resultMap="merchantResultMap">
+        SELECT <include refid="merchantColumns"/>
+        FROM merchants
+        WHERE account = #{account}
+    </select>
+
+    <select id="findById" resultMap="merchantResultMap">
+        SELECT <include refid="merchantColumns"/>
+        FROM merchants
+        WHERE id = #{id}
+    </select>
+
+    <insert id="insert" parameterType="com.delivery.backend.merchant.entity.MerchantEntity"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO merchants (account, password_hash, name, phone, status)
+        VALUES (#{account}, #{passwordHash}, #{name}, #{phone}, #{status})
+    </insert>
+
+    <update id="updateProfile">
+        UPDATE merchants
+        <set>
+            <if test="nameSpecified">
+                name = #{name},
+            </if>
+            <if test="phoneSpecified">
+                phone = #{phone},
+            </if>
+        </set>
+        WHERE id = #{id}
+    </update>
+
+</mapper>

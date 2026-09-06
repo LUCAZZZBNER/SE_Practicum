@@ -36,6 +36,8 @@ public interface UserService {
 		private String nickname;
 		@Pattern(regexp = "(?s).*\\S.*")
 		private String phone;
+		private boolean nicknameSpecified;
+		private boolean phoneSpecified;
 
 		public UpdateRequest() {
 		}
@@ -53,6 +55,7 @@ public interface UserService {
 
 		public void setNickname(String nickname) {
 			this.nickname = nickname;
+			this.nicknameSpecified = true;
 			markUpdateSpecified();
 		}
 
@@ -62,7 +65,18 @@ public interface UserService {
 
 		public void setPhone(String phone) {
 			this.phone = phone;
+			this.phoneSpecified = true;
 			markUpdateSpecified();
+		}
+
+		@JsonIgnore
+		public boolean isNicknameSpecified() {
+			return nicknameSpecified;
+		}
+
+		@JsonIgnore
+		public boolean isPhoneSpecified() {
+			return phoneSpecified;
 		}
 	}
 

@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.delivery.backend.order.dao.OrderDao">
+
+    <resultMap id="orderResultMap" type="com.delivery.backend.order.entity.OrderEntity">
+        <id property="id" column="id"/>
+        <result property="orderNumber" column="order_no"/>
+        <result property="userId" column="user_id"/>
+        <result property="idempotencyKey" column="idempotency_key"/>
+        <result property="requestFingerprint" column="request_fingerprint"/>
+        <result property="shopId" column="shop_id"/>
+        <result property="shopName" column="shop_name"/>
+        <result property="totalAmount" column="total_amount"/>
+        <result property="status" column="status"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+        <result property="cancelledAt" column="cancelled_at"/>
+    </resultMap>
+
+    <resultMap id="orderItemResultMap" type="com.delivery.backend.order.entity.OrderItemEntity">
+        <id property="id" column="id"/>
+        <result property="orderId" column="order_id"/>
+        <result property="productId" column="product_id"/>
+        <result property="productName" column="product_name"/>
+        <result property="unitPrice" column="unit_price"/>
+        <result property="quantity" column="quantity"/>
+    </resultMap>
+
+    <sql id="orderColumns">
+        o.id, o.order_no, o.user_id, o.idempotency_key, o.request_fingerprint,
+        o.shop_id, o.shop_name, o.total_amount, o.status, o.created_at,
+        o.updated_at, o.cancelled_at
+    </sql>
+
+    <sql id="orderSort">
+        ORDER BY
+        <choose>
+            <when test="sortBy == 'total'">o.total_amount</when>
+            <otherwise>o.created_at</otherwise>
+        </choose>
+        <choose>
+            <when test="sortOrder == 'asc'">ASC</when>
+            <otherwise>DESC</otherwise>
+        </choose>,
+        o.id
+        <choose>
+            <when test="sortOrder == 'asc'">ASC</when>
+            <otherwise>DESC</otherwise>
+        </choose>
+    </sql>
+
+    <select id="findByUserAndIdempotency" resultMap="orderResultMap">
+        SELECT <include refid="orderColumns"/>
+        FROM orders o
+        WHERE o.user_id = #{userId}
+          AND o.idempotency_key = #{idempotencyKey}
+    </select>
+
+    <select id="findMine" resultMap="orderResultMap">
+        SELECT <include refid="orderColumns"/>
+        FROM orders o
+        WHERE o.user_id = #{userId}
+          AND o.id = #{orderId}
+    </select>
+
+    <select id="findMerchantOrder" resultMap="orderResultMap">
+        SELECT <include refid="orderColumns"/>
+        FROM orders o
+        JOIN shops s ON s.id = o.shop_id
+        WHERE s.merchant_id = #{merchantId}
+          AND o.id = #{orderId}
+    </select>
+
+    <insert id="insertOrder" parameterType="com.delivery.backend.order.entity.OrderEntity"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO orders (
+            order_no, user_id, idempotency_key, request_fingerprint,
+            shop_id, shop_name, total_amount, status
+        ) VALUES (
+            #{orderNumber}, #{userId}, #{idempotencyKey}, #{requestFingerprint},
+            #{shopId}, #{shopName}, #{totalAmount}, #{status}
+        )
+    </insert>
+
+    <insert id="insertItems">
+        INSERT INTO order_items (order_id, product_id, product_name, unit_price, quantity)
+        VALUES
+        <foreach collection="items" item="item" separator=",">
+            (#{item.orderId}, #{item.productId}, #{item.productName}, #{item.unitPrice}, #{item.quantity})
+        </foreach>
+    </insert>
+
+    <select id="listItems" resultMap="orderItemResultMap">
+        SELECT id, order_id, product_id, product_name, unit_price, quantity
+        FROM order_items
+        WHERE order_id = #{orderId}
+        ORDER BY id ASC
+    </select>
+
+    <select id="listMine" resultMap="orderResultMap">
+        SELECT <include refid="orderColumns"/>
+        FROM orders o
+        WHERE o.user_id = #{userId}
+        <if test="status != null">
+            AND o.status = #{status}
+        </if>
+        <include refid="orderSort"/>
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countMine" resultType="long">
+        SELECT COUNT(*)
+        FROM orders o
+        WHERE o.user_id = #{userId}
+        <if test="status != null">
+            AND o.status = #{status}
+        </if>
+    </select>
+
+    <select id="listMerchant" resultMap="orderResultMap">
+        SELECT <include refid="orderColumns"/>
+        FROM orders o
+        JOIN shops s ON s.id = o.shop_id
+        WHERE s.merchant_id = #{merchantId}
+        <if test="shopId != null">
+            AND o.shop_id = #{shopId}
+        </if>
+        <if test="status != null">
+            AND o.status = #{status}
+        </if>
+        <include refid="orderSort"/>
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countMerchant" resultType="long">
+        SELECT COUNT(*)
+        FROM orders o
+        JOIN shops s ON s.id = o.shop_id
+        WHERE s.merchant_id = #{merchantId}
+        <if test="shopId != null">
+            AND o.shop_id = #{shopId}
+        </if>
+        <if test="status != null">
+            AND o.status = #{status}
+        </if>
+    </select>
+
+    <update id="cancelPending">
+        UPDATE orders
+        SET status = 'CANCELLED',
+            cancelled_at = CURRENT_TIMESTAMP(3)
+        WHERE id = #{orderId}
+          AND user_id = #{userId}
+          AND status = 'PENDING_PAYMENT'
+    </update>
+
+</mapper>

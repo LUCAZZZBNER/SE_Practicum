@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.delivery.backend.shopping.dao.ShoppingDao">
+
+    <resultMap id="cartItemResultMap" type="com.delivery.backend.shopping.entity.CartItemEntity">
+        <id property="id" column="id"/>
+        <result property="userId" column="user_id"/>
+        <result property="productId" column="product_id"/>
+        <result property="quantity" column="quantity"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+        <result property="shopId" column="shop_id"/>
+        <result property="productName" column="product_name"/>
+        <result property="productPrice" column="product_price"/>
+        <result property="productStock" column="product_stock"/>
+        <result property="productStatus" column="product_status"/>
+        <result property="productVersion" column="product_version"/>
+        <result property="shopStatus" column="shop_status"/>
+    </resultMap>
+
+    <sql id="cartItemColumns">
+        ci.id,
+        ci.user_id,
+        ci.product_id,
+        ci.quantity,
+        ci.created_at,
+        ci.updated_at,
+        p.shop_id,
+        p.name AS product_name,
+        p.price AS product_price,
+        p.stock AS product_stock,
+        p.status AS product_status,
+        p.version AS product_version,
+        s.status AS shop_status
+    </sql>
+
+    <sql id="cartItemJoins">
+        FROM cart_items ci
+        JOIN products p ON p.id = ci.product_id
+        JOIN shops s ON s.id = p.shop_id AND s.deleted_at IS NULL
+    </sql>
+
+    <select id="findByUserAndProduct" resultMap="cartItemResultMap">
+        SELECT <include refid="cartItemColumns"/>
+        <include refid="cartItemJoins"/>
+        WHERE ci.user_id = #{userId}
+          AND ci.product_id = #{productId}
+    </select>
+
+    <select id="findOwnedById" resultMap="cartItemResultMap">
+        SELECT <include refid="cartItemColumns"/>
+        <include refid="cartItemJoins"/>
+        WHERE ci.user_id = #{userId}
+          AND ci.id = #{id}
+    </select>
+
+    <select id="listByUser" resultMap="cartItemResultMap">
+        SELECT <include refid="cartItemColumns"/>
+        <include refid="cartItemJoins"/>
+        WHERE ci.user_id = #{userId}
+        ORDER BY ci.created_at ASC, ci.id ASC
+    </select>
+
+    <select id="listSelected" resultMap="cartItemResultMap">
+        SELECT <include refid="cartItemColumns"/>
+        <include refid="cartItemJoins"/>
+        WHERE ci.user_id = #{userId}
+          AND ci.id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+        ORDER BY ci.id ASC
+    </select>
+
+    <insert id="insert" parameterType="com.delivery.backend.shopping.entity.CartItemEntity"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO cart_items (user_id, product_id, quantity)
+        VALUES (#{userId}, #{productId}, #{quantity})
+    </insert>
+
+    <update id="updateQuantity">
+        UPDATE cart_items
+        SET quantity = #{quantity}
+        WHERE user_id = #{userId}
+          AND id = #{id}
+    </update>
+
+    <delete id="deleteOwned">
+        DELETE FROM cart_items
+        WHERE user_id = #{userId}
+          AND id = #{id}
+    </delete>
+
+    <delete id="deleteSelected">
+        DELETE FROM cart_items
+        WHERE user_id = #{userId}
+          AND id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+</mapper>

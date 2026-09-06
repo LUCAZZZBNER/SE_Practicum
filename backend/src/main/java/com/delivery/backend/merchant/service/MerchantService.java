@@ -36,6 +36,8 @@ public interface MerchantService {
 		private String name;
 		@Pattern(regexp = "(?s).*\\S.*")
 		private String phone;
+		private boolean nameSpecified;
+		private boolean phoneSpecified;
 
 		public UpdateRequest() {
 		}
@@ -53,6 +55,7 @@ public interface MerchantService {
 
 		public void setName(String name) {
 			this.name = name;
+			this.nameSpecified = true;
 			markUpdateSpecified();
 		}
 
@@ -62,7 +65,18 @@ public interface MerchantService {
 
 		public void setPhone(String phone) {
 			this.phone = phone;
+			this.phoneSpecified = true;
 			markUpdateSpecified();
+		}
+
+		@JsonIgnore
+		public boolean isNameSpecified() {
+			return nameSpecified;
+		}
+
+		@JsonIgnore
+		public boolean isPhoneSpecified() {
+			return phoneSpecified;
 		}
 	}
 
