@@ -1,5 +1,5 @@
 import { flushPromises, mount } from '@vue/test-utils'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import CartView from '../../views/CartView.vue'
 
 const mocks = vi.hoisted(() => ({
@@ -52,6 +52,7 @@ function mountView() {
           template: '<div />',
         },
         'el-button': {
+          emits: ['click'],
           props: ['disabled'],
           template: '<button :disabled="disabled" @click="$emit(\'click\')"><slot /></button>',
         },
@@ -61,6 +62,9 @@ function mountView() {
 }
 
 beforeEach(() => {
+  vi.stubGlobal('crypto', {
+    randomUUID: vi.fn(() => 'order-key-1'),
+  })
   mocks.getCart.mockReset()
   mocks.updateCartItem.mockReset()
   mocks.removeCartItem.mockReset()
@@ -68,6 +72,10 @@ beforeEach(() => {
   mocks.routerPush.mockReset()
   mocks.messageSuccess.mockReset()
   mocks.messageError.mockReset()
+})
+
+afterEach(() => {
+  vi.unstubAllGlobals()
 })
 
 describe('CartView', () => {
@@ -208,9 +216,46 @@ describe('CartView', () => {
       },
       {
         headers: {
-          'X-Idempotency-Key': expect.any(String),
+          'X-Idempotency-Key': 'order-key-1',
         },
       },
     )
+  })
+
+  it('reuses idempotency key when retrying the same checkout after failure', async () => {
+    mocks.getCart.mockResolvedValue({
+      items: [
+        {
+          id: 1,
+          product: {
+            id: 11,
+            name: '招牌牛肉饭',
+            shopId: 7,
+            price: 18.8,
+            stock: 20,
+            status: 'ON_SALE',
+            version: 3,
+          },
+          quantity: 2,
+          subtotal: 37.6,
+          available: true,
+        },
+      ],
+      total: 37.6,
+    })
+    mocks.createOrder.mockRejectedValueOnce(new Error('网络超时')).mockResolvedValueOnce({ id: 1001 })
+
+    const wrapper = mountView()
+    await flushPromises()
+
+    await wrapper.findAll('button')[2].trigger('click')
+    await flushPromises()
+    await wrapper.findAll('button')[2].trigger('click')
+    await flushPromises()
+
+    expect(crypto.randomUUID).toHaveBeenCalledTimes(1)
+    expect(mocks.createOrder).toHaveBeenCalledTimes(2)
+    expect(mocks.createOrder.mock.calls[0][1].headers['X-Idempotency-Key']).toBe('order-key-1')
+    expect(mocks.createOrder.mock.calls[1][1].headers['X-Idempotency-Key']).toBe('order-key-1')
   })
 })

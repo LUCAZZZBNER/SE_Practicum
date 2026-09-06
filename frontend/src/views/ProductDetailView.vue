@@ -36,7 +36,7 @@ async function loadProductDetail() {
 
     if (product.shopId) {
       const categories = await listCategories(product.shopId)
-      const matched = categories?.items?.find((item) => item.id === product.categoryId)
+      const matched = categories?.find((item) => item.id === product.categoryId)
       product.categoryName = matched?.name || ''
     }
   } catch (error) {

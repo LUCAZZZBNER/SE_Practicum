@@ -126,6 +126,29 @@ describe('http', () => {
     expect(mocks.state.errorSpy).toHaveBeenCalledWith('请求参数不合法')
   })
 
+  it('clears auth state and returns to login entry when response is 401', async () => {
+    localStorage.setItem('access_token', 'expired-token')
+    localStorage.setItem('user_role', 'USER')
+    window.history.replaceState({}, '', '/customer/orders')
+
+    const error = {
+      response: {
+        status: 401,
+        data: {
+          msg: '登录已失效',
+        },
+      },
+      message: 'Unauthorized',
+    }
+
+    await expect(mocks.state.responseRejected(error)).rejects.toBe(error)
+
+    expect(localStorage.getItem('access_token')).toBeNull()
+    expect(localStorage.getItem('user_role')).toBeNull()
+    expect(window.location.pathname).toBe('/')
+    expect(mocks.state.errorSpy).toHaveBeenCalledWith('登录已失效')
+  })
+
   it('falls back to generic message when failed response has no msg', async () => {
     const error = {
       message: 'Network Error',

@@ -5,6 +5,7 @@ import MerchantStoreView from '../../views/MerchantStoreView.vue'
 const mocks = vi.hoisted(() => ({
   listStores: vi.fn(),
   getStoreDetail: vi.fn(),
+  createShop: vi.fn(),
   updateStoreStatus: vi.fn(),
   messageSuccess: vi.fn(),
   messageError: vi.fn(),
@@ -20,6 +21,7 @@ vi.mock('element-plus', () => ({
 vi.mock('../../api/store', () => ({
   listStores: mocks.listStores,
   getStoreDetail: mocks.getStoreDetail,
+  createShop: mocks.createShop,
   updateStoreStatus: mocks.updateStoreStatus,
 }))
 
@@ -59,6 +61,7 @@ function mountView() {
 beforeEach(() => {
   mocks.listStores.mockReset()
   mocks.getStoreDetail.mockReset()
+  mocks.createShop.mockReset()
   mocks.updateStoreStatus.mockReset()
   mocks.messageSuccess.mockReset()
   mocks.messageError.mockReset()
@@ -112,6 +115,34 @@ describe('MerchantStoreView', () => {
       status: 'OPEN',
       description: '临时休息',
     })
+  })
+
+  it('creates a store when merchant has no existing shop', async () => {
+    mocks.listStores.mockResolvedValue({
+      items: [],
+      total: 0,
+    })
+    mocks.createShop.mockResolvedValue({
+      id: 9,
+      name: '新店铺',
+      description: '新店介绍',
+      status: 'CLOSED',
+    })
+
+    const wrapper = mountView()
+    await flushPromises()
+
+    const inputs = wrapper.findAll('input')
+    await inputs[0].setValue('新店铺')
+    await inputs[1].setValue('新店介绍')
+    await wrapper.find('button').trigger('click')
+
+    expect(mocks.getStoreDetail).not.toHaveBeenCalled()
+    expect(mocks.createShop).toHaveBeenCalledWith({
+      name: '新店铺',
+      description: '新店介绍',
+    })
+    expect(mocks.messageSuccess).toHaveBeenCalledWith('创建成功')
   })
 
   it('shows backend error when store update fails', async () => {

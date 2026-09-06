@@ -29,6 +29,10 @@ body { margin: 0; min-width: 320px; }
 .form-page { max-width: 640px; }
 .narrow-form { max-width: 640px; }
 .action-bar { display: flex; align-items: center; justify-content: flex-end; gap: 12px; }
+.manage-panel { display: grid; gap: 12px; padding: 16px; background: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px; }
+.manage-panel h2 { margin: 0; font-size: 18px; }
+.inline-form, .category-row, .product-row, .order-item { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.product-form { justify-content: flex-start; }
 .auth-page { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 32px 20px; background: #eef2f7; }
 .auth-panel { width: min(960px, 100%); }
 .auth-intro { margin-bottom: 24px; }

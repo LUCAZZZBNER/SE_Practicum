@@ -8,7 +8,10 @@ const http = axios.create({
 
 http.interceptors.request.use((config) => {
   const token = localStorage.getItem('access_token')
-  if (token) config.headers.Authorization = `Bearer ${token}`
+  if (token) {
+    config.headers = config.headers || {}
+    config.headers.Authorization = `Bearer ${token}`
+  }
   return config
 })
 
@@ -28,6 +31,11 @@ http.interceptors.response.use(
   },
   (error) => {
     const message = error.response?.data?.msg || error.message || '网络请求失败'
+    if (error.response?.status === 401) {
+      localStorage.removeItem('access_token')
+      localStorage.removeItem('user_role')
+      window.history.replaceState({}, '', '/')
+    }
     ElMessage.error(message)
     return Promise.reject(error)
   },

@@ -8,6 +8,10 @@ export function getStoreDetail(storeId) {
   return http.get(`/shops/${storeId}`)
 }
 
+export function createShop(data) {
+  return http.post('/shops', data)
+}
+
 export function updateStoreStatus(storeId, data) {
   return http.patch(`/shops/${storeId}`, data)
 }

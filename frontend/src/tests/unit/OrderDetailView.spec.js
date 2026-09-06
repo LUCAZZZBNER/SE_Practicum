@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import OrderDetailView from '../../views/OrderDetailView.vue'
 
 const mocks = vi.hoisted(() => ({
+  cancelOrder: vi.fn(),
   getOrderDetail: vi.fn(),
   messageError: vi.fn(),
 }))
@@ -18,6 +19,7 @@ vi.mock('element-plus', () => ({
 }))
 
 vi.mock('../../api/order', () => ({
+  cancelOrder: mocks.cancelOrder,
   getOrderDetail: mocks.getOrderDetail,
 }))
 
@@ -41,12 +43,17 @@ function mountView() {
           props: ['label'],
           template: '<div>{{ label }}<slot /></div>',
         },
+        'el-button': {
+          emits: ['click'],
+          template: '<button type="button" @click="$emit(\'click\')"><slot /></button>',
+        },
       },
     },
   })
 }
 
 beforeEach(() => {
+  mocks.cancelOrder.mockReset()
   mocks.getOrderDetail.mockReset()
   mocks.messageError.mockReset()
 })
@@ -86,6 +93,38 @@ describe('OrderDetailView', () => {
     expect(wrapper.text()).toContain('43.60 元')
     expect(wrapper.text()).toContain('招牌牛肉饭')
     expect(wrapper.text()).toContain('冰柠檬茶')
+    expect(wrapper.text()).toContain('取消订单')
+  })
+
+  it('cancels pending order and reloads detail', async () => {
+    mocks.getOrderDetail
+      .mockResolvedValueOnce({
+        id: 10001,
+        orderNumber: 'OD202609030001',
+        shopName: '示例快餐店',
+        status: 'PENDING_PAYMENT',
+        total: 43.6,
+        lines: [],
+      })
+      .mockResolvedValueOnce({
+        id: 10001,
+        orderNumber: 'OD202609030001',
+        shopName: '示例快餐店',
+        status: 'CANCELLED',
+        total: 43.6,
+        lines: [],
+      })
+    mocks.cancelOrder.mockResolvedValue({})
+
+    const wrapper = mountView()
+    await flushPromises()
+
+    await wrapper.find('button').trigger('click')
+    await flushPromises()
+
+    expect(mocks.cancelOrder).toHaveBeenCalledWith(10001)
+    expect(mocks.getOrderDetail).toHaveBeenCalledTimes(2)
+    expect(wrapper.text()).toContain('CANCELLED')
   })
 
   it('shows an error when loading order detail fails', async () => {

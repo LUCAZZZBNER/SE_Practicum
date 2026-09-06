@@ -8,6 +8,7 @@ import { getCart, removeCartItem, updateCartItem } from '../api/cart'
 
 const cartItems = ref([])
 const loading = ref(false)
+const checkoutKey = ref(null)
 
 const total = computed(() => {
   return cartItems.value.reduce((sum, item) => sum + Number(item.subtotal || 0), 0)
@@ -27,26 +28,37 @@ async function loadCart() {
 
 async function changeQuantity(item) {
   await updateCartItem(item.id, { quantity: item.quantity + 1 })
+  checkoutKey.value = null
 }
 
 async function removeItem(item) {
   await removeCartItem(item.id)
+  checkoutKey.value = null
 }
 
 async function submitOrder() {
-  await createOrder(
-    {
-      items: cartItems.value.map((item) => ({
-        cartItemId: item.id,
-        productVersion: item.product.version,
-      })),
-    },
-    {
-      headers: {
-        'X-Idempotency-Key': crypto.randomUUID(),
+  if (!checkoutKey.value) {
+    checkoutKey.value = crypto.randomUUID()
+  }
+
+  try {
+    await createOrder(
+      {
+        items: cartItems.value.map((item) => ({
+          cartItemId: item.id,
+          productVersion: item.product.version,
+        })),
       },
-    },
-  )
+      {
+        headers: {
+          'X-Idempotency-Key': checkoutKey.value,
+        },
+      },
+    )
+    checkoutKey.value = null
+  } catch (error) {
+    ElMessage.error(error?.message || '创建订单失败')
+  }
 }
 
 onMounted(loadCart)

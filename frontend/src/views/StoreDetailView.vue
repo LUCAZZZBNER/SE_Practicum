@@ -2,6 +2,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { addCartItem } from '../api/cart'
 import { listCategories } from '../api/category'
 import { getStoreDetail } from '../api/store'
 import { listProducts } from '../api/product'
@@ -37,10 +38,21 @@ async function loadStoreDetail() {
       listProducts(shopId, { page: 1, pageSize: 100, includeOffSale: true }),
     ])
 
-    categories.value = categoryData?.items || []
+    categories.value = categoryData || []
     products.value = productData?.items || []
   } catch (error) {
     ElMessage.error(error?.message || '店铺详情加载失败')
+  }
+}
+
+async function addToCart(product) {
+  try {
+    await addCartItem({
+      productId: product.id,
+      quantity: 1,
+    })
+  } catch (error) {
+    ElMessage.error(error?.message || '加入购物车失败')
   }
 }
 
@@ -64,7 +76,7 @@ onMounted(loadStoreDetail)
             <div>库存：{{ row.stock }}</div>
             <div>状态：{{ row.status }}</div>
             <el-button size="small" @click="$router.push(`/customer/products/${row.id}`)">详情</el-button>
-            <el-button size="small" type="primary" :disabled="row.stock <= 0">加入购物车</el-button>
+            <el-button size="small" type="primary" :disabled="row.stock <= 0" @click="addToCart(row)">加入购物车</el-button>
           </div>
         </div>
       </el-tab-pane>

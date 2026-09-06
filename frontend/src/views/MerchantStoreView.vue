@@ -1,14 +1,14 @@
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { getStoreDetail, listStores, updateStoreStatus } from '../api/store'
+import { createShop, getStoreDetail, listStores, updateStoreStatus } from '../api/store'
 
 const storeId = ref(null)
 
 const store = reactive({
   name: '',
   description: '',
-  status: '',
+  status: 'CLOSED',
 })
 
 async function loadStore() {
@@ -17,7 +17,7 @@ async function loadStore() {
     const shop = mine?.items?.[0]
 
     if (!shop) {
-      ElMessage.error('未找到店铺')
+      storeId.value = null
       return
     }
 
@@ -35,7 +35,14 @@ async function loadStore() {
 async function saveStore() {
   try {
     if (!storeId.value) {
-      throw new Error('未找到店铺')
+      const created = await createShop({
+        name: store.name,
+        description: store.description,
+      })
+      storeId.value = created?.id || null
+      store.status = created?.status || 'CLOSED'
+      ElMessage.success('创建成功')
+      return
     }
 
     await updateStoreStatus(storeId.value, {
@@ -55,7 +62,7 @@ onMounted(loadStore)
 <template>
   <el-form :model="store" label-width="90px" class="narrow-form">
     <el-form-item>
-      <el-button type="primary" @click="saveStore">保存店铺</el-button>
+      <el-button type="primary" @click="saveStore">{{ storeId ? '保存店铺' : '创建店铺' }}</el-button>
     </el-form-item>
     <div class="profile-field">店铺名称：{{ store.name }}</div>
     <div class="profile-field">营业状态：{{ store.status }}</div>

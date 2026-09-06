@@ -83,9 +83,7 @@ describe('ProductDetailView', () => {
       stock: 20,
       status: 'ON_SALE',
     })
-    mocks.listCategories.mockResolvedValue({
-      items: [{ id: 21, name: '主食' }],
-    })
+    mocks.listCategories.mockResolvedValue([{ id: 21, name: '主食' }])
 
     const wrapper = mountView()
     await flushPromises()
@@ -111,9 +109,7 @@ describe('ProductDetailView', () => {
       stock: 0,
       status: 'ON_SALE',
     })
-    mocks.listCategories.mockResolvedValue({
-      items: [{ id: 21, name: '主食' }],
-    })
+    mocks.listCategories.mockResolvedValue([{ id: 21, name: '主食' }])
 
     const wrapper = mountView()
     await flushPromises()

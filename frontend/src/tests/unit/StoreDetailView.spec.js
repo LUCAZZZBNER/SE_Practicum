@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import StoreDetailView from '../../views/StoreDetailView.vue'
 
 const mocks = vi.hoisted(() => ({
+  addCartItem: vi.fn(),
   getStoreDetail: vi.fn(),
   listCategories: vi.fn(),
   listProducts: vi.fn(),
@@ -18,6 +19,10 @@ vi.mock('element-plus', () => ({
   ElMessage: {
     error: mocks.messageError,
   },
+}))
+
+vi.mock('../../api/cart', () => ({
+  addCartItem: mocks.addCartItem,
 }))
 
 vi.mock('../../api/store', () => ({
@@ -64,7 +69,7 @@ function mountView() {
         },
         'el-button': {
           props: ['disabled'],
-          template: '<button :disabled="disabled"><slot /></button>',
+          template: '<button :disabled="disabled" @click="$emit(\'click\')"><slot /></button>',
         },
       },
     },
@@ -72,6 +77,7 @@ function mountView() {
 }
 
 beforeEach(() => {
+  mocks.addCartItem.mockReset()
   mocks.getStoreDetail.mockReset()
   mocks.listCategories.mockReset()
   mocks.listProducts.mockReset()
@@ -87,12 +93,10 @@ describe('StoreDetailView', () => {
       description: '校园简餐',
       status: 'OPEN',
     })
-    mocks.listCategories.mockResolvedValue({
-      items: [
-        { id: 21, name: '主食' },
-        { id: 22, name: '饮品' },
-      ],
-    })
+    mocks.listCategories.mockResolvedValue([
+      { id: 21, name: '主食' },
+      { id: 22, name: '饮品' },
+    ])
     mocks.listProducts.mockResolvedValue({
       items: [
         { id: 1, name: '招牌牛肉饭', categoryId: 21, price: 18.8, stock: 20, status: '在售' },
@@ -117,6 +121,32 @@ describe('StoreDetailView', () => {
     expect(wrapper.text()).toContain('饮品')
     expect(wrapper.text()).toContain('招牌牛肉饭')
     expect(wrapper.text()).toContain('冰柠檬茶')
+  })
+
+  it('submits add-to-cart from a store product row', async () => {
+    mocks.getStoreDetail.mockResolvedValue({
+      id: 7,
+      name: '示例快餐店',
+      description: '校园简餐',
+      status: 'OPEN',
+    })
+    mocks.listCategories.mockResolvedValue([{ id: 21, name: '主食' }])
+    mocks.listProducts.mockResolvedValue({
+      items: [
+        { id: 1, name: '招牌牛肉饭', categoryId: 21, price: 18.8, stock: 20, status: '在售' },
+      ],
+    })
+    mocks.addCartItem.mockResolvedValue({})
+
+    const wrapper = mountView()
+    await flushPromises()
+
+    await wrapper.findAll('button')[1].trigger('click')
+
+    expect(mocks.addCartItem).toHaveBeenCalledWith({
+      productId: 1,
+      quantity: 1,
+    })
   })
 
   it('shows an error when loading store detail fails', async () => {

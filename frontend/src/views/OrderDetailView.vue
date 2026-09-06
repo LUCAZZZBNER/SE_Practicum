@@ -2,7 +2,7 @@
 import { onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { getOrderDetail } from '../api/order'
+import { cancelOrder, getOrderDetail } from '../api/order'
 
 const route = useRoute()
 const loading = ref(false)
@@ -32,6 +32,15 @@ async function loadOrder() {
   }
 }
 
+async function cancelCurrentOrder() {
+  try {
+    await cancelOrder(Number(route.params.id))
+    await loadOrder()
+  } catch (error) {
+    ElMessage.error(error?.message || '取消订单失败')
+  }
+}
+
 onMounted(loadOrder)
 </script>
 
@@ -51,6 +60,10 @@ onMounted(loadOrder)
         <el-descriptions-item label="状态">{{ order.status }}</el-descriptions-item>
         <el-descriptions-item label="金额">{{ order.total.toFixed(2) }} 元</el-descriptions-item>
       </el-descriptions>
+
+      <div class="action-bar" v-if="order.status === 'PENDING_PAYMENT'">
+        <el-button type="danger" @click="cancelCurrentOrder">取消订单</el-button>
+      </div>
 
       <div class="order-items">
         <div v-for="item in order.lines" :key="item.productId" class="order-item">
