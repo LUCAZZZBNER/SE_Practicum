@@ -34,7 +34,19 @@ async function removeItem(item) {
 }
 
 async function submitOrder() {
-  await createOrder({ items: cartItems.value.map((item) => ({ cartItemId: item.id })) })
+  await createOrder(
+    {
+      items: cartItems.value.map((item) => ({
+        cartItemId: item.id,
+        productVersion: item.product.version,
+      })),
+    },
+    {
+      headers: {
+        'X-Idempotency-Key': crypto.randomUUID(),
+      },
+    },
+  )
 }
 
 onMounted(loadCart)

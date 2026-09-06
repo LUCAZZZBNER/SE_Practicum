@@ -3,6 +3,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { addCartItem } from '../api/cart'
+import { listCategories } from '../api/category'
 import { getProductDetail } from '../api/product'
 
 const route = useRoute()
@@ -10,7 +11,9 @@ const loading = ref(false)
 const product = reactive({
   name: '',
   shopName: '',
+  categoryId: null,
   categoryName: '',
+  shopId: null,
   price: 0,
   stock: 0,
   status: '',
@@ -25,10 +28,17 @@ async function loadProductDetail() {
     const data = await getProductDetail(Number(route.params.id))
     product.name = data.name || ''
     product.shopName = data.shopName || ''
-    product.categoryName = data.categoryName || ''
+    product.categoryId = data.categoryId ?? null
+    product.shopId = data.shopId ?? null
     product.price = data.price ?? 0
     product.stock = data.stock ?? 0
     product.status = data.status || ''
+
+    if (product.shopId) {
+      const categories = await listCategories(product.shopId)
+      const matched = categories?.items?.find((item) => item.id === product.categoryId)
+      product.categoryName = matched?.name || ''
+    }
   } catch (error) {
     ElMessage.error(error?.message || '商品详情加载失败')
   } finally {

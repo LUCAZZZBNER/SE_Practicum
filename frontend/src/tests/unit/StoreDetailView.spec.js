@@ -4,6 +4,8 @@ import StoreDetailView from '../../views/StoreDetailView.vue'
 
 const mocks = vi.hoisted(() => ({
   getStoreDetail: vi.fn(),
+  listCategories: vi.fn(),
+  listProducts: vi.fn(),
   routerPush: vi.fn(),
   messageError: vi.fn(),
 }))
@@ -20,6 +22,14 @@ vi.mock('element-plus', () => ({
 
 vi.mock('../../api/store', () => ({
   getStoreDetail: mocks.getStoreDetail,
+}))
+
+vi.mock('../../api/category', () => ({
+  listCategories: mocks.listCategories,
+}))
+
+vi.mock('../../api/product', () => ({
+  listProducts: mocks.listProducts,
 }))
 
 function mountView() {
@@ -63,6 +73,8 @@ function mountView() {
 
 beforeEach(() => {
   mocks.getStoreDetail.mockReset()
+  mocks.listCategories.mockReset()
+  mocks.listProducts.mockReset()
   mocks.routerPush.mockReset()
   mocks.messageError.mockReset()
 })
@@ -75,14 +87,36 @@ describe('StoreDetailView', () => {
       description: '校园简餐',
       status: 'OPEN',
     })
+    mocks.listCategories.mockResolvedValue({
+      items: [
+        { id: 21, name: '主食' },
+        { id: 22, name: '饮品' },
+      ],
+    })
+    mocks.listProducts.mockResolvedValue({
+      items: [
+        { id: 1, name: '招牌牛肉饭', categoryId: 21, price: 18.8, stock: 20, status: '在售' },
+        { id: 2, name: '冰柠檬茶', categoryId: 22, price: 6.0, stock: 35, status: '在售' },
+      ],
+    })
 
     const wrapper = mountView()
     await flushPromises()
 
     expect(mocks.getStoreDetail).toHaveBeenCalledWith(7)
+    expect(mocks.listCategories).toHaveBeenCalledWith(7)
+    expect(mocks.listProducts).toHaveBeenCalledWith(7, {
+      page: 1,
+      pageSize: 100,
+      includeOffSale: true,
+    })
     expect(wrapper.text()).toContain('示例快餐店')
     expect(wrapper.text()).toContain('校园简餐')
     expect(wrapper.text()).toContain('OPEN')
+    expect(wrapper.text()).toContain('主食')
+    expect(wrapper.text()).toContain('饮品')
+    expect(wrapper.text()).toContain('招牌牛肉饭')
+    expect(wrapper.text()).toContain('冰柠檬茶')
   })
 
   it('shows an error when loading store detail fails', async () => {

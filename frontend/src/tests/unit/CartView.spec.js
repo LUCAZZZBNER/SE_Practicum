@@ -181,6 +181,7 @@ describe('CartView', () => {
             price: 18.8,
             stock: 20,
             status: 'ON_SALE',
+            version: 3,
           },
           quantity: 2,
           subtotal: 37.6,
@@ -194,7 +195,22 @@ describe('CartView', () => {
     const wrapper = mountView()
     await flushPromises()
 
-    expect(wrapper.text()).toContain('创建订单')
-    expect(mocks.createOrder).not.toHaveBeenCalled()
+    await wrapper.findAll('button')[2].trigger('click')
+
+    expect(mocks.createOrder).toHaveBeenCalledWith(
+      {
+        items: [
+          {
+            cartItemId: 1,
+            productVersion: 3,
+          },
+        ],
+      },
+      {
+        headers: {
+          'X-Idempotency-Key': expect.any(String),
+        },
+      },
+    )
   })
 })
