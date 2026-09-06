@@ -579,6 +579,74 @@ Merchant → Restaurant → Item → Shopping → Order
 
 每个模块遵循相同闭环：确认已有 Red → 最少 Entity/DAO/XML/ServiceImpl → 目标测试 Green → 公共回归 → 独立提交。不要为了追求一次完整测试全绿而同时把六个模块一起写完。
 
+#### 7.0.8 暂不逐模块提交，最后在本人 PowerShell 统一运行数据库测试
+
+Codex 可以完成编译和不连接数据库的 Controller 测试，但不能代替 B 输入本机 `delivery_app` 密码。B 可以先连续完成 Merchant、Restaurant、Item、Shopping、Order，最后在自己能够输入密码的 PowerShell 中统一验证。密码只能通过 `Read-Host -MaskInput` 写入当前进程环境，禁止写进配置文件、命令历史、测试代码或 Git。
+
+先打开一个新的 PowerShell，整个测试过程都不要关闭这个窗口，然后执行一次环境准备：
+
+```powershell
+Set-Location 'D:\Projects\SchoolWorks\SW_2609\SE_Practicum\backend'
+
+$env:JAVA_HOME = 'D:\Dev\Java\JDK17'
+$env:Path = "$env:JAVA_HOME\bin;$env:Path"
+$env:DELIVERY_DB_USERNAME = 'delivery_app'
+$env:DELIVERY_DB_PASSWORD = Read-Host '输入本机 delivery_app 密码' -MaskInput
+$env:SPRING_PROFILES_ACTIVE = 'test'
+
+java -version
+.\mvnw.cmd -version
+```
+
+所有模块完成前，如果只想检查目前已经完成的 User、Merchant、Restaurant、Item，运行：
+
+```powershell
+.\mvnw.cmd "-Dtest=UserServiceContractTests,MerchantServiceContractTests,RestaurantServiceContractTests,ItemServiceContractTests,ItemDaoIntegrationTests,UserControllerTests,MerchantControllerTests,RestaurantControllerTests,ItemControllerTests,DefaultJwtTokenServiceTests,AuthenticationInterceptorTests,GlobalExceptionHandlerTests" test
+```
+
+当前阶段这条命令应运行 132 个测试，结果必须是 `Failures: 0`、`Errors: 0`、`Skipped: 0` 和 `BUILD SUCCESS`。未到最终验收时可以跳过这条中间命令，直接继续写下面模块。
+
+Shopping 完成后如需单独验证购物车，运行：
+
+```powershell
+.\mvnw.cmd "-Dtest=ShoppingServiceContractTests,ShoppingControllerTests" test
+```
+
+Item 的数据库原子性测试已经包含在 `ItemDaoIntegrationTests` 中。需要单独验证分类、商品、乐观锁和库存时运行：
+
+```powershell
+.\mvnw.cmd "-Dtest=ItemServiceContractTests,ItemDaoIntegrationTests,ItemControllerTests" test
+```
+
+Order 完成后如需单独验证订单，运行：
+
+```powershell
+.\mvnw.cmd "-Dtest=OrderServiceContractTests,OrderControllerTests" test
+```
+
+六个模块全部实现完后，必须运行最终完整测试；这条命令不能省略：
+
+```powershell
+.\mvnw.cmd clean test
+```
+
+加入 2 个 Item DAO 集成测试后，当前最终总数应至少为 171；如果后续再补必要测试，总数可以增加。最终结果必须同时满足：
+
+```text
+Failures: 0
+Errors: 0
+Skipped: 0
+BUILD SUCCESS
+```
+
+最后确认测试库确实执行了 V1 和 V2：
+
+```powershell
+mysql -u delivery_app -p delivery_test -e "SELECT installed_rank, version, script, success FROM flyway_schema_history ORDER BY installed_rank;"
+```
+
+应看到 `V1__create_core_tables.sql`、`V2__align_schema_with_api_contract.sql` 各一条并且 `success=1`。如果失败，保存从第一个 `[ERROR]` 开始到 `BUILD FAILURE` 的完整输出；不要删除 `flyway_schema_history`、不要改 V1、不要运行 `flyway repair`。测试全部通过后再决定一次性提交和 Push。
+
 ### 7.1 建立 B 分支并保存正式 Red
 
 ```powershell

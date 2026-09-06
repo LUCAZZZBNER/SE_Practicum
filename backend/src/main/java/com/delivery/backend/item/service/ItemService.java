@@ -50,6 +50,8 @@ public interface ItemService {
 		private String name;
 		@PositiveOrZero
 		private Integer sortOrder;
+		private boolean nameSpecified;
+		private boolean sortOrderSpecified;
 
 		public UpdateCategoryRequest() {
 		}
@@ -67,6 +69,7 @@ public interface ItemService {
 
 		public void setName(String name) {
 			this.name = name;
+			this.nameSpecified = true;
 			markUpdateSpecified();
 		}
 
@@ -76,7 +79,18 @@ public interface ItemService {
 
 		public void setSortOrder(Integer sortOrder) {
 			this.sortOrder = sortOrder;
+			this.sortOrderSpecified = true;
 			markUpdateSpecified();
+		}
+
+		@JsonIgnore
+		public boolean isNameSpecified() {
+			return nameSpecified;
+		}
+
+		@JsonIgnore
+		public boolean isSortOrderSpecified() {
+			return sortOrderSpecified;
 		}
 	}
 
@@ -100,6 +114,13 @@ public interface ItemService {
 		private String status;
 		@Positive
 		private Long version;
+		private boolean categoryIdSpecified;
+		private boolean nameSpecified;
+		private boolean descriptionSpecified;
+		private boolean priceSpecified;
+		private boolean stockSpecified;
+		private boolean statusSpecified;
+		private boolean versionSpecified;
 
 		public UpdateProductRequest() {
 		}
@@ -117,6 +138,7 @@ public interface ItemService {
 
 		public void setCategoryId(Long categoryId) {
 			this.categoryId = categoryId;
+			this.categoryIdSpecified = true;
 			markUpdateSpecified();
 		}
 
@@ -126,6 +148,7 @@ public interface ItemService {
 
 		public void setName(String name) {
 			this.name = name;
+			this.nameSpecified = true;
 			markUpdateSpecified();
 		}
 
@@ -135,6 +158,7 @@ public interface ItemService {
 
 		public void setDescription(String description) {
 			this.description = description;
+			this.descriptionSpecified = true;
 			markUpdateSpecified();
 		}
 
@@ -144,6 +168,7 @@ public interface ItemService {
 
 		public void setPrice(BigDecimal price) {
 			this.price = price;
+			this.priceSpecified = true;
 			markUpdateSpecified();
 		}
 
@@ -153,6 +178,7 @@ public interface ItemService {
 
 		public void setStock(Integer stock) {
 			this.stock = stock;
+			this.stockSpecified = true;
 			markUpdateSpecified();
 		}
 
@@ -162,6 +188,7 @@ public interface ItemService {
 
 		public void setStatus(String status) {
 			this.status = status;
+			this.statusSpecified = true;
 			markUpdateSpecified();
 		}
 
@@ -171,7 +198,43 @@ public interface ItemService {
 
 		public void setVersion(Long version) {
 			this.version = version;
+			this.versionSpecified = true;
 			markUpdateSpecified();
+		}
+
+		@JsonIgnore
+		public boolean isCategoryIdSpecified() {
+			return categoryIdSpecified;
+		}
+
+		@JsonIgnore
+		public boolean isNameSpecified() {
+			return nameSpecified;
+		}
+
+		@JsonIgnore
+		public boolean isDescriptionSpecified() {
+			return descriptionSpecified;
+		}
+
+		@JsonIgnore
+		public boolean isPriceSpecified() {
+			return priceSpecified;
+		}
+
+		@JsonIgnore
+		public boolean isStockSpecified() {
+			return stockSpecified;
+		}
+
+		@JsonIgnore
+		public boolean isStatusSpecified() {
+			return statusSpecified;
+		}
+
+		@JsonIgnore
+		public boolean isVersionSpecified() {
+			return versionSpecified;
 		}
 	}
 
