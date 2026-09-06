@@ -2,9 +2,9 @@
 
 > 更新日期：2026-09-06
 >
-> 当前状态：后端阶段 1 实现已经完成，`feature/b-tdd` 已合并并推送到远程 `develop`。后端完整测试已经由 B 在本机 MySQL 环境中验证通过。
+> 当前状态：本轮同步检查时，本地和远程 `develop` 的共同基线为 `69efde1`。后端阶段 1 实现已经完成并全绿；团队已确认仓库中最新前端就是 `a633dd6` 这一批前端提交，不再等待 C 提供另一版代码。B 的 Node.js、npm、前端依赖、现有测试和生产构建也已验证可用。
 >
-> 当前唯一下一阶段：A 冻结并检查契约，C 按契约修正前端并接入真实后端，B 只处理联调发现的后端缺陷；三人完成 30 个接口的真实联调、证据记录和最终验收。
+> 当前唯一下一阶段：立即对最新前端做接口契约 Red/Green。A 固定前端 API 契约，C 修正前端并接入真实后端，B 准备联调环境并只处理联调证明存在的后端缺陷；三人完成 30 个接口的真实联调、证据记录和最终验收。
 
 本文已经删除建 B 分支、保存初始 Red、创建 ServiceImpl 外壳、编写 V2、逐模块重复提交和反复 Push 等已完成步骤。那些内容可从 Git 历史查看，不再作为待办重复执行。
 
@@ -53,6 +53,8 @@
 - 用户/商家独立账号、分类逻辑删除、商品乐观锁、原子库存、购物车、订单幂等及取消事务；
 - 后端 Controller、Service 契约和 DAO 集成测试全部通过；
 - `feature/b-tdd` 已通过合并提交进入远程 `develop`。
+
+2026-09-06 再次执行 `git fetch` 和 `git pull --ff-only origin develop`，结果为 `Already up to date`；该次同步检查时，本地 `develop` 与 `origin/develop` 的共同基线为 `69efde1`。当前仓库中最后一条修改 `frontend` 的提交是 `a633dd6 test: add auth home view tests`。团队已经确认这就是 C 的最新交付，因此第 5 节列出的前端契约问题属于最新前端本身，既不是 B 合并造成的回退，也不是等待下一次拉取能够解决的问题。
 
 后端代码当前基线是远程 `develop`。不要再次创建 V2、ServiceImpl 外壳或 `feature/b-tdd`，也不要再次制造最初的 26 个 Red。
 
@@ -134,9 +136,9 @@ Refactor：自动测试仍全绿时整理重复代码和命名
 
 ---
 
-## 6. 第一步：三个人同步最终后端基线
+## 6. 第一步：确认共同基线并立即开始前端契约修正
 
-三个人都在自己的项目根目录执行：
+B 的电脑已经完成本节同步。A、C 在各自电脑仍需执行：
 
 ```powershell
 git status --short
@@ -153,6 +155,14 @@ git status --short
 - `git status --short` 没有输出；
 - 能看到合并 `feature/b-tdd` 的提交；
 - 不再复制文件或压缩包手工同步。
+
+B 当前不再等待 C Push。确认最新前端后，三人立即按下面顺序并行准备：
+
+1. A 阅读第 5 节问题表和 API 文档，开始第 7 节前端契约 Red；
+2. C 从最新 `develop` 创建修正分支，阅读 A 正在固定的断言，不再按旧路径继续扩展页面；
+3. B 完成 6.1、6.2 的记录和环境准备，之后进入第 9 节联调机角色；
+4. A 的 Red 推送后，C 将它同步到个人分支并完成第 8 节 Green；
+5. 三人不再等待不存在的“下一版前端”。
 
 C 创建本阶段工作分支：
 
@@ -175,6 +185,41 @@ A 只有在需要新增/修正测试时才创建 `test/a-api-contract`；B 只�
 - 不记录任何数据库密码。
 
 不要凭记忆填写数量，应从 Maven 最后输出或 `backend/target/surefire-reports` 读取。
+
+### 6.2 B 的前端运行准备已经完成
+
+2026-09-06，B 已使用下列环境完成最新前端基线验证：
+
+```text
+Node.js v24.19.0
+npm 11.17.0
+npm ci：成功，安装并审计 179 个依赖包
+npm run test:run：22 个测试文件通过，67 个测试通过
+npm run build：成功，Vite 生产构建完成
+```
+
+依赖安装过程中显示的 deprecated、allow-scripts、5 vulnerabilities 和大于 500 kB 的 chunk 均为警告，没有导致测试或构建失败。当前阶段不要执行 `npm audit fix --force`，以免强制升级依赖并改动已经锁定的版本。
+
+以后在 B 的电脑重新验证前端时执行：
+
+```powershell
+Set-Location 'D:\Projects\SchoolWorks\SW_2609\SE_Practicum\frontend'
+node -v
+npm.cmd -v
+npm.cmd ci
+npm.cmd run test:run
+npm.cmd run build
+```
+
+若其他成员或新电脑提示无法识别 `node` 和 `npm`，先安装 Node.js LTS：
+
+```powershell
+winget install --id OpenJS.NodeJS.LTS -e
+```
+
+安装完成后必须关闭旧 PowerShell 并重新打开，再执行上面的验证命令。如果 PowerShell 的脚本执行策略拦截 `npm.ps1`，直接使用文中所写的 `npm.cmd`，不需要修改系统执行策略。
+
+这一步只证明“C 当前交付版的前端自身测试和构建通过”，不能宣布联调完成。当前 67 个测试大量 mock 了 API 模块，没有真正调用 Spring Boot，因此不会自动发现第 5 节已经确认的错误路径、字段、版本号、幂等请求头和缺失功能。下一步仍必须由 A 完成第 7 节契约 Red，再由 C 完成第 8 节 Green。
 
 ---
 
