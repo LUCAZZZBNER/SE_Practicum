@@ -4,6 +4,7 @@ import ProductDetailView from '../../views/ProductDetailView.vue'
 
 const mocks = vi.hoisted(() => ({
   getProductDetail: vi.fn(),
+  getStoreDetail: vi.fn(),
   listCategories: vi.fn(),
   addCartItem: vi.fn(),
   routerPush: vi.fn(),
@@ -26,6 +27,10 @@ vi.mock('../../api/product', () => ({
 
 vi.mock('../../api/category', () => ({
   listCategories: mocks.listCategories,
+}))
+
+vi.mock('../../api/store', () => ({
+  getStoreDetail: mocks.getStoreDetail,
 }))
 
 vi.mock('../../api/cart', () => ({
@@ -65,6 +70,7 @@ function mountView() {
 
 beforeEach(() => {
   mocks.getProductDetail.mockReset()
+  mocks.getStoreDetail.mockReset()
   mocks.listCategories.mockReset()
   mocks.addCartItem.mockReset()
   mocks.routerPush.mockReset()
@@ -76,19 +82,20 @@ describe('ProductDetailView', () => {
     mocks.getProductDetail.mockResolvedValue({
       id: 11,
       name: '招牌牛肉饭',
-      shopName: '示例快餐店',
       shopId: 7,
       categoryId: 21,
       price: 18.8,
       stock: 20,
       status: 'ON_SALE',
     })
+    mocks.getStoreDetail.mockResolvedValue({ id: 7, name: '示例快餐店' })
     mocks.listCategories.mockResolvedValue([{ id: 21, name: '主食' }])
 
     const wrapper = mountView()
     await flushPromises()
 
     expect(mocks.getProductDetail).toHaveBeenCalledWith(11)
+    expect(mocks.getStoreDetail).toHaveBeenCalledWith(7)
     expect(mocks.listCategories).toHaveBeenCalledWith(7)
     expect(wrapper.text()).toContain('招牌牛肉饭')
     expect(wrapper.text()).toContain('示例快餐店')
@@ -102,13 +109,13 @@ describe('ProductDetailView', () => {
     mocks.getProductDetail.mockResolvedValue({
       id: 12,
       name: '售罄商品',
-      shopName: '示例快餐店',
       shopId: 7,
       categoryId: 21,
       price: 9.9,
       stock: 0,
       status: 'ON_SALE',
     })
+    mocks.getStoreDetail.mockResolvedValue({ id: 7, name: '示例快餐店' })
     mocks.listCategories.mockResolvedValue([{ id: 21, name: '主食' }])
 
     const wrapper = mountView()

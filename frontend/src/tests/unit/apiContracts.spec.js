@@ -61,12 +61,12 @@ describe('api contracts', () => {
     const registerBody = {
       account: 'user01',
       password: 'pass123456',
-      name: '普通用户',
+      passwordConfirm: 'pass123456',
+      nickname: '普通用户',
       phone: '13800000000',
-      address: '教学楼 A',
     }
     const loginBody = { account: 'user01', password: 'pass123456' }
-    const profileBody = { name: '新用户', phone: '13900000000', address: '宿舍楼 B' }
+    const profileBody = { nickname: '新用户', phone: '13900000000' }
 
     registerCustomer(registerBody)
     loginCustomer(loginBody)

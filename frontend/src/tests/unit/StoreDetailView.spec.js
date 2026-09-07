@@ -112,7 +112,6 @@ describe('StoreDetailView', () => {
     expect(mocks.listProducts).toHaveBeenCalledWith(7, {
       page: 1,
       pageSize: 100,
-      includeOffSale: true,
     })
     expect(wrapper.text()).toContain('示例快餐店')
     expect(wrapper.text()).toContain('校园简餐')
