@@ -185,6 +185,31 @@ describe('MerchantProductsView', () => {
     })
   })
 
+  it('submits product description when creating a product', async () => {
+    seedMerchantProducts()
+    mocks.createProduct.mockResolvedValue({})
+
+    const wrapper = mountView()
+    await flushPromises()
+
+    const descriptionInput = wrapper.find('textarea[placeholder="商品描述"]')
+    await descriptionInput.setValue('招牌套餐')
+    const inputs = wrapper.findAll('input')
+    await inputs[1].setValue('牛肉饭')
+    await inputs[2].setValue('18.8')
+    await inputs[3].setValue('20')
+    await wrapper.findAll('button').find((button) => button.text() === '新增商品').trigger('click')
+
+    expect(mocks.createProduct).toHaveBeenCalledWith({
+      shopId: 7,
+      categoryId: 21,
+      name: '牛肉饭',
+      description: '招牌套餐',
+      price: 18.8,
+      stock: 20,
+    })
+  })
+
   it('shows validation error instead of submitting invalid product payload', async () => {
     seedMerchantProducts()
 
@@ -228,6 +253,42 @@ describe('MerchantProductsView', () => {
       name: '升级牛肉饭',
       price: 20,
       stock: 18,
+      version: 3,
+    })
+  })
+
+  it('loads and submits edited product description with current version', async () => {
+    seedMerchantProducts({
+      products: [
+        {
+          id: 1,
+          name: '招牌牛肉饭',
+          description: '原商品描述',
+          categoryId: 21,
+          price: 18.8,
+          stock: 20,
+          status: 'ON_SALE',
+          version: 3,
+        },
+      ],
+    })
+    mocks.updateProduct.mockResolvedValue({})
+
+    const wrapper = mountView()
+    await flushPromises()
+
+    await wrapper.findAll('button').find((button) => button.text() === '编辑').trigger('click')
+    const descriptionInput = wrapper.find('textarea[placeholder="商品描述"]')
+    expect(descriptionInput.element.value).toBe('原商品描述')
+    await descriptionInput.setValue('升级后的描述')
+    await wrapper.findAll('button').find((button) => button.text() === '保存商品').trigger('click')
+
+    expect(mocks.updateProduct).toHaveBeenCalledWith(1, {
+      categoryId: 21,
+      name: '招牌牛肉饭',
+      description: '升级后的描述',
+      price: 18.8,
+      stock: 20,
       version: 3,
     })
   })

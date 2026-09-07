@@ -82,6 +82,7 @@ describe('ProductDetailView', () => {
     mocks.getProductDetail.mockResolvedValue({
       id: 11,
       name: '招牌牛肉饭',
+      description: '招牌套餐，现做现卖',
       shopId: 7,
       categoryId: 21,
       price: 18.8,
@@ -98,6 +99,7 @@ describe('ProductDetailView', () => {
     expect(mocks.getStoreDetail).toHaveBeenCalledWith(7)
     expect(mocks.listCategories).toHaveBeenCalledWith(7)
     expect(wrapper.text()).toContain('招牌牛肉饭')
+    expect(wrapper.text()).toContain('招牌套餐，现做现卖')
     expect(wrapper.text()).toContain('示例快餐店')
     expect(wrapper.text()).toContain('主食')
     expect(wrapper.text()).toContain('18.8')

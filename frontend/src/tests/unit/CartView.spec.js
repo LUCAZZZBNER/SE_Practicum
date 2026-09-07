@@ -148,6 +148,38 @@ describe('CartView', () => {
     expect(mocks.updateCartItem).toHaveBeenCalled()
   })
 
+  it('submits the selected target quantity for a cart item', async () => {
+    mocks.getCart.mockResolvedValue({
+      items: [
+        {
+          id: 1,
+          product: {
+            id: 11,
+            name: '招牌牛肉饭',
+            shopId: 7,
+            price: 18.8,
+            stock: 20,
+            status: 'ON_SALE',
+          },
+          quantity: 2,
+          subtotal: 37.6,
+          available: true,
+        },
+      ],
+      total: 37.6,
+    })
+    mocks.updateCartItem.mockResolvedValue({})
+
+    const wrapper = mountView()
+    await flushPromises()
+
+    const quantityInput = wrapper.find('input[data-testid="cart-quantity"]')
+    await quantityInput.setValue('5')
+    await wrapper.find('button').trigger('click')
+
+    expect(mocks.updateCartItem).toHaveBeenCalledWith(1, { quantity: 5 })
+  })
+
   it('submits delete action for a cart item', async () => {
     mocks.getCart.mockResolvedValue({
       items: [
@@ -257,5 +289,46 @@ describe('CartView', () => {
     expect(mocks.createOrder).toHaveBeenCalledTimes(2)
     expect(mocks.createOrder.mock.calls[0][1].headers['X-Idempotency-Key']).toBe('order-key-1')
     expect(mocks.createOrder.mock.calls[1][1].headers['X-Idempotency-Key']).toBe('order-key-1')
+  })
+
+  it('disables checkout while order request is pending', async () => {
+    mocks.getCart.mockResolvedValue({
+      items: [
+        {
+          id: 1,
+          product: {
+            id: 11,
+            name: '招牌牛肉饭',
+            shopId: 7,
+            price: 18.8,
+            stock: 20,
+            status: 'ON_SALE',
+            version: 3,
+          },
+          quantity: 2,
+          subtotal: 37.6,
+          available: true,
+        },
+      ],
+      total: 37.6,
+    })
+    let resolveOrder
+    mocks.createOrder.mockReturnValue(new Promise((resolve) => {
+      resolveOrder = resolve
+    }))
+
+    const wrapper = mountView()
+    await flushPromises()
+
+    const checkoutButton = wrapper.findAll('button').find((button) => button.text() === '创建订单')
+    const request = checkoutButton.trigger('click')
+    await flushPromises()
+
+    expect(checkoutButton.element.disabled).toBe(true)
+
+    resolveOrder({ id: 1001 })
+    await request
+    await flushPromises()
+    expect(checkoutButton.element.disabled).toBe(false)
   })
 })
