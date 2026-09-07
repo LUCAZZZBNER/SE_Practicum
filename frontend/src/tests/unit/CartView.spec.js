@@ -51,6 +51,11 @@ function mountView() {
         'el-table-column': {
           template: '<div />',
         },
+        'el-input-number': {
+          props: ['modelValue', 'min', 'max'],
+          emits: ['update:modelValue'],
+          template: '<input type="number" :value="modelValue" @input="$emit(\'update:modelValue\', Number($event.target.value))" />',
+        },
         'el-button': {
           emits: ['click'],
           props: ['disabled'],

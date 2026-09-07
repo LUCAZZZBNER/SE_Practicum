@@ -20,6 +20,7 @@ const productForm = reactive({
   id: null,
   categoryId: null,
   name: '',
+  description: '',
   price: 0,
   stock: 0,
   version: null,
@@ -29,6 +30,7 @@ function resetProductForm() {
   productForm.id = null
   productForm.categoryId = categories.value[0]?.id || null
   productForm.name = ''
+  productForm.description = ''
   productForm.price = 0
   productForm.stock = 0
   productForm.version = null
@@ -38,6 +40,7 @@ function fillProductForm(product) {
   productForm.id = product.id
   productForm.categoryId = product.categoryId
   productForm.name = product.name
+  productForm.description = product.description || ''
   productForm.price = product.price
   productForm.stock = product.stock
   productForm.version = product.version
@@ -107,6 +110,7 @@ async function saveProduct() {
   const payload = {
     categoryId: Number(productForm.categoryId),
     name: productForm.name.trim(),
+    description: productForm.description.trim(),
     price: Number(productForm.price),
     stock: Number(productForm.stock),
   }
@@ -162,6 +166,7 @@ onMounted(loadProducts)
           />
         </el-select>
         <el-input v-model="productForm.name" placeholder="商品名称" />
+        <el-input v-model="productForm.description" type="textarea" placeholder="商品描述" />
         <el-input-number v-model="productForm.price" :min="0" />
         <el-input-number v-model="productForm.stock" :min="0" />
         <el-button type="primary" @click="saveProduct">{{ productForm.id ? '保存商品' : '新增商品' }}</el-button>

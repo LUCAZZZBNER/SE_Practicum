@@ -8,6 +8,7 @@ import { getCart, removeCartItem, updateCartItem } from '../api/cart'
 
 const cartItems = ref([])
 const loading = ref(false)
+const submitting = ref(false)
 const checkoutKey = ref(null)
 
 const total = computed(() => {
@@ -27,7 +28,7 @@ async function loadCart() {
 }
 
 async function changeQuantity(item) {
-  await updateCartItem(item.id, { quantity: item.quantity + 1 })
+  await updateCartItem(item.id, { quantity: Number(item.quantity) })
   checkoutKey.value = null
   await loadCart()
 }
@@ -39,10 +40,13 @@ async function removeItem(item) {
 }
 
 async function submitOrder() {
+  if (submitting.value) return
+
   if (!checkoutKey.value) {
     checkoutKey.value = crypto.randomUUID()
   }
 
+  submitting.value = true
   try {
     await createOrder(
       {
@@ -62,6 +66,8 @@ async function submitOrder() {
     ElMessage.success('订单创建成功')
   } catch (error) {
     ElMessage.error(error?.message || '创建订单失败')
+  } finally {
+    submitting.value = false
   }
 }
 
@@ -83,6 +89,12 @@ onMounted(loadCart)
         </div>
 
         <div class="cart-actions">
+          <el-input-number
+            v-model="item.quantity"
+            data-testid="cart-quantity"
+            :min="1"
+            :max="item.product.stock"
+          />
           <el-button size="small" @click="changeQuantity(item)">修改数量</el-button>
           <ConfirmAction title="确认删除该购物车项？" type="danger" @confirm="removeItem(item)">
             <el-button size="small" type="danger">删除</el-button>
@@ -93,7 +105,7 @@ onMounted(loadCart)
 
     <div v-if="cartItems.length > 0" class="action-bar">
       <span>合计：{{ total.toFixed(2) }} 元</span>
-      <el-button type="primary" @click="submitOrder">创建订单</el-button>
+      <el-button type="primary" :disabled="submitting" @click="submitOrder">创建订单</el-button>
     </div>
   </section>
 </template>

@@ -69,9 +69,9 @@ function mountView() {
           template: '<div class="confirm"><slot /><button type="button" class="confirm-button" @click="$emit(\'confirm\')">确认</button></div>',
         },
         'el-input': {
-          props: ['modelValue', 'placeholder'],
+          props: ['modelValue', 'placeholder', 'type'],
           emits: ['update:modelValue'],
-          template: '<input :placeholder="placeholder" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />',
+          template: '<textarea v-if="type === \'textarea\'" :placeholder="placeholder" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" /><input v-else :placeholder="placeholder" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />',
         },
         'el-input-number': {
           props: ['modelValue', 'min'],
@@ -180,6 +180,7 @@ describe('MerchantProductsView', () => {
       shopId: 7,
       categoryId: 21,
       name: '牛肉饭',
+      description: '',
       price: 18.8,
       stock: 20,
     })
@@ -194,10 +195,10 @@ describe('MerchantProductsView', () => {
 
     const descriptionInput = wrapper.find('textarea[placeholder="商品描述"]')
     await descriptionInput.setValue('招牌套餐')
-    const inputs = wrapper.findAll('input')
-    await inputs[1].setValue('牛肉饭')
-    await inputs[2].setValue('18.8')
-    await inputs[3].setValue('20')
+    await wrapper.find('input[placeholder="商品名称"]').setValue('牛肉饭')
+    const numberInputs = wrapper.findAll('input[type="number"]')
+    await numberInputs[0].setValue('18.8')
+    await numberInputs[1].setValue('20')
     await wrapper.findAll('button').find((button) => button.text() === '新增商品').trigger('click')
 
     expect(mocks.createProduct).toHaveBeenCalledWith({
@@ -251,6 +252,7 @@ describe('MerchantProductsView', () => {
     expect(mocks.updateProduct).toHaveBeenCalledWith(1, {
       categoryId: 21,
       name: '升级牛肉饭',
+      description: '',
       price: 20,
       stock: 18,
       version: 3,

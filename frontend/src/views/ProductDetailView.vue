@@ -11,6 +11,7 @@ const route = useRoute()
 const loading = ref(false)
 const product = reactive({
   name: '',
+  description: '',
   shopName: '',
   categoryId: null,
   categoryName: '',
@@ -28,6 +29,7 @@ async function loadProductDetail() {
   try {
     const data = await getProductDetail(Number(route.params.id))
     product.name = data.name || ''
+    product.description = data.description || ''
     product.shopName = data.shopName || ''
     product.categoryId = data.categoryId ?? null
     product.shopId = data.shopId ?? null
@@ -72,6 +74,7 @@ onMounted(loadProductDetail)
       <el-descriptions :title="product.name" border>
         <el-descriptions-item label="所属店铺">{{ product.shopName }}</el-descriptions-item>
         <el-descriptions-item label="分类">{{ product.categoryName }}</el-descriptions-item>
+        <el-descriptions-item label="商品描述">{{ product.description || '暂无描述' }}</el-descriptions-item>
         <el-descriptions-item label="价格">{{ product.price }} 元</el-descriptions-item>
         <el-descriptions-item label="库存">{{ product.stock }}</el-descriptions-item>
         <el-descriptions-item label="状态">{{ product.status }}</el-descriptions-item>
