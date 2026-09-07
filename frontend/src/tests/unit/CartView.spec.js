@@ -43,7 +43,8 @@ function mountView() {
           template: '<div class="empty">{{ description }}</div>',
         },
         ConfirmAction: {
-          template: '<div class="confirm"><slot /></div>',
+          emits: ['confirm'],
+          template: '<div class="confirm"><slot /><button class="confirm-button" @click="$emit(\'confirm\')">确认</button></div>',
         },
         'el-table': {
           template: '<div><slot /></div>',
@@ -151,6 +152,7 @@ describe('CartView', () => {
     await wrapper.findAll('button')[0].trigger('click')
 
     expect(mocks.updateCartItem).toHaveBeenCalled()
+    expect(mocks.getCart).toHaveBeenCalledTimes(2)
   })
 
   it('submits the selected target quantity for a cart item', async () => {
@@ -211,7 +213,11 @@ describe('CartView', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('删除')
-    expect(mocks.removeCartItem).not.toHaveBeenCalled()
+    await wrapper.find('.confirm-button').trigger('click')
+    await flushPromises()
+
+    expect(mocks.removeCartItem).toHaveBeenCalledWith(1)
+    expect(mocks.getCart).toHaveBeenCalledTimes(2)
   })
 
   it('submits create order action from cart', async () => {
@@ -240,7 +246,8 @@ describe('CartView', () => {
     const wrapper = mountView()
     await flushPromises()
 
-    await wrapper.findAll('button')[2].trigger('click')
+    await wrapper.findAll('button').find((button) => button.text() === '创建订单').trigger('click')
+    await flushPromises()
 
     expect(mocks.createOrder).toHaveBeenCalledWith(
       {
@@ -257,6 +264,8 @@ describe('CartView', () => {
         },
       },
     )
+    expect(mocks.getCart).toHaveBeenCalledTimes(2)
+    expect(mocks.messageSuccess).toHaveBeenCalledWith('订单创建成功')
   })
 
   it('reuses idempotency key when retrying the same checkout after failure', async () => {
@@ -285,9 +294,9 @@ describe('CartView', () => {
     const wrapper = mountView()
     await flushPromises()
 
-    await wrapper.findAll('button')[2].trigger('click')
+    await wrapper.findAll('button').find((button) => button.text() === '创建订单').trigger('click')
     await flushPromises()
-    await wrapper.findAll('button')[2].trigger('click')
+    await wrapper.findAll('button').find((button) => button.text() === '创建订单').trigger('click')
     await flushPromises()
 
     expect(crypto.randomUUID).toHaveBeenCalledTimes(1)
