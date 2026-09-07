@@ -98,7 +98,8 @@ async function deleteCategory(category) {
 }
 
 async function offShelf(product) {
-  await updateProduct(product.id, { status: 'OFF_SALE', version: product.version })
+  const status = product.status === 'OFF_SALE' ? 'ON_SALE' : 'OFF_SALE'
+  await updateProduct(product.id, { status, version: product.version })
   await loadProducts()
 }
 
@@ -177,8 +178,13 @@ onMounted(loadProducts)
         <div>库存：{{ product.stock }}</div>
         <div>状态：{{ product.status }}</div>
         <el-button size="small" @click="fillProductForm(product)">编辑</el-button>
-        <ConfirmAction title="确认下架该商品？" @confirm="offShelf(product)">
-          <el-button size="small" type="warning">下架</el-button>
+        <ConfirmAction
+          :title="product.status === 'OFF_SALE' ? '确认上架该商品？' : '确认下架该商品？'"
+          @confirm="offShelf(product)"
+        >
+          <el-button size="small" type="warning">
+            {{ product.status === 'OFF_SALE' ? '上架' : '下架' }}
+          </el-button>
         </ConfirmAction>
       </div>
     </div>

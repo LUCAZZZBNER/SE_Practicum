@@ -258,4 +258,32 @@ describe('MerchantProductsView', () => {
       version: 3,
     })
   })
+
+  it('submits on-sale action for an off-sale product with version', async () => {
+    seedMerchantProducts({
+      products: [
+        {
+          id: 2,
+          name: '暂停售商品',
+          categoryId: 21,
+          price: 18.8,
+          stock: 20,
+          status: 'OFF_SALE',
+          version: 4,
+        },
+      ],
+    })
+    mocks.updateProduct.mockResolvedValue({})
+
+    const wrapper = mountView()
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('上架')
+    await wrapper.find('.confirm-button').trigger('click')
+
+    expect(mocks.updateProduct).toHaveBeenCalledWith(2, {
+      status: 'ON_SALE',
+      version: 4,
+    })
+  })
 })

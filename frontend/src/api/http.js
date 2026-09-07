@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
+import router from '../router'
 
 const http = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '/api/v1',
@@ -34,7 +35,7 @@ http.interceptors.response.use(
     if (error.response?.status === 401) {
       localStorage.removeItem('access_token')
       localStorage.removeItem('user_role')
-      window.history.replaceState({}, '', '/')
+      router.replace('/')
     }
     ElMessage.error(message)
     return Promise.reject(error)

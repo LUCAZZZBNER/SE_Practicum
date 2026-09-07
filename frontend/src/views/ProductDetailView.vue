@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { addCartItem } from '../api/cart'
 import { listCategories } from '../api/category'
+import { getStoreDetail } from '../api/store'
 import { getProductDetail } from '../api/product'
 
 const route = useRoute()
@@ -35,9 +36,13 @@ async function loadProductDetail() {
     product.status = data.status || ''
 
     if (product.shopId) {
-      const categories = await listCategories(product.shopId)
+      const [categories, shop] = await Promise.all([
+        listCategories(product.shopId),
+        getStoreDetail(product.shopId),
+      ])
       const matched = categories?.find((item) => item.id === product.categoryId)
       product.categoryName = matched?.name || ''
+      product.shopName = shop?.name || ''
     }
   } catch (error) {
     ElMessage.error(error?.message || '商品详情加载失败')

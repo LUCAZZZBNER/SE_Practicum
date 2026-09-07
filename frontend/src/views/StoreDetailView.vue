@@ -35,7 +35,7 @@ async function loadStoreDetail() {
 
     const [categoryData, productData] = await Promise.all([
       listCategories(shopId),
-      listProducts(shopId, { page: 1, pageSize: 100, includeOffSale: true }),
+      listProducts(shopId, { page: 1, pageSize: 100 }),
     ])
 
     categories.value = categoryData || []

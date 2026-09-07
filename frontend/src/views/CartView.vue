@@ -29,11 +29,13 @@ async function loadCart() {
 async function changeQuantity(item) {
   await updateCartItem(item.id, { quantity: item.quantity + 1 })
   checkoutKey.value = null
+  await loadCart()
 }
 
 async function removeItem(item) {
   await removeCartItem(item.id)
   checkoutKey.value = null
+  await loadCart()
 }
 
 async function submitOrder() {
@@ -56,6 +58,8 @@ async function submitOrder() {
       },
     )
     checkoutKey.value = null
+    await loadCart()
+    ElMessage.success('订单创建成功')
   } catch (error) {
     ElMessage.error(error?.message || '创建订单失败')
   }

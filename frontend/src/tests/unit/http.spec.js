@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => {
     responseFulfilled: null,
     responseRejected: null,
     errorSpy: vi.fn(),
+    routerReplace: vi.fn(),
   }
 
   const createSpy = vi.fn(() => ({
@@ -39,11 +40,18 @@ vi.mock('element-plus', () => ({
   },
 }))
 
+vi.mock('../../router', () => ({
+  default: {
+    replace: mocks.state.routerReplace,
+  },
+}))
+
 import http from '../../api/http'
 
 beforeEach(() => {
   localStorage.clear()
   mocks.state.errorSpy.mockClear()
+  mocks.state.routerReplace.mockReset()
 })
 
 describe('http', () => {
@@ -145,7 +153,7 @@ describe('http', () => {
 
     expect(localStorage.getItem('access_token')).toBeNull()
     expect(localStorage.getItem('user_role')).toBeNull()
-    expect(window.location.pathname).toBe('/')
+    expect(mocks.state.routerReplace).toHaveBeenCalledWith('/')
     expect(mocks.state.errorSpy).toHaveBeenCalledWith('登录已失效')
   })
 
