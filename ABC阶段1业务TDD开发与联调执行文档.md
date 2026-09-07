@@ -1,10 +1,10 @@
 # ABC 阶段 1 前后端联调、验收与交付执行文档
 
-> 更新日期：2026-09-07
+> 更新日期：2026-09-08
 >
-> 当前状态：B 已再次执行 `git pull --ff-only origin develop`，从 `cb1d93a` 快进到 `83c3f93 fix: close frontend integration blockers`。本地与远程 `develop` 完全一致。最新前端 25 个测试文件、90 个测试全部通过，生产构建成功。`fix/api-alignment` 及其本地评审分支仍不参与本轮。
+> 当前状态：B 已再次执行 `git pull --ff-only origin develop`，从 `2132dad` 快进到 `1168626 test: complete cart regression evidence`。本地与远程 `develop` 完全一致。最新前端 25 个测试文件、94 个测试全部通过，生产构建成功。`fix/api-alignment` 及其本地评审分支仍不参与本轮。
 >
-> 当前唯一下一阶段：补齐 SRS 仍明确要求的三个最小前端行为和缺失的购物车回归测试，然后在同一台电脑启动 MySQL、后端和前端，完成 30 个接口的真实联调、证据记录和最终验收。90 个 mock 单元测试全绿仍不能替代真实联调。
+> 当前唯一下一阶段：R1 至 R3 和购物车回归测试已经完成，不再继续补同类前端代码。现在从第 9 节开始，在同一台电脑启动 MySQL、后端和前端，完成 30 个接口的真实联调、证据记录和最终验收。94 个 mock 单元测试全绿仍不能替代真实联调。
 
 本文已经删除建 B 分支、保存初始 Red、创建 ServiceImpl 外壳、编写 V2、逐模块重复提交和反复 Push 等已完成步骤。那些内容可从 Git 历史查看，不再作为待办重复执行。
 
@@ -54,7 +54,7 @@
 - 后端 Controller、Service 契约和 DAO 集成测试全部通过；
 - `feature/b-tdd` 已通过合并提交进入远程 `develop`。
 
-2026-09-07，A 的测试提交 `a808d79` 和 C 的修复提交 `83c3f93` 已先后进入 `develop`。B 已从 `cb1d93a` fast-forward 到 `83c3f93`。本轮共修改 10 个前端文件，处理上次列出的店铺权限、商品上架、商品详情店铺名、购物车刷新和 401 跳转问题。第 5 节已经重新按 `83c3f93` 审计；此前针对 `3aa82ac`、`90fd50c` 或 `fix/api-alignment` 的待办不能代替本次结论。
+2026-09-07，A/C 又将 `7b2274b`、`7b257f8`、`1168626` 三个提交推入 `develop`。B 已从 `2132dad` fast-forward 到 `1168626`。本轮修改 6 个前端文件，完成商品描述、目标购物车数量、下单防重复点击及购物车回归测试。第 5 节已经重新按 `1168626` 审计；此前针对 `83c3f93`、`3aa82ac`、`90fd50c` 或 `fix/api-alignment` 的待办不能代替本次结论。
 
 后端代码当前基线是远程 `develop`。不要再次创建 V2、ServiceImpl 外壳或 `feature/b-tdd`，也不要再次制造最初的 26 个 Red。
 
@@ -114,65 +114,61 @@ Refactor：自动测试仍全绿时整理重复代码和命名
 
 ---
 
-## 5. `develop@83c3f93` 最新审计结论
+## 5. `develop@1168626` 最新审计结论
 
-### 5.1 本次拉取和自动验证结果
+### 5.1 本次拉取的三个提交
 
-本次快进包含两个提交：
+| 顺序 | 提交 | 实际作用 |
+| ---: | --- | --- |
+| 1 | `7b2274b test: add product and cart requirement red coverage` | 先加入商品描述、目标数量和防重复提交的失败测试 |
+| 2 | `7b257f8 feat:add product and cart requirement red coverage` | 实际是 Green：修改三个页面让 Red 通过；提交标题写成了 red coverage，但代码内容没有问题 |
+| 3 | `1168626 test: complete cart regression evidence` | 补齐删除、刷新和下单成功的回归断言 |
 
-| 提交 | 含义 |
-| --- | --- |
-| `a808d79 test: complete frontend contract red coverage` | 先修改商品详情、顾客店铺详情和用户契约测试 |
-| `83c3f93 fix: close frontend integration blockers` | 修复页面，并补商品上架和 401 测试 |
+Git 顺序保留了 R1 至 R3 的 `Red → Green`。最后一个提交是对已经存在的购物车刷新实现补回归证据，因此直接 Green 是正常的，不要伪造失败记录。
 
-B 在当前 `develop@83c3f93` 实际执行：
+### 5.2 自动验证结果
+
+B 在当前 `develop@1168626` 实际执行：
 
 ```text
-npm.cmd run test:run：25 个测试文件通过，90 个测试通过
+npm.cmd run test:run：25 个测试文件通过，94 个测试通过
 npm.cmd run build：成功，1710 个模块完成生产构建
 ```
 
-构建只有大于 500 kB 的 chunk 警告，不影响阶段 1。受限执行环境第一次运行 Vitest/Vite 时因临时文件得到 EPERM，换成正常本机权限后测试和构建均成功；这不是项目代码错误。
+构建只有大于 500 kB 的 chunk 警告，不影响阶段 1，不做拆包或构建工具升级。MySQL267 当前为 Running，localhost:3306 端口可连接。
 
-### 5.2 上次五个问题的处理结果
+### 5.3 R1 至 R3 和回归测试全部完成
 
-| 原编号 | 最新结果 | 代码证据 |
+| 项目 | 最新证据 | 结论 |
 | --- | --- | --- |
-| P0-1 顾客错误请求下架商品 | 已修复 | `StoreDetailView.vue` 已删掉 `includeOffSale: true`；顾客只查询默认上架商品 |
-| P0-2 新商品无法上架 | 已修复 | `MerchantProductsView.vue` 已根据状态提供上架/下架，并携带当前 `version` |
-| P0-3 商品详情读取不存在的 `shopName` | 已修复 | 页面根据商品 `shopId` 调用 `getStoreDetail()` 取得店铺名，测试也不再伪造该字段 |
-| P0-4 购物车操作后不刷新 | 实现已修复，测试未补齐 | 修改数量、删除、创建订单成功后都调用 `loadCart()`；创建订单还显示成功提示 |
-| P0-5 401 只修改地址栏 | 已修复 | `http.js` 改为 `router.replace('/')`，并有测试验证 |
+| R1 商品描述 | 商家表单能创建、载入和修改 `description`；商品详情展示描述；有新增与编辑测试 | 完成 |
+| R2 目标购物车数量 | 每项有 1 至库存上限的数字输入，PATCH 发送用户选择的数量 | 完成 |
+| R3 防重复点击 | `submitting` 请求锁和按钮 disabled 同时存在，finally 恢复 | 完成 |
+| 删除回归 | 测试真正触发 ConfirmAction 的 confirm，并断言 `removeCartItem(id)` | 完成 |
+| 刷新回归 | 修改、删除、下单成功后均断言再次 `getCart()` | 完成 |
+| 下单反馈 | 测试断言“订单创建成功”提示；幂等重试测试仍保留 | 完成 |
 
-用户注册和资料修改的契约样例也已改回 `passwordConfirm`、`nickname`、`phone`，30 个接口的方法和路径继续全部覆盖。不要再次修复这五项实现。
+上次的 P0-1 至 P0-5 也保持已修复。静态检查没有发现会阻止开始真实联调的新 API 契约错误。
 
-### 5.3 当前仍需补的三个最小业务缺口
+### 5.4 现在真正还缺什么
 
-这些不是新增需求，均来自 SRS 已有文字：
+当前缺的不是更多 mock 单元测试，而是以下真实证据：
 
-| 编号 | 当前缺口 | SRS 依据 | 最小实现 |
-| --- | --- | --- | --- |
-| R1 | 商品描述无法录入、修改或查看 | FR-PRODUCT-002 将描述列为基本字段；FR-PRODUCT-003 允许修改描述；Product 对象也包含 `description` | 在现有商品表单增加一个描述输入；创建和编辑请求透传 `description`；商品详情显示 `description` |
-| R2 | 购物车“修改数量”只能执行 `当前数量 + 1`，不能减少或直接选择目标数量 | FR-CART-003 要求用户可以调整数量，数量必须为正整数且不超过库存 | 每行增加一个最小数字输入，提交用户选定的 `quantity`；不做复杂购物车组件 |
-| R3 | 创建订单请求进行中仍可连续点击按钮 | NFR 9.5 明确要求订单提交过程中避免重复点击 | 增加 `submitting` 状态；请求期间禁用按钮；`finally` 恢复。幂等键规则保持不变 |
+1. MySQL、Spring Boot、Vite 同时运行时，浏览器是否能完成整个商家建店和用户下单故事；
+2. 30 个接口是否真正经过 HTTP、JWT、安全拦截器、Service、DAO 和 MySQL；
+3. 401、403、404、409、旧版本、库存不足、幂等冲突和重复取消是否返回规定结果；
+4. Flyway V1/V2、后端完整测试、前端 94 项测试和构建结果是否进入最终测试日志；
+5. 是否保存 Network 记录、关键页面截图和 Bug/复测证据。
 
-R1 至 R3 完成后，不再新增页面或业务模块，直接进入真实联调。
+因此现在直接从第 9 节开始，不再等 A 或 C 提交同类前端功能。
 
-### 5.4 当前测试证据仍有的缺口
+### 5.5 联调时重点观察、不要提前扩大开发范围
 
-1. `CartView.spec.js` 中名为“submits delete action”的测试没有触发 ConfirmAction 的确认事件，反而断言 `removeCartItem` 没有被调用。它只能证明“未确认时不删除”，不能证明删除接口可用。
-2. 购物车修改、删除、下单成功后的 `loadCart()` 刷新没有断言。
-3. 下单成功提示没有断言。
-4. `a808d79` 确实先于 Green 保存了顾客商品列表和商品详情两个 Red；商品上架、401 的测试与实现一起出现在 `83c3f93`，购物车刷新则没有对应测试。不要篡改 Git 历史宣称五项全都严格先 Red 后 Green，应在测试日志中如实记录。
-
-当前补购物车刷新测试属于“既有实现的回归测试”，会直接 Green，不是假装成 Red。R1 至 R3 尚未实现，应继续严格先写失败测试再修改页面。
-
-### 5.5 不阻塞联调，但不能误判的界面问题
-
-- 店铺列表的“搜索店铺或商品”输入框没有 `v-model`，也没有发送 `keyword`。阶段 1 不做复杂搜索；最少工作是删除无效输入框。若保留，只允许按后端已有店铺 `keyword` 查询，不能承诺搜索商品。
-- 店铺列表禁止进入 CLOSED 店铺，而 SRS 允许查看指定店铺详情和当前状态。真实联调时需要确认验收者是否要求关闭店铺也能进入详情；后端仍会阻止购买。
-- 店铺详情和商品详情的加入购物车按钮没有结合店铺状态禁用。后端会正确拒绝闭店购买；当前至少要确认错误提示清楚，不必复制后端权限规则到前端。
-- Axios 拦截器和部分页面 `catch` 可能对同一个失败各弹一次消息。若真实联调出现重复提示，再做一次小修，不在联调前扩展范围。
+- `CustomerStoresView.vue` 的“搜索店铺或商品”输入框目前没有绑定，也不发送 `keyword`；它是无效控件。最小处理是联调后删除，或者只接入后端已有的店铺关键字查询，不能宣称能搜索商品。
+- 店铺、用户订单、商家订单页面目前只请求固定第一页，没有翻页控件。SRS 写有分页查询；先用少量联调数据验证主流程，随后在最终验收前由 A/C 确认是否需要最小翻页控件，不要现在引入复杂表格框架。
+- `/acceptance` 页面仍显示“页面骨架完成、待确认接口”等过期硬编码内容。它不影响业务接口，但演示前应更新为真实结果或从演示入口移除，避免误导验收者。
+- CLOSED 店铺在列表中不能进入详情，而 SRS 允许查看指定店铺详情和状态。联调时记录验收意见；后端已经正确阻止闭店加入购物车和下单。
+- Axios 与页面 catch 可能重复显示同一失败消息。只有真实联调复现重复提示后才修，不提前重构统一错误层。
 
 ---
 
@@ -192,9 +188,9 @@ git status --short
 
 核对结果：
 
-- `HEAD` 和 `origin/develop` 都是 `83c3f93`；
-- 第一行日志是 `83c3f93 fix: close frontend integration blockers`；
-- 下一行能看到 A 的 `a808d79 test: complete frontend contract red coverage`；
+- `HEAD` 和 `origin/develop` 都是 `1168626`；
+- 第一行日志是 `1168626 test: complete cart regression evidence`；
+- 后面能看到 `7b257f8` Green 和 `7b2274b` Red；
 - `git status --short` 没有输出；
 - 不复制压缩包，不从 `fix/api-alignment` 取文件，不执行针对该分支的 merge、rebase 或 cherry-pick。
 
@@ -202,15 +198,15 @@ git status --short
 
 ### 6.1 当前三个人是否还要互相等待
 
-不需要空等，但代码顺序必须保持：
+现在不需要再等任何人的前端 Push：
 
-1. A 先按第 7 节为 R1 至 R3 写新的 Red，并补购物车已有实现的回归测试；
-2. C 可以先阅读要求，但 R1 至 R3 必须等 A 保存 Red 后再修改；
-3. B 现在即可检查 MySQL、JDK 和后端能否启动，不修改已全绿的业务代码；
-4. C 完成最后三个 Green 后，三人再进行第 9、10 节真实联调；
-5. 真实联调若证明后端有缺陷，才由 A 补后端 Red、B 修 ServiceImpl/DAO/XML。
+1. A 的 R1 至 R3 Red 已在 `7b2274b`；
+2. C 的 Green 已在 `7b257f8`；
+3. 购物车补充回归测试已在 `1168626`；
+4. B 的 MySQL267 正在运行，3306 可连接；
+5. 三人现在直接进入第 9、10 节真实联调。
 
-这表示 B 现在等的不是“A 再写 Controller”。30 个 Controller 和 B 的 ServiceImpl/DAO 已完成。B 等的是最后三个前端必要行为进入 `develop`；等待期间可以保持 MySQL、JDK 和后端环境可用。
+30 个 Controller 和 B 的 ServiceImpl/DAO 已完成。只有真实联调证明后端有缺陷时，才由 A 补后端 Red、B 修 ServiceImpl/DAO/XML；不要因为前端显示问题直接修改数据库或后端。
 
 ### 6.2 B 现在立即执行的环境预检
 
@@ -250,174 +246,38 @@ npm.cmd run build
 
 ---
 
-## 7. 第二步：A 为三个剩余行为补 Red
+## 7. 已完成证据：A 的 Red 测试
 
-### 7.1 建立测试分支
+提交 `7b2274b test: add product and cart requirement red coverage` 已经进入 `develop`，不再执行建分支、提交或 Push。它为下面三个缺失行为先写了会失败的测试：
 
-```powershell
-Set-Location 'D:\Projects\SchoolWorks\SW_2609\SE_Practicum'
-git switch develop
-git pull --ff-only origin develop
-git switch -c test/a-final-ui-red
-```
+1. 商品创建、编辑和详情必须处理 `description`；
+2. 购物车修改数量必须提交用户选择的目标数量；
+3. 创建订单请求未结束时必须禁用按钮，防止重复点击。
 
-本轮不用每写一个测试就提交或 Push。把同一批 Red 全部写好、确认失败原因正确后提交一次即可。
-
-### 7.2 R1：商品描述 Red
-
-修改 `frontend/src/tests/unit/MerchantProductsView.spec.js` 和 `ProductDetailView.spec.js`：
-
-1. 新增商品时填写“商品描述”，断言 `createProduct()` Body 包含 `description`；
-2. 编辑商品时先从商品数据载入 `description`，修改后断言 `updateProduct()` Body 包含新描述和当前 `version`；
-3. 商品详情接口返回 `description` 后，页面必须显示它。
-
-示例核心断言：
-
-```javascript
-expect(mocks.createProduct).toHaveBeenCalledWith({
-  shopId: 7,
-  categoryId: 21,
-  name: '牛肉饭',
-  description: '招牌套餐',
-  price: 18.8,
-  stock: 20,
-})
-```
-
-当前表单和详情都没有描述字段，因此这些测试应当 Red。
-
-### 7.3 R2：购物车目标数量 Red
-
-修改 `frontend/src/tests/unit/CartView.spec.js`：
-
-1. 给购物车项提供可编辑数量控件；
-2. 把原数量 3 改成 2；
-3. 点击“保存数量”后断言：
-
-```javascript
-expect(mocks.updateCartItem).toHaveBeenCalledWith(1, { quantity: 2 })
-```
-
-这个测试必须证明数量可以减少，不能继续只断言“API 曾经被调用”。当前实现固定发送 `item.quantity + 1`，所以应当 Red。
-
-### 7.4 R3：下单防重复点击 Red
-
-修改 `CartView.spec.js`：
-
-1. 让 `createOrder()` 返回一个暂时不完成的 Promise；
-2. 第一次点击“创建订单”；
-3. 断言按钮在 Promise 完成前处于 disabled；
-4. 再次点击不能产生第二次 `createOrder()`；
-5. Promise 完成后按钮恢复。
-
-不能把幂等键测试删除。幂等键保护后端结果，disabled 保护用户交互，两者用途不同。
-
-### 7.5 补购物车既有实现的回归测试
-
-下面这些代码已经存在，因此新增测试会直接 Green，应标为回归测试而不是 Red：
-
-- 修改数量成功后 `getCart()` 总调用次数从 1 变为 2；
-- 删除确认后调用 `removeCartItem(item.id)`，随后再次 `getCart()`；
-- 创建订单成功后再次 `getCart()`，并调用 `ElMessage.success('订单创建成功')`。
-
-ConfirmAction 测试替身必须能够发出 `confirm`：
-
-```javascript
-ConfirmAction: {
-  emits: ['confirm'],
-  template: '<div><slot /><button class="confirm-button" @click="$emit(\"confirm\")">确认</button></div>',
-}
-```
-
-不要保留“测试名称说会删除，断言却要求未调用删除”的假测试。
-
-### 7.6 运行并保存 Red
-
-```powershell
-Set-Location 'D:\Projects\SchoolWorks\SW_2609\SE_Practicum\frontend'
-npm.cmd run test:run
-```
-
-有效 Red 的判断：旧的 90 个测试没有被删除或 `skip`；R1 至 R3 的新增失败明确指向当前缺失行为；购物车刷新回归测试允许直接通过；失败不能来自导入或语法错误。记录结果后一次性提交：
-
-```powershell
-Set-Location '..'
-git status --short
-git diff --check
-git add -- frontend/src/tests
-git diff --cached --check
-git commit -m 'test(frontend): cover final required ui behavior [RED]'
-git push -u origin test/a-final-ui-red
-```
-
-团队如果不要求保留独立 Red 分支，可以由 C 合入或基于该分支继续；但必须保留能证明“测试先失败”的提交历史。
+这三个 Red 都指向具体缺失行为，不是语法、导入或测试环境错误。它们保留在 Git 历史里，可作为“先写测试、后写实现”的 TDD 证据。
 
 ---
 
-## 8. 第三步：C 只完成三个最小 Green
+## 8. 已完成证据：C 的最小 Green 和购物车回归
 
-### 8.1 从最新基线开始
+提交 `7b257f8` 已完成三个最小实现，提交 `1168626` 已补齐购物车删除、刷新和下单成功提示的回归断言。当前结果如下：
 
-```powershell
-Set-Location 'D:\Projects\SchoolWorks\SW_2609\SE_Practicum'
-git fetch origin --prune
-git switch develop
-git pull --ff-only origin develop
-git switch -c fix/c-final-ui-green
-```
+- `MerchantProductsView.vue` 的商品表单、创建请求和修改请求都处理 `description`；
+- `ProductDetailView.vue` 显示后端返回的商品描述；
+- `CartView.vue` 使用数字输入保存目标数量；
+- 创建订单期间按钮处于 loading/disabled，结束后恢复；
+- 修改数量、删除商品、创建订单后都会重新读取购物车；
+- 最新全量结果为 25 个测试文件、94 个测试全部通过，生产构建成功。
 
-将 A 的 Red 合入该分支，具体用 merge 还是 cherry-pick 由团队现有流程决定，只取 A 的测试提交，不取 `fix/api-alignment`。
-
-### 8.2 按依赖顺序修改
-
-1. `MerchantProductsView.vue`：在现有 `productForm` 增加 `description`，重置、载入编辑值、创建和修改请求都处理它；模板增加一个文本输入即可。
-2. `ProductDetailView.vue`：从后端已有 `data.description` 赋值并显示；不新增接口。
-3. `CartView.vue`：用数字输入保存目标数量，最小值 1、最大值商品库存；提交所选值而非固定加 1。
-4. `CartView.vue`：增加 `submitting`；创建订单开始时设为 true，在 `finally` 设回 false，按钮绑定 `:loading` 和 `:disabled`。
-5. 保留 `83c3f93` 已完成的五项修复，不重构 API 层或后端。
-
-### 8.3 每完成一组怎样验证
-
-开发过程中可以只跑目标测试：
-
-```powershell
-Set-Location 'D:\Projects\SchoolWorks\SW_2609\SE_Practicum\frontend'
-npm.cmd run test:run -- MerchantProductsView.spec.js
-npm.cmd run test:run -- ProductDetailView.spec.js
-npm.cmd run test:run -- CartView.spec.js
-```
-
-三组都完成后必须跑全量：
-
-```powershell
-npm.cmd run test:run
-npm.cmd run build
-```
-
-要求：原 90 个测试和 A 新增测试全部通过；测试总数只能保持或增加，不能减少；构建成功。不要在本轮增加支付、退款、骑手、配送、优惠券、地图、WebSocket、复杂搜索或 UI 重构。
-
-### 8.4 Green 完成后提交一次
-
-```powershell
-Set-Location '..'
-git status --short
-git diff --check
-git add -- frontend
-git diff --cached --check
-git diff --cached --stat
-git commit -m 'fix(frontend): complete required product and cart behavior [GREEN]'
-git push -u origin fix/c-final-ui-green
-```
-
-在真实联调完成前不要删除该分支。合入 `develop` 后，B 再拉取一次并从第 9 节开始操作。
+这些修改已经合入 `develop`，不要重复实现，也不要为了这一批已完成内容再次建分支。现在直接从第 9 节开始真实联调。
 
 ---
 
-## 9. 第四步：在同一台联调电脑上启动真实后端和前端
+## 9. 现在执行：在同一台联调电脑上启动真实后端和前端
 
 下面两个进程必须在同一台电脑上运行，因为 `localhost` 只代表当前电脑。B 和 C 如果使用不同电脑，C 的 `localhost:8080` 不能访问 B 的后端。
 
-最少工作方案：A 的 Red 和 C 的 Green 合入远程 `develop` 后，B 的电脑再次执行 `git pull --ff-only origin develop`，然后同时启动后端和前端进行真实联调。不要直接在未合并的评审分支上做最终验收。
+A 的 Red 和 C 的 Green 已进入远程 `develop`，B 也已拉取到 `1168626`。现在就在 B 的电脑同时启动后端和前端进行真实联调，不要再建立等待分支，也不要在未合并的评审分支上做最终验收。
 
 ### 9.1 联调机启动 MySQL 和后端
 
@@ -580,33 +440,26 @@ npm.cmd run build
 
 ---
 
-## 13. 剩余 Green 完成后怎样交付
+## 13. 真实联调发现缺陷后怎样交付
 
-C 在个人分支先同步最新 `develop`：
+如果第 9、10 节没有发现代码缺陷，不创建空分支，直接补齐测试日志和验收材料。如果发现缺陷：
+
+1. 先记录请求、响应、复现步骤和责任层；
+2. A 为确认的缺陷补最小失败测试；
+3. 前端缺陷由 C 修，ServiceImpl/DAO/XML 缺陷由 B 修；
+4. 分支名按责任使用 `fix/c-integration-<简短问题>` 或 `fix/b-integration-<简短问题>`；
+5. 目标测试、前后端全量测试和原失败请求复测都通过后，才合入 `develop`。
+
+合入后的最终操作：
 
 ```powershell
 Set-Location 'D:\Projects\SchoolWorks\SW_2609\SE_Practicum'
-git fetch origin --prune
-git rebase origin/develop
-```
-
-重新执行前端测试和构建；若 rebase 包含后端修复，还要执行后端完整测试。全部通过后：
-
-```powershell
-git push -u origin fix/c-final-ui-green
 git switch develop
 git pull --ff-only origin develop
-git merge --no-ff fix/c-final-ui-green
-```
-
-在合并后的 `develop` 上执行第 12 节最终验收。全部通过才推送：
-
-```powershell
-git push origin develop
 git status --short
 ```
 
-只有 `git push origin develop` 成功且 `git status --short` 为空，阶段 1 才算完成。个人分支要等合并成功后再删除。
+然后执行第 12 节最终验收并推送最后的测试日志/验收材料。只有远程 `develop` 包含全部代码和证据、工作区干净，阶段 1 才算完成。个人修复分支等合并成功后再删除。
 
 ---
 
@@ -633,11 +486,10 @@ Git 会同步源码、Maven Wrapper、`pom.xml`、`package-lock.json` 和迁移 
 - [x] 后端四层实现完成并合入远程 `develop`；
 - [x] V1/V2 和后端完整测试通过；
 - [x] P0-1 至 P0-5 的实现修复已进入远程 `develop`；
-- [ ] 购物车删除、刷新和下单成功已有有效回归测试；
-- [ ] R1 商品描述、R2 目标数量、R3 防重复点击已按 Red/Green 完成；
+- [x] 购物车删除、刷新和下单成功已有有效回归测试；
+- [x] R1 商品描述、R2 目标数量、R3 防重复点击已按 Red/Green 完成；
 - [x] 30 个前端 API 的方法和路径已有自动契约覆盖；
-- [x] 当前 `develop@83c3f93` 的 25 个测试文件、90 个测试和生产构建通过；
-- [ ] 修复后的前端新增测试和生产构建全部通过；
+- [x] 当前 `develop@1168626` 的 25 个测试文件、94 个测试和生产构建通过；
 - [ ] 30 个接口真实联调全部通过；
 - [ ] 必要的 401/403/404/409、乐观锁、幂等和重复取消已验证；
 - [ ] 测试日志、Bug 记录和关键截图真实可追踪；
