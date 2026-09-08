@@ -99,6 +99,19 @@ public class UserServiceImpl implements UserService {
 		return new UserSnapshot(user.getId(), user.getStatus());
 	}
 
+	@Override
+	@Transactional
+	public UserSnapshot requireActiveForUpdate(long userId) {
+		UserEntity user = userDao.findByIdForUpdate(userId);
+		if (user == null) {
+			throw new BusinessException(ApiError.RESOURCE_NOT_FOUND);
+		}
+		if (!ACTIVE.equals(user.getStatus())) {
+			throw new BusinessException(ApiError.ACCOUNT_DISABLED);
+		}
+		return new UserSnapshot(user.getId(), user.getStatus());
+	}
+
 	private UserEntity requireById(long userId) {
 		UserEntity user = userDao.findById(userId);
 		if (user == null) {

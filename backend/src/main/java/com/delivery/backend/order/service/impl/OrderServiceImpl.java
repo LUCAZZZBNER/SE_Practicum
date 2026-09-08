@@ -60,7 +60,7 @@ public class OrderServiceImpl implements OrderService {
 	@Override
 	@Transactional
 	public OrderView create(long userId, String idempotencyKey, CreateRequest request) {
-		userService.requireActive(userId);
+		userService.requireActiveForUpdate(userId);
 		String key = normalizeIdempotencyKey(idempotencyKey);
 		List<ItemRequest> requestedItems = validateItems(request);
 		String fingerprint = fingerprint(requestedItems);
