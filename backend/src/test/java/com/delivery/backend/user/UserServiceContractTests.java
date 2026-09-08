@@ -3,8 +3,10 @@ package com.delivery.backend.user;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import org.junit.jupiter.api.Test;
+import org.apache.ibatis.session.SqlSession;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.delivery.backend.ServiceContractTestSupport;
@@ -17,6 +19,10 @@ class UserServiceContractTests extends ServiceContractTestSupport {
 
 	@Autowired
 	private UserService service;
+	@Autowired
+	private JdbcTemplate jdbcTemplate;
+	@Autowired
+	private SqlSession sqlSession;
 
 	@Test
 	void registrationReturnsAnActiveNonSensitiveUser() {
@@ -66,6 +72,25 @@ class UserServiceContractTests extends ServiceContractTestSupport {
 		assertThat(service.getCurrent(registered.id())).isEqualTo(updated);
 		assertThat(service.requireActive(registered.id()).id()).isEqualTo(registered.id());
 		assertBusinessError(ApiError.RESOURCE_NOT_FOUND, () -> service.getCurrent(Long.MAX_VALUE));
+	}
+
+	@Test
+	void disabledUsersCannotUpdateTheirProfileOrAcquireAnUpdateLock() {
+		UserService.UserView registered = service.register(registration("disabled-user"));
+		jdbcTemplate.update("UPDATE users SET status = 'DISABLED' WHERE id = ?", registered.id());
+		sqlSession.clearCache();
+		UserService.UpdateRequest update = new UserService.UpdateRequest();
+		update.setNickname("Not allowed");
+
+		assertBusinessError(ApiError.ACCOUNT_DISABLED,
+				() -> service.updateCurrent(registered.id(), update));
+		assertBusinessError(ApiError.ACCOUNT_DISABLED,
+				() -> service.requireActiveForUpdate(registered.id()));
+	}
+
+	@Test
+	void nullRegistrationInputProducesAValidationError() {
+		assertBusinessError(ApiError.VALIDATION_ERROR, () -> service.register(null));
 	}
 
 	private static UserService.RegisterRequest registration(String account) {

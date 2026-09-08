@@ -32,7 +32,8 @@ public class UserServiceImpl implements UserService {
 	@Override
 	@Transactional
 	public UserView register(RegisterRequest request) {
-		if (!request.password().equals(request.passwordConfirm())) {
+		if (request == null || request.password() == null
+				|| !request.password().equals(request.passwordConfirm())) {
 			throw new BusinessException(ApiError.VALIDATION_ERROR);
 		}
 		String account = normalizeRequired(request.account());
@@ -81,7 +82,7 @@ public class UserServiceImpl implements UserService {
 		if (!request.isUpdateSpecified()) {
 			throw new BusinessException(ApiError.VALIDATION_ERROR);
 		}
-		requireById(userId);
+		requireActive(userId);
 		String nickname = request.isNicknameSpecified() ? normalizeRequired(request.nickname()) : null;
 		String phone = request.isPhoneSpecified() ? normalizeNullable(request.phone()) : null;
 		userDao.updateProfile(userId, request.isNicknameSpecified(), nickname,

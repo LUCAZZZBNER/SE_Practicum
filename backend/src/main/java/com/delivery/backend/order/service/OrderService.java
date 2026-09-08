@@ -29,7 +29,7 @@ public interface OrderService {
 
 	record CreateRequest(@NotEmpty List<@NotNull @Valid ItemRequest> items) {
 		public CreateRequest {
-			items = List.copyOf(items);
+			items = items == null ? null : List.copyOf(items);
 		}
 	}
 
