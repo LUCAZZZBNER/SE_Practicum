@@ -33,6 +33,8 @@ body { margin: 0; min-width: 320px; }
 .manage-panel h2 { margin: 0; font-size: 18px; }
 .inline-form, .category-row, .product-row, .order-item { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .product-form { justify-content: flex-start; }
+.product-field { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.product-field span { font-size: 13px; color: #606266; }
 .auth-page { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 32px 20px; background: #eef2f7; }
 .auth-panel { width: min(960px, 100%); }
 .auth-intro { margin-bottom: 24px; }

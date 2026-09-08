@@ -167,8 +167,14 @@ onMounted(loadProducts)
         </el-select>
         <el-input v-model="productForm.name" placeholder="商品名称" />
         <el-input v-model="productForm.description" type="textarea" placeholder="商品描述" />
-        <el-input-number v-model="productForm.price" :min="0" />
-        <el-input-number v-model="productForm.stock" :min="0" />
+        <label class="product-field">
+          <span>商品价格（元）</span>
+          <el-input-number v-model="productForm.price" :min="0" />
+        </label>
+        <label class="product-field">
+          <span>库存数量（个）</span>
+          <el-input-number v-model="productForm.stock" :min="0" />
+        </label>
         <el-button type="primary" @click="saveProduct">{{ productForm.id ? '保存商品' : '新增商品' }}</el-button>
       </div>
     </div>

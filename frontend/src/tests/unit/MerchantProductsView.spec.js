@@ -151,6 +151,9 @@ describe('MerchantProductsView', () => {
     const wrapper = mountView()
     await flushPromises()
 
+    expect(wrapper.text()).toContain('商品价格（元）')
+    expect(wrapper.text()).toContain('库存数量（个）')
+
     const inputs = wrapper.findAll('input')
     await inputs[0].setValue('饮品')
     await wrapper.findAll('button').find((button) => button.text() === '新增分类').trigger('click')
