@@ -124,6 +124,40 @@ def main():
         expected_code=1005,
     )
 
+    changed = call(
+        "POST",
+        "/products",
+        token=merchant_token,
+        body={"shopId": shop_id, "categoryId": category_id, "name": "Price Change", "price": 8.00, "stock": 2},
+        expected_status=201,
+    )
+    changed = call(
+        "PATCH",
+        f"/products/{changed['id']}",
+        token=merchant_token,
+        body={"status": "ON_SALE", "version": changed["version"]},
+    )
+    changed_cart = call(
+        "POST", "/cart-items", token=user_token, body={"productId": changed["id"], "quantity": 1}, expected_status=201
+    )
+    changed_version = changed["version"]
+    changed = call(
+        "PATCH",
+        f"/products/{changed['id']}",
+        token=merchant_token,
+        body={"price": 9.00, "version": changed_version},
+    )
+    call(
+        "POST",
+        "/orders",
+        token=user_token,
+        body={"items": [{"cartItemId": changed_cart["id"], "productVersion": changed_version}]},
+        headers={"X-Idempotency-Key": f"price-change-{suffix}"},
+        expected_status=409,
+        expected_code=1601,
+    )
+    call("DELETE", f"/cart-items/{changed_cart['id']}", token=user_token)
+
     cart_item = call("POST", "/cart-items", token=user_token, body={"productId": product_id, "quantity": 2}, expected_status=201)
     cart_item_id = cart_item["id"]
     idempotency_key = f"risk-{suffix}"
