@@ -1,5 +1,8 @@
 <script setup>
 import { ShoppingCart, User } from '@element-plus/icons-vue'
+import { useRouter } from 'vue-router'
+
+const router = useRouter()
 
 defineProps({
   title: {
@@ -11,6 +14,12 @@ defineProps({
     default: '未登录',
   },
 })
+
+function logout() {
+  localStorage.removeItem('access_token')
+  localStorage.removeItem('user_role')
+  router.replace('/')
+}
 </script>
 
 <template>
@@ -22,7 +31,7 @@ defineProps({
     <div class="header-user">
       <el-icon><User /></el-icon>
       <span>{{ statusText }}</span>
-      <router-link to="/">退出</router-link>
+      <router-link to="/" @click="logout">退出</router-link>
     </div>
   </el-header>
 </template>
