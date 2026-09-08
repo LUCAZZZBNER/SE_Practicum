@@ -32,6 +32,9 @@ public class MerchantServiceImpl implements MerchantService {
 	@Override
 	@Transactional
 	public MerchantView register(RegisterRequest request) {
+		if (request == null || request.password() == null) {
+			throw new BusinessException(ApiError.VALIDATION_ERROR);
+		}
 		if (request.passwordConfirm() != null
 				&& !request.password().equals(request.passwordConfirm())) {
 			throw new BusinessException(ApiError.VALIDATION_ERROR);

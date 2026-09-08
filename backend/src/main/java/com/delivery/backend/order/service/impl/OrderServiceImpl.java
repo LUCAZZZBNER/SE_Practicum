@@ -60,7 +60,7 @@ public class OrderServiceImpl implements OrderService {
 	@Override
 	@Transactional
 	public OrderView create(long userId, String idempotencyKey, CreateRequest request) {
-		userService.requireActive(userId);
+		userService.requireActiveForUpdate(userId);
 		String key = normalizeIdempotencyKey(idempotencyKey);
 		List<ItemRequest> requestedItems = validateItems(request);
 		String fingerprint = fingerprint(requestedItems);
@@ -158,9 +158,9 @@ public class OrderServiceImpl implements OrderService {
 	@Override
 	@Transactional(readOnly = true)
 	public PageResult<OrderSummaryView> listMerchantOrders(long merchantId, MerchantListQuery query) {
-		merchantService.requireActive(merchantId);
+		merchantService.getCurrent(merchantId);
 		if (query.shopId() != null) {
-			restaurantService.requireOwned(merchantId, query.shopId());
+			restaurantService.requireOwnedForRead(merchantId, query.shopId());
 		}
 		String status = validateStatus(query.status());
 		int page = defaultPage(query.page());
@@ -177,7 +177,7 @@ public class OrderServiceImpl implements OrderService {
 	@Override
 	@Transactional(readOnly = true)
 	public OrderView getMerchantOrder(long merchantId, long orderId) {
-		merchantService.requireActive(merchantId);
+		merchantService.getCurrent(merchantId);
 		OrderEntity order = orderDao.findMerchantOrder(merchantId, orderId);
 		if (order == null) {
 			throw new BusinessException(ApiError.RESOURCE_NOT_FOUND);
@@ -199,7 +199,7 @@ public class OrderServiceImpl implements OrderService {
 	}
 
 	private static List<ItemRequest> validateItems(CreateRequest request) {
-		if (request == null || request.items().isEmpty()) {
+		if (request == null || request.items() == null || request.items().isEmpty()) {
 			throw new BusinessException(ApiError.CART_EMPTY);
 		}
 		Set<Long> cartItemIds = new HashSet<>();
@@ -221,10 +221,14 @@ public class OrderServiceImpl implements OrderService {
 	}
 
 	private static String normalizeIdempotencyKey(String key) {
-		if (key == null || key.isBlank() || key.length() > 100) {
+		if (key == null) {
 			throw new BusinessException(ApiError.VALIDATION_ERROR);
 		}
-		return key.trim();
+		String normalized = key.trim();
+		if (normalized.isEmpty() || normalized.length() > 100) {
+			throw new BusinessException(ApiError.VALIDATION_ERROR);
+		}
+		return normalized;
 	}
 
 	private static String fingerprint(List<ItemRequest> items) {

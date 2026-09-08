@@ -26,6 +26,8 @@ public interface RestaurantService {
 
 	ShopSnapshot requireOwned(long merchantId, long shopId);
 
+	ShopSnapshot requireOwnedForRead(long merchantId, long shopId);
+
 	record CreateRequest(@NotBlank String name, String description) {
 	}
 

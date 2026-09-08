@@ -38,7 +38,8 @@ class RestaurantServiceContractTests extends ServiceContractTestSupport {
 	@Test
 	void publicAndMineListsApplyPagingFilteringAndOwnership() {
 		long merchantId = merchant("shop-owner-b").id();
-		service.create(merchantId, new RestaurantService.CreateRequest("Noodle Shop", null));
+		RestaurantService.ShopView closed = service.create(merchantId,
+				new RestaurantService.CreateRequest("Noodle Shop", null));
 
 		PageResult<RestaurantService.ShopView> mine = service.list(
 				new RestaurantService.ListQuery(1, 10, "Noodle", "CLOSED", true, "name", "asc", merchantId));
@@ -49,6 +50,10 @@ class RestaurantServiceContractTests extends ServiceContractTestSupport {
 		PageResult<RestaurantService.ShopView> publiclyVisible = service.list(
 				new RestaurantService.ListQuery(1, 10, null, null, false, null, null, null));
 		assertThat(publiclyVisible.items()).allMatch(shop -> shop.status().equals("OPEN"));
+
+		PageResult<RestaurantService.ShopView> closedFilter = service.list(
+				new RestaurantService.ListQuery(1, 10, "Noodle", "CLOSED", false, null, null, null));
+		assertThat(closedFilter.items()).extracting(RestaurantService.ShopView::id).containsExactly(closed.id());
 	}
 
 	@Test

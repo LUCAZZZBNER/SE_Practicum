@@ -33,7 +33,7 @@ public interface RestaurantDao {
 			@Param("sortBy") String sortBy,
 			@Param("sortOrder") String sortOrder,
 			@Param("limit") int limit,
-			@Param("offset") int offset);
+			@Param("offset") long offset);
 
 	long count(@Param("mine") boolean mine,
 			@Param("merchantId") Long merchantId,
