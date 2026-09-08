@@ -5,7 +5,7 @@
 ## 目录结构
 
 ```text
-backend/                 Spring Boot + Spring Modulith 单体后端
+backend/                 Spring Boot 简单四层 MVC 单体后端
   src/main/java/         Java 源代码
     com/delivery/backend/user/       用户模块
     com/delivery/backend/merchant/   商家模块
@@ -33,6 +33,6 @@ docs/                    项目文档
   dev-log/               开发日志和过程记录
 ```
 
-需求基线见 [软件需求规格说明书](docs/software-requirements-specification.md)。
+需求基线见 [软件需求规格说明书](docs/software-requirements-specification.md)，HTTP 契约见 [后端 API 设计](docs/api/backend-api-design.md)，当前开发步骤见 [ABC 阶段 1 业务 TDD 开发与联调执行文档](ABC阶段1业务TDD开发与联调执行文档.md)。
 
-后端已完成 Spring Modulith 单体模块骨架，前端仍待初始化。各业务模块的边界和职责见[架构设计](docs/architecture/README.md)。
+后端采用简单四层 MVC，不使用 Spring Modulith。各业务模块的边界和职责见[架构设计](docs/architecture/README.md)。

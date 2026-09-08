@@ -1,0 +1,190 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.delivery.backend.item.dao.ItemDao">
+
+    <resultMap id="categoryResultMap" type="com.delivery.backend.item.entity.CategoryEntity">
+        <id property="id" column="id"/>
+        <result property="shopId" column="shop_id"/>
+        <result property="name" column="name"/>
+        <result property="sortOrder" column="sort_order"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+        <result property="deletedAt" column="deleted_at"/>
+    </resultMap>
+
+    <resultMap id="productResultMap" type="com.delivery.backend.item.entity.ProductEntity">
+        <id property="id" column="id"/>
+        <result property="shopId" column="shop_id"/>
+        <result property="categoryId" column="category_id"/>
+        <result property="name" column="name"/>
+        <result property="description" column="description"/>
+        <result property="price" column="price"/>
+        <result property="stock" column="stock"/>
+        <result property="status" column="status"/>
+        <result property="version" column="version"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <sql id="categoryColumns">
+        id, shop_id, name, sort_order, created_at, updated_at, deleted_at
+    </sql>
+
+    <sql id="productColumns">
+        id, shop_id, category_id, name, description, price, stock, status, version,
+        created_at, updated_at
+    </sql>
+
+    <sql id="productFilters">
+        WHERE shop_id = #{shopId}
+        <if test="!includeOffSale">
+            AND status = 'ON_SALE'
+        </if>
+        <if test="categoryId != null">
+            AND category_id = #{categoryId}
+        </if>
+        <if test="keyword != null">
+            AND name LIKE CONCAT('%', #{keyword}, '%')
+        </if>
+    </sql>
+
+    <select id="findCategoryById" resultMap="categoryResultMap">
+        SELECT <include refid="categoryColumns"/>
+        FROM product_categories
+        WHERE id = #{id}
+          AND deleted_at IS NULL
+    </select>
+
+    <select id="findCategoryByShopAndName" resultMap="categoryResultMap">
+        SELECT <include refid="categoryColumns"/>
+        FROM product_categories
+        WHERE shop_id = #{shopId}
+          AND name = #{name}
+    </select>
+
+    <select id="listCategories" resultMap="categoryResultMap">
+        SELECT <include refid="categoryColumns"/>
+        FROM product_categories
+        WHERE shop_id = #{shopId}
+          AND deleted_at IS NULL
+        ORDER BY sort_order ASC, id ASC
+    </select>
+
+    <insert id="insertCategory" parameterType="com.delivery.backend.item.entity.CategoryEntity"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO product_categories (shop_id, name, sort_order)
+        VALUES (#{shopId}, #{name}, #{sortOrder})
+    </insert>
+
+    <update id="updateCategory">
+        UPDATE product_categories
+        <set>
+            <if test="nameSpecified">
+                name = #{name},
+            </if>
+            <if test="sortOrderSpecified">
+                sort_order = #{sortOrder},
+            </if>
+        </set>
+        WHERE id = #{id}
+          AND deleted_at IS NULL
+    </update>
+
+    <update id="logicalDeleteCategory">
+        UPDATE product_categories
+        SET deleted_at = CURRENT_TIMESTAMP(3)
+        WHERE id = #{id}
+          AND deleted_at IS NULL
+    </update>
+
+    <select id="countProductsByCategory" resultType="long">
+        SELECT COUNT(*)
+        FROM products
+        WHERE category_id = #{categoryId}
+    </select>
+
+    <select id="findProductById" resultMap="productResultMap">
+        SELECT <include refid="productColumns"/>
+        FROM products
+        WHERE id = #{id}
+    </select>
+
+    <insert id="insertProduct" parameterType="com.delivery.backend.item.entity.ProductEntity"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO products (shop_id, category_id, name, description, price, stock, status, version)
+        VALUES (#{shopId}, #{categoryId}, #{name}, #{description}, #{price}, #{stock}, #{status}, #{version})
+    </insert>
+
+    <update id="updateProduct">
+        UPDATE products
+        <set>
+            <if test="categoryIdSpecified">
+                category_id = #{categoryId},
+            </if>
+            <if test="nameSpecified">
+                name = #{name},
+            </if>
+            <if test="descriptionSpecified">
+                description = #{description},
+            </if>
+            <if test="priceSpecified">
+                price = #{price},
+            </if>
+            <if test="stockSpecified">
+                stock = #{stock},
+            </if>
+            <if test="statusSpecified">
+                status = #{status},
+            </if>
+            version = version + 1
+        </set>
+        WHERE id = #{id}
+          AND version = #{expectedVersion}
+    </update>
+
+    <select id="listProducts" resultMap="productResultMap">
+        SELECT <include refid="productColumns"/>
+        FROM products
+        <include refid="productFilters"/>
+        ORDER BY
+        <choose>
+            <when test="sortBy == 'name'">name</when>
+            <when test="sortBy == 'price'">price</when>
+            <otherwise>created_at</otherwise>
+        </choose>
+        <choose>
+            <when test="sortOrder == 'asc'">ASC</when>
+            <otherwise>DESC</otherwise>
+        </choose>,
+        id
+        <choose>
+            <when test="sortOrder == 'asc'">ASC</when>
+            <otherwise>DESC</otherwise>
+        </choose>
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countProducts" resultType="long">
+        SELECT COUNT(*)
+        FROM products
+        <include refid="productFilters"/>
+    </select>
+
+    <update id="reserveStock">
+        UPDATE products
+        SET stock = stock - #{quantity}
+        WHERE id = #{id}
+          AND version = #{expectedVersion}
+          AND status = 'ON_SALE'
+          AND stock &gt;= #{quantity}
+    </update>
+
+    <update id="restoreStock">
+        UPDATE products
+        SET stock = stock + #{quantity}
+        WHERE id = #{id}
+    </update>
+
+</mapper>
