@@ -149,7 +149,7 @@ def main():
         "POST",
         "/orders",
         token=user_token,
-        body={"items": []},
+        body={"items": [{"cartItemId": cart_item_id, "productVersion": version + 1}]},
         headers={"X-Idempotency-Key": idempotency_key},
         expected_status=409,
         expected_code=1603,
