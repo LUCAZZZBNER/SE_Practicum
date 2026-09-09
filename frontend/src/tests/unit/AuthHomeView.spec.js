@@ -1,22 +1,50 @@
-import { mount } from '@vue/test-utils'
-import { describe, expect, it, vi } from 'vitest'
+import { flushPromises, mount } from '@vue/test-utils'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import AuthHomeView from '../../views/AuthHomeView.vue'
 
 const mocks = vi.hoisted(() => ({
+  loginCustomer: vi.fn(),
+  loginMerchant: vi.fn(),
   routerPush: vi.fn(),
+  messageSuccess: vi.fn(),
+  messageError: vi.fn(),
+}))
+
+vi.mock('vue-router', () => ({
+  useRouter: () => ({
+    push: mocks.routerPush,
+  }),
+}))
+
+vi.mock('element-plus', () => ({
+  ElMessage: {
+    success: mocks.messageSuccess,
+    error: mocks.messageError,
+  },
+}))
+
+vi.mock('../../api/user', () => ({
+  loginCustomer: mocks.loginCustomer,
+  loginMerchant: mocks.loginMerchant,
 }))
 
 function mountView() {
   return mount(AuthHomeView, {
     global: {
-      mocks: {
-        $router: {
-          push: mocks.routerPush,
-        },
-      },
       stubs: {
         'el-card': {
           template: '<section><slot /></section>',
+        },
+        'el-form': {
+          template: '<form><slot /></form>',
+        },
+        'el-form-item': {
+          template: '<div><slot /></div>',
+        },
+        'el-input': {
+          props: ['modelValue', 'placeholder', 'type'],
+          emits: ['update:modelValue'],
+          template: '<input :type="type || \'text\'" :placeholder="placeholder" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />',
         },
         'el-button': {
           template: '<button type="button" @click="$emit(\'click\')"><slot /></button>',
@@ -26,36 +54,97 @@ function mountView() {
   })
 }
 
+beforeEach(() => {
+  localStorage.clear()
+  mocks.loginCustomer.mockReset()
+  mocks.loginMerchant.mockReset()
+  mocks.routerPush.mockReset()
+  mocks.messageSuccess.mockReset()
+  mocks.messageError.mockReset()
+})
+
 describe('AuthHomeView', () => {
-  it('renders separate entry points for customer and merchant users', () => {
+  it('shows customer login by default', () => {
     const wrapper = mountView()
 
     expect(wrapper.text()).toContain('轻量级外卖服务平台')
-    expect(wrapper.text()).toContain('普通用户')
-    expect(wrapper.text()).toContain('商家')
-    expect(wrapper.text()).toContain('用户登录')
-    expect(wrapper.text()).toContain('用户注册')
-    expect(wrapper.text()).toContain('商家登录')
-    expect(wrapper.text()).toContain('商家注册')
+    expect(wrapper.get('[data-testid="customer-tab"]').attributes('aria-selected')).toBe('true')
+    expect(wrapper.get('input[placeholder="请输入用户账号"]')).toBeTruthy()
+    expect(wrapper.find('input[placeholder="请输入商家账号"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="login-submit"]').text()).toBe('用户登录')
   })
 
-  it('navigates to customer login and register routes from the homepage', async () => {
+  it('switches to the merchant login form', async () => {
     const wrapper = mountView()
 
-    await wrapper.findAll('button')[0].trigger('click')
-    await wrapper.findAll('button')[1].trigger('click')
+    await wrapper.get('[data-testid="merchant-tab"]').trigger('click')
 
-    expect(mocks.routerPush).toHaveBeenCalledWith('/login/customer')
-    expect(mocks.routerPush).toHaveBeenCalledWith('/register/customer')
+    expect(wrapper.get('[data-testid="merchant-tab"]').attributes('aria-selected')).toBe('true')
+    expect(wrapper.get('input[placeholder="请输入商家账号"]')).toBeTruthy()
+    expect(wrapper.find('input[placeholder="请输入用户账号"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="login-submit"]').text()).toBe('商家登录')
   })
 
-  it('navigates to merchant login and register routes from the homepage', async () => {
+  it('uses the customer login contract and enters the customer area', async () => {
+    mocks.loginCustomer.mockResolvedValue({ accessToken: 'customer-token', roles: ['USER'] })
     const wrapper = mountView()
 
-    await wrapper.findAll('button')[2].trigger('click')
-    await wrapper.findAll('button')[3].trigger('click')
+    await wrapper.get('input[placeholder="请输入用户账号"]').setValue('alice01')
+    await wrapper.get('input[placeholder="请输入密码"]').setValue('ExamplePass123!')
+    await wrapper.get('[data-testid="login-submit"]').trigger('click')
+    await flushPromises()
 
-    expect(mocks.routerPush).toHaveBeenCalledWith('/login/merchant')
-    expect(mocks.routerPush).toHaveBeenCalledWith('/register/merchant')
+    expect(mocks.loginCustomer).toHaveBeenCalledWith({
+      account: 'alice01',
+      password: 'ExamplePass123!',
+    })
+    expect(mocks.loginMerchant).not.toHaveBeenCalled()
+    expect(localStorage.getItem('access_token')).toBe('customer-token')
+    expect(localStorage.getItem('user_role')).toBe('USER')
+    expect(mocks.routerPush).toHaveBeenCalledWith('/customer/stores')
+  })
+
+  it('uses the merchant login contract and enters the merchant area', async () => {
+    mocks.loginMerchant.mockResolvedValue({ accessToken: 'merchant-token', roles: ['MERCHANT'] })
+    const wrapper = mountView()
+
+    await wrapper.get('[data-testid="merchant-tab"]').trigger('click')
+    await wrapper.get('input[placeholder="请输入商家账号"]').setValue('merchant01')
+    await wrapper.get('input[placeholder="请输入密码"]').setValue('ExamplePass123!')
+    await wrapper.get('[data-testid="login-submit"]').trigger('click')
+    await flushPromises()
+
+    expect(mocks.loginMerchant).toHaveBeenCalledWith({
+      account: 'merchant01',
+      password: 'ExamplePass123!',
+    })
+    expect(mocks.loginCustomer).not.toHaveBeenCalled()
+    expect(localStorage.getItem('access_token')).toBe('merchant-token')
+    expect(localStorage.getItem('user_role')).toBe('MERCHANT')
+    expect(mocks.routerPush).toHaveBeenCalledWith('/merchant/store')
+  })
+
+  it('keeps customer and merchant registration routes independent', async () => {
+    const wrapper = mountView()
+
+    await wrapper.get('[data-testid="register-link"]').trigger('click')
+    expect(mocks.routerPush).toHaveBeenLastCalledWith('/register/customer')
+
+    await wrapper.get('[data-testid="merchant-tab"]').trigger('click')
+    await wrapper.get('[data-testid="register-link"]').trigger('click')
+    expect(mocks.routerPush).toHaveBeenLastCalledWith('/register/merchant')
+  })
+
+  it('shows a login error and stays on the page when authentication fails', async () => {
+    mocks.loginCustomer.mockRejectedValue(new Error('账号或密码错误'))
+    const wrapper = mountView()
+
+    await wrapper.get('input[placeholder="请输入用户账号"]').setValue('alice01')
+    await wrapper.get('input[placeholder="请输入密码"]').setValue('wrong-password')
+    await wrapper.get('[data-testid="login-submit"]').trigger('click')
+    await flushPromises()
+
+    expect(mocks.messageError).toHaveBeenCalledWith('账号或密码错误')
+    expect(mocks.routerPush).not.toHaveBeenCalledWith('/customer/stores')
   })
 })
