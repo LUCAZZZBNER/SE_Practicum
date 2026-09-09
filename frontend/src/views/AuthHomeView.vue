@@ -1,6 +1,6 @@
 <script setup>
 import { reactive, ref } from 'vue'
-import { Lock, Shop, ShoppingCart, UserFilled } from '@element-plus/icons-vue'
+import { Food, Lock, Shop, UserFilled } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { loginCustomer, loginMerchant } from '../api/user'
@@ -66,10 +66,9 @@ function goToRegister() {
     <section class="auth-home-shell" :class="`role-${activeRole}`" aria-labelledby="platform-title">
       <header class="auth-brand-block">
         <div class="auth-brand-mark" aria-hidden="true">
-          <ShoppingCart />
+          <Food />
         </div>
         <h1 id="platform-title">轻量级外卖服务平台</h1>
-        <p>连接日常点餐与店铺经营</p>
       </header>
 
       <el-card shadow="never" class="login-card">
@@ -148,16 +147,30 @@ function goToRegister() {
 </template>
 
 <style scoped>
-.auth-home-page { background: #f2f5f3; }
+.auth-home-page {
+  align-items: flex-start;
+  padding-top: 20px;
+  background: #f2f5f3;
+  background-image:
+    linear-gradient(rgba(31, 41, 55, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(31, 41, 55, 0.025) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
 .auth-home-shell { width: min(460px, 100%); }
-.auth-brand-block { margin-bottom: 24px; text-align: center; }
+.auth-brand-block {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin-bottom: 14px;
+}
 .auth-brand-mark {
   display: grid;
   width: 52px;
   height: 52px;
-  margin: 0 auto 14px;
+  flex: 0 0 52px;
   place-items: center;
-  color: #c83f36;
+  color: #c8473d;
   background: #ffffff;
   border: 1px solid #dfe5e1;
   border-radius: 8px;
@@ -171,11 +184,12 @@ function goToRegister() {
   line-height: 1.3;
   letter-spacing: 0;
 }
-.auth-brand-block p { margin: 8px 0 0; color: #66716c; line-height: 1.6; }
 .login-card {
   border: 1px solid #dfe5e1;
   border-radius: 8px;
-  box-shadow: 0 16px 40px rgba(31, 41, 55, 0.09);
+  box-shadow:
+    0 2px 8px rgba(31, 41, 55, 0.04),
+    0 12px 32px rgba(31, 41, 55, 0.06);
 }
 .role-tabs {
   display: grid;
@@ -248,7 +262,7 @@ function goToRegister() {
 .register-row :deep(.el-button) { padding-right: 4px; padding-left: 4px; }
 
 @media (max-width: 520px) {
-  .auth-home-page { align-items: flex-start; padding: 28px 16px; }
+  .auth-home-page { padding: 20px 16px; }
   .auth-brand-block h1 { font-size: 24px; }
   .role-tabs button { font-size: 13px; }
 }
