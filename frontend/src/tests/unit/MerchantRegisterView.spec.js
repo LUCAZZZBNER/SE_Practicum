@@ -68,7 +68,7 @@ describe('MerchantRegisterView', () => {
     expect(wrapper.text()).toContain('商家注册')
     expect(wrapper.text()).toContain('提交注册')
     expect(wrapper.text()).toContain('去登录')
-    expect(wrapper.text()).toContain('返回首页')
+    expect(wrapper.text()).not.toContain('返回首页')
   })
 
   it('submits merchant registration with contract fields and returns to merchant login', async () => {

@@ -2,11 +2,12 @@
 import { reactive, ref } from 'vue'
 import { Food, Lock, Shop, UserFilled } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { loginCustomer, loginMerchant } from '../api/user'
 
 const router = useRouter()
-const activeRole = ref('customer')
+const route = useRoute()
+const activeRole = ref(route.query.role === 'merchant' ? 'merchant' : 'customer')
 const submitting = ref(false)
 const forms = reactive({
   customer: { account: '', password: '' },
@@ -98,7 +99,6 @@ function goToRegister() {
         </div>
 
         <div class="login-heading">
-          <h2>{{ roleConfig[activeRole].submitText }}</h2>
           <p>{{ activeRole === 'customer' ? '发现附近店铺，开始便捷点餐' : '管理店铺、商品与订单' }}</p>
         </div>
 
@@ -151,10 +151,8 @@ function goToRegister() {
   align-items: flex-start;
   padding-top: 20px;
   background: #f2f5f3;
-  background-image:
-    linear-gradient(rgba(31, 41, 55, 0.025) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(31, 41, 55, 0.025) 1px, transparent 1px);
-  background-size: 32px 32px;
+  background-image: url('../assets/food-pattern.svg');
+  background-size: 280px 280px;
 }
 .auth-home-shell { width: min(460px, 100%); }
 .auth-brand-block {
@@ -225,9 +223,8 @@ function goToRegister() {
 }
 .role-merchant .role-tabs button.active { color: #176554; border-color: #c9ddd6; }
 .role-tabs button:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
-.login-heading { margin: 26px 0 22px; }
-.login-heading h2 { margin: 0; color: #202925; font-size: 21px; letter-spacing: 0; }
-.login-heading p { margin: 7px 0 0; color: #75807b; font-size: 14px; }
+.login-heading { margin: 20px 0 18px; }
+.login-heading p { margin: 0; color: #75807b; font-size: 16px; }
 .login-form :deep(.el-form-item__label) { color: #3d4742; font-weight: 600; }
 .login-form :deep(.el-input__wrapper) { min-height: 42px; }
 .login-submit {

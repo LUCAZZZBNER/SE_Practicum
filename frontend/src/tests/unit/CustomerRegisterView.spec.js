@@ -68,7 +68,7 @@ describe('CustomerRegisterView', () => {
     expect(wrapper.text()).toContain('普通用户注册')
     expect(wrapper.text()).toContain('提交注册')
     expect(wrapper.text()).toContain('去登录')
-    expect(wrapper.text()).toContain('返回首页')
+    expect(wrapper.text()).not.toContain('返回首页')
   })
 
   it('submits customer registration with contract fields and returns to customer login', async () => {
