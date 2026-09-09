@@ -8,9 +8,13 @@ const mocks = vi.hoisted(() => ({
   routerPush: vi.fn(),
   messageSuccess: vi.fn(),
   messageError: vi.fn(),
+  routeQuery: {},
 }))
 
 vi.mock('vue-router', () => ({
+  useRoute: () => ({
+    query: mocks.routeQuery,
+  }),
   useRouter: () => ({
     push: mocks.routerPush,
   }),
@@ -56,6 +60,7 @@ function mountView() {
 
 beforeEach(() => {
   localStorage.clear()
+  delete mocks.routeQuery.role
   mocks.loginCustomer.mockReset()
   mocks.loginMerchant.mockReset()
   mocks.routerPush.mockReset()
@@ -82,6 +87,16 @@ describe('AuthHomeView', () => {
     expect(wrapper.get('[data-testid="merchant-tab"]').attributes('aria-selected')).toBe('true')
     expect(wrapper.get('input[placeholder="请输入商家账号"]')).toBeTruthy()
     expect(wrapper.find('input[placeholder="请输入用户账号"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="login-submit"]').text()).toBe('商家登录')
+  })
+
+  it('shows merchant login when opened with the merchant role query', () => {
+    mocks.routeQuery.role = 'merchant'
+
+    const wrapper = mountView()
+
+    expect(wrapper.get('[data-testid="merchant-tab"]').attributes('aria-selected')).toBe('true')
+    expect(wrapper.get('input[placeholder="请输入商家账号"]')).toBeTruthy()
     expect(wrapper.get('[data-testid="login-submit"]').text()).toBe('商家登录')
   })
 

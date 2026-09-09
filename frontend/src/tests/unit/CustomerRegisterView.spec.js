@@ -46,7 +46,8 @@ function mountView() {
             '<input :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />',
         },
         'el-button': {
-          template: '<button type="button"><slot /></button>',
+          emits: ['click'],
+          template: '<button type="button" @click="$emit(\'click\')"><slot /></button>',
         },
       },
     },
@@ -70,7 +71,7 @@ describe('CustomerRegisterView', () => {
     expect(wrapper.text()).toContain('返回首页')
   })
 
-  it('submits customer registration with contract fields and redirects to login', async () => {
+  it('submits customer registration with contract fields and returns to customer login', async () => {
     mocks.registerCustomer.mockResolvedValue({
       id: 1,
       account: 'alice01',
@@ -100,7 +101,15 @@ describe('CustomerRegisterView', () => {
       phone: '13800000000',
     })
     expect(mocks.messageSuccess).toHaveBeenCalledWith('注册成功')
-    expect(mocks.routerPush).toHaveBeenCalledWith('/login/customer')
+    expect(mocks.routerPush).toHaveBeenCalledWith({ path: '/', query: { role: 'customer' } })
+  })
+
+  it('returns to the customer tab on the combined login page', async () => {
+    const wrapper = mountView()
+
+    await wrapper.findAll('button').find((button) => button.text() === '去登录').trigger('click')
+
+    expect(mocks.routerPush).toHaveBeenCalledWith({ path: '/', query: { role: 'customer' } })
   })
 
   it('shows backend error when customer registration fails', async () => {
@@ -120,6 +129,6 @@ describe('CustomerRegisterView', () => {
     await flushPromises()
 
     expect(mocks.messageError).toHaveBeenCalledWith('用户账号已存在')
-    expect(mocks.routerPush).not.toHaveBeenCalledWith('/login/customer')
+    expect(mocks.routerPush).not.toHaveBeenCalledWith({ path: '/', query: { role: 'customer' } })
   })
 })
