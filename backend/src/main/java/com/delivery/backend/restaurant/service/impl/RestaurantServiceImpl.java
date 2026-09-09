@@ -68,7 +68,7 @@ public class RestaurantServiceImpl implements RestaurantService {
 		String status = validateStatus(query.status());
 		String sortBy = validateSortBy(query.sortBy());
 		String sortOrder = validateSortOrder(query.sortOrder());
-		int offset = Math.multiplyExact(page - 1, pageSize);
+		long offset = (long) (page - 1) * pageSize;
 		List<ShopView> items = restaurantDao.list(mine, query.merchantId(), keyword, status,
 				sortBy, sortOrder, pageSize, offset).stream().map(RestaurantServiceImpl::toView).toList();
 		long total = restaurantDao.count(mine, query.merchantId(), keyword, status);
@@ -121,6 +121,16 @@ public class RestaurantServiceImpl implements RestaurantService {
 	@Transactional(readOnly = true)
 	public ShopSnapshot requireOwned(long merchantId, long shopId) {
 		return toSnapshot(requireOwnedEntity(merchantId, shopId));
+	}
+
+	@Override
+	@Transactional(readOnly = true)
+	public ShopSnapshot requireOwnedForRead(long merchantId, long shopId) {
+		ShopEntity shop = requireById(shopId);
+		if (shop.getMerchantId() != merchantId) {
+			throw new BusinessException(ApiError.FORBIDDEN);
+		}
+		return toSnapshot(shop);
 	}
 
 	private ShopEntity requireOwnedEntity(long merchantId, long shopId) {

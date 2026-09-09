@@ -6,8 +6,10 @@ import java.math.BigDecimal;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
+import org.apache.ibatis.session.SqlSession;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.delivery.backend.ServiceContractTestSupport;
@@ -35,6 +37,10 @@ class OrderServiceContractTests extends ServiceContractTestSupport {
 	private ItemService itemService;
 	@Autowired
 	private ShoppingService shoppingService;
+	@Autowired
+	private JdbcTemplate jdbcTemplate;
+	@Autowired
+	private SqlSession sqlSession;
 
 	@Test
 	void createCalculatesServerTotalStoresSnapshotsAndRemovesSelectedCartItems() {
@@ -109,6 +115,26 @@ class OrderServiceContractTests extends ServiceContractTestSupport {
 		assertThat(itemService.getProduct(fixture.productId(), true, fixture.merchantId()).stock()).isEqualTo(5);
 		assertBusinessError(ApiError.ORDER_STATE_CONFLICT, () -> service.cancel(fixture.userId(), order.id()));
 		assertThat(itemService.getProduct(fixture.productId(), true, fixture.merchantId()).stock()).isEqualTo(5);
+	}
+
+	@Test
+	void suspendedMerchantsCanStillReadHistoricalOrders() {
+		Fixture fixture = fixture("order-suspended-merchant");
+		OrderService.OrderView order = service.create(fixture.userId(), "suspended-key", request(fixture));
+		jdbcTemplate.update("UPDATE merchants SET status = 'SUSPENDED' WHERE id = ?", fixture.merchantId());
+		sqlSession.clearCache();
+
+		assertThat(service.listMerchantOrders(fixture.merchantId(),
+				new OrderService.MerchantListQuery(fixture.shopId(), null, 1, 10, null, null)).items())
+				.extracting(OrderService.OrderSummaryView::id).contains(order.id());
+		assertThat(service.getMerchantOrder(fixture.merchantId(), order.id()).id()).isEqualTo(order.id());
+	}
+
+	@Test
+	void nullOrderItemsProduceTheCartEmptyBusinessError() {
+		Fixture fixture = fixture("order-null-items");
+		assertBusinessError(ApiError.CART_EMPTY,
+				() -> service.create(fixture.userId(), "null-items-key", new OrderService.CreateRequest(null)));
 	}
 
 	private Fixture fixture(String name) {

@@ -28,6 +28,11 @@ public interface ShoppingDao {
 			@Param("id") long id,
 			@Param("quantity") int quantity);
 
+	int incrementQuantity(@Param("userId") long userId,
+			@Param("id") long id,
+			@Param("addition") int addition,
+			@Param("maximum") int maximum);
+
 	int deleteOwned(@Param("userId") long userId, @Param("id") long id);
 
 	int deleteSelected(@Param("userId") long userId, @Param("ids") List<Long> ids);

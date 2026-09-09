@@ -24,14 +24,21 @@
         <choose>
             <when test="mine">
                 AND merchant_id = #{merchantId}
+				<if test="status != null">
+					AND status = #{status}
+				</if>
             </when>
             <otherwise>
-                AND status = 'OPEN'
+				<choose>
+					<when test="status != null">
+						AND status = #{status}
+					</when>
+					<otherwise>
+						AND status = 'OPEN'
+					</otherwise>
+				</choose>
             </otherwise>
         </choose>
-        <if test="status != null">
-            AND status = #{status}
-        </if>
         <if test="keyword != null">
             AND name LIKE CONCAT('%', #{keyword}, '%')
         </if>

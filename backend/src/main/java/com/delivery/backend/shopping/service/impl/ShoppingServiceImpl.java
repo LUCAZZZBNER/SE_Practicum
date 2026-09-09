@@ -108,7 +108,7 @@ public class ShoppingServiceImpl implements ShoppingService {
 	}
 
 	@Override
-	@Transactional(readOnly = true)
+	@Transactional
 	public List<CheckoutItem> loadForCheckout(long userId, List<Long> cartItemIds) {
 		userService.requireActive(userId);
 		List<Long> ids = normalizeIds(cartItemIds);
@@ -132,13 +132,12 @@ public class ShoppingServiceImpl implements ShoppingService {
 	}
 
 	private AddResult merge(long userId, CartItemEntity existing, int addition, int productStock) {
-		long merged = (long) existing.getQuantity() + addition;
-		if (merged > Integer.MAX_VALUE) {
+		if (shoppingDao.incrementQuantity(userId, existing.getId(), addition, productStock) != 1) {
+			CartItemEntity current = shoppingDao.findOwnedById(userId, existing.getId());
+			if (current == null) {
+				throw new BusinessException(ApiError.RESOURCE_NOT_FOUND);
+			}
 			throw new BusinessException(ApiError.INSUFFICIENT_STOCK);
-		}
-		ensureStock((int) merged, productStock);
-		if (shoppingDao.updateQuantity(userId, existing.getId(), (int) merged) != 1) {
-			throw new BusinessException(ApiError.RESOURCE_NOT_FOUND);
 		}
 		return new AddResult(false, toView(requireOwned(userId, existing.getId())));
 	}
