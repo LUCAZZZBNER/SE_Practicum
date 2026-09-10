@@ -8,6 +8,8 @@ const mocks = vi.hoisted(() => ({
   listCategories: vi.fn(),
   addCartItem: vi.fn(),
   routerPush: vi.fn(),
+  routerBack: vi.fn(),
+  messageSuccess: vi.fn(),
   messageError: vi.fn(),
 }))
 
@@ -17,6 +19,7 @@ vi.mock('vue-router', () => ({
 
 vi.mock('element-plus', () => ({
   ElMessage: {
+    success: mocks.messageSuccess,
     error: mocks.messageError,
   },
 }))
@@ -43,6 +46,7 @@ function mountView() {
       mocks: {
         $router: {
           push: mocks.routerPush,
+          back: mocks.routerBack,
         },
       },
       stubs: {
@@ -61,8 +65,9 @@ function mountView() {
         },
         'el-button': {
           props: ['disabled'],
-          template: '<button :disabled="disabled"><slot /></button>',
+          template: '<button :disabled="disabled" @click="$emit(\'click\')"><slot /></button>',
         },
+        'el-icon': { template: '<i><slot /></i>' },
       },
     },
   })
@@ -74,6 +79,8 @@ beforeEach(() => {
   mocks.listCategories.mockReset()
   mocks.addCartItem.mockReset()
   mocks.routerPush.mockReset()
+  mocks.routerBack.mockReset()
+  mocks.messageSuccess.mockReset()
   mocks.messageError.mockReset()
 })
 
@@ -102,9 +109,11 @@ describe('ProductDetailView', () => {
     expect(wrapper.text()).toContain('招牌套餐，现做现卖')
     expect(wrapper.text()).toContain('示例快餐店')
     expect(wrapper.text()).toContain('主食')
-    expect(wrapper.text()).toContain('18.8')
+    expect(wrapper.text()).toContain('¥18.80')
     expect(wrapper.text()).toContain('20')
-    expect(wrapper.text()).toContain('ON_SALE')
+    expect(wrapper.text()).toContain('在售')
+    expect(wrapper.text()).not.toContain('ON_SALE')
+    expect(wrapper.get('[data-testid="back-to-store"]')).toBeTruthy()
   })
 
   it('disables add-to-cart when stock is zero', async () => {
@@ -123,9 +132,33 @@ describe('ProductDetailView', () => {
     const wrapper = mountView()
     await flushPromises()
 
-    const buttons = wrapper.findAll('button')
-    expect(buttons[0].element.disabled).toBe(true)
+    const button = wrapper.get('[data-testid="add-to-cart"]')
+    expect(button.element.disabled).toBe(true)
+    expect(button.text()).toBe('暂不可购买')
     expect(mocks.addCartItem).not.toHaveBeenCalled()
+  })
+
+  it('adds the selected quantity to cart and shows success feedback', async () => {
+    mocks.getProductDetail.mockResolvedValue({
+      id: 11,
+      name: '招牌牛肉饭',
+      shopId: 7,
+      categoryId: 21,
+      price: 18.8,
+      stock: 20,
+      status: 'ON_SALE',
+    })
+    mocks.getStoreDetail.mockResolvedValue({ id: 7, name: '示例快餐店' })
+    mocks.listCategories.mockResolvedValue([{ id: 21, name: '主食' }])
+    mocks.addCartItem.mockResolvedValue({})
+
+    const wrapper = mountView()
+    await flushPromises()
+    await wrapper.get('[data-testid="add-to-cart"]').trigger('click')
+    await flushPromises()
+
+    expect(mocks.addCartItem).toHaveBeenCalledWith({ productId: 11, quantity: 1 })
+    expect(mocks.messageSuccess).toHaveBeenCalledWith('已加入购物车')
   })
 
   it('shows an error when loading product detail fails', async () => {
