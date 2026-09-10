@@ -8,13 +8,13 @@ export default [
   {
     path: '/login/customer',
     name: 'CustomerLogin',
-    component: () => import('../../views/CustomerLoginView.vue'),
+    redirect: { path: '/', query: { role: 'customer' } },
     meta: { title: '普通用户登录' },
   },
   {
     path: '/login/merchant',
     name: 'MerchantLogin',
-    component: () => import('../../views/MerchantLoginView.vue'),
+    redirect: { path: '/', query: { role: 'merchant' } },
     meta: { title: '商家登录' },
   },
   {

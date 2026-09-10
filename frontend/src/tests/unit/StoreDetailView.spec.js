@@ -8,6 +8,8 @@ const mocks = vi.hoisted(() => ({
   listCategories: vi.fn(),
   listProducts: vi.fn(),
   routerPush: vi.fn(),
+  routerBack: vi.fn(),
+  messageSuccess: vi.fn(),
   messageError: vi.fn(),
 }))
 
@@ -17,6 +19,7 @@ vi.mock('vue-router', () => ({
 
 vi.mock('element-plus', () => ({
   ElMessage: {
+    success: mocks.messageSuccess,
     error: mocks.messageError,
   },
 }))
@@ -43,6 +46,7 @@ function mountView() {
       mocks: {
         $router: {
           push: mocks.routerPush,
+          back: mocks.routerBack,
         },
       },
       stubs: {
@@ -71,6 +75,7 @@ function mountView() {
           props: ['disabled'],
           template: '<button :disabled="disabled" @click="$emit(\'click\')"><slot /></button>',
         },
+        'el-icon': { template: '<i><slot /></i>' },
       },
     },
   })
@@ -82,6 +87,8 @@ beforeEach(() => {
   mocks.listCategories.mockReset()
   mocks.listProducts.mockReset()
   mocks.routerPush.mockReset()
+  mocks.routerBack.mockReset()
+  mocks.messageSuccess.mockReset()
   mocks.messageError.mockReset()
 })
 
@@ -99,8 +106,8 @@ describe('StoreDetailView', () => {
     ])
     mocks.listProducts.mockResolvedValue({
       items: [
-        { id: 1, name: '招牌牛肉饭', categoryId: 21, price: 18.8, stock: 20, status: '在售' },
-        { id: 2, name: '冰柠檬茶', categoryId: 22, price: 6.0, stock: 35, status: '在售' },
+        { id: 1, name: '招牌牛肉饭', description: '现做现卖', categoryId: 21, price: 18.8, stock: 20, status: 'ON_SALE' },
+        { id: 2, name: '冰柠檬茶', description: '清爽解腻', categoryId: 22, price: 6.0, stock: 35, status: 'ON_SALE' },
       ],
     })
 
@@ -115,11 +122,15 @@ describe('StoreDetailView', () => {
     })
     expect(wrapper.text()).toContain('示例快餐店')
     expect(wrapper.text()).toContain('校园简餐')
-    expect(wrapper.text()).toContain('OPEN')
+    expect(wrapper.text()).toContain('营业中')
+    expect(wrapper.text()).not.toContain('OPEN')
     expect(wrapper.text()).toContain('主食')
     expect(wrapper.text()).toContain('饮品')
     expect(wrapper.text()).toContain('招牌牛肉饭')
     expect(wrapper.text()).toContain('冰柠檬茶')
+    expect(wrapper.text()).toContain('现做现卖')
+    expect(wrapper.text()).toContain('¥18.80')
+    expect(wrapper.get('[data-testid="back-to-stores"]')).toBeTruthy()
   })
 
   it('submits add-to-cart from a store product row', async () => {
@@ -132,7 +143,7 @@ describe('StoreDetailView', () => {
     mocks.listCategories.mockResolvedValue([{ id: 21, name: '主食' }])
     mocks.listProducts.mockResolvedValue({
       items: [
-        { id: 1, name: '招牌牛肉饭', categoryId: 21, price: 18.8, stock: 20, status: '在售' },
+        { id: 1, name: '招牌牛肉饭', categoryId: 21, price: 18.8, stock: 20, status: 'ON_SALE' },
       ],
     })
     mocks.addCartItem.mockResolvedValue({})
@@ -140,12 +151,14 @@ describe('StoreDetailView', () => {
     const wrapper = mountView()
     await flushPromises()
 
-    await wrapper.findAll('button')[1].trigger('click')
+    await wrapper.get('[data-testid="add-product-1"]').trigger('click')
+    await flushPromises()
 
     expect(mocks.addCartItem).toHaveBeenCalledWith({
       productId: 1,
       quantity: 1,
     })
+    expect(mocks.messageSuccess).toHaveBeenCalledWith('已加入购物车')
   })
 
   it('shows an error when loading store detail fails', async () => {

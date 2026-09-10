@@ -5,6 +5,7 @@ import OrderDetailView from '../../views/OrderDetailView.vue'
 const mocks = vi.hoisted(() => ({
   cancelOrder: vi.fn(),
   getOrderDetail: vi.fn(),
+  routerBack: vi.fn(),
   messageError: vi.fn(),
 }))
 
@@ -26,6 +27,11 @@ vi.mock('../../api/order', () => ({
 function mountView() {
   return mount(OrderDetailView, {
     global: {
+      mocks: {
+        $router: {
+          back: mocks.routerBack,
+        },
+      },
       stubs: {
         'el-steps': {
           props: ['active', 'finishStatus'],
@@ -47,6 +53,14 @@ function mountView() {
           emits: ['click'],
           template: '<button type="button" @click="$emit(\'click\')"><slot /></button>',
         },
+        'el-tag': {
+          template: '<span><slot /></span>',
+        },
+        'el-icon': { template: '<i><slot /></i>' },
+        ConfirmAction: {
+          emits: ['confirm'],
+          template: '<div class="confirm"><slot /><button class="confirm-button" @click="$emit(\'confirm\')">确认</button></div>',
+        },
       },
     },
   })
@@ -55,6 +69,7 @@ function mountView() {
 beforeEach(() => {
   mocks.cancelOrder.mockReset()
   mocks.getOrderDetail.mockReset()
+  mocks.routerBack.mockReset()
   mocks.messageError.mockReset()
 })
 
@@ -66,6 +81,7 @@ describe('OrderDetailView', () => {
       shopName: '示例快餐店',
       status: 'PENDING_PAYMENT',
       total: 43.6,
+      createdAt: '2026-09-04T09:40:00Z',
       lines: [
         {
           productId: 11,
@@ -90,9 +106,18 @@ describe('OrderDetailView', () => {
     expect(mocks.getOrderDetail).toHaveBeenCalledWith(10001)
     expect(wrapper.text()).toContain('OD202609030001')
     expect(wrapper.text()).toContain('示例快餐店')
-    expect(wrapper.text()).toContain('43.60 元')
+    expect(wrapper.text()).toContain('¥43.60')
+    expect(wrapper.text()).toContain('待支付')
+    expect(wrapper.text()).not.toContain('PENDING_PAYMENT')
+    expect(wrapper.text()).toContain('2026/09/04 17:40')
     expect(wrapper.text()).toContain('招牌牛肉饭')
     expect(wrapper.text()).toContain('冰柠檬茶')
+    expect(wrapper.text()).toContain('单价：¥18.80')
+    expect(wrapper.text()).toContain('小计：¥37.60')
+    expect(wrapper.text()).toContain('单价：¥6.00')
+    expect(wrapper.text()).toContain('小计：¥6.00')
+    expect(wrapper.find('.steps').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="back-to-orders"]')).toBeTruthy()
     expect(wrapper.text()).toContain('取消订单')
   })
 
@@ -119,12 +144,13 @@ describe('OrderDetailView', () => {
     const wrapper = mountView()
     await flushPromises()
 
-    await wrapper.find('button').trigger('click')
+    await wrapper.find('.confirm-button').trigger('click')
     await flushPromises()
 
     expect(mocks.cancelOrder).toHaveBeenCalledWith(10001)
     expect(mocks.getOrderDetail).toHaveBeenCalledTimes(2)
-    expect(wrapper.text()).toContain('CANCELLED')
+    expect(wrapper.text()).toContain('已取消')
+    expect(wrapper.text()).not.toContain('CANCELLED')
   })
 
   it('shows an error when loading order detail fails', async () => {

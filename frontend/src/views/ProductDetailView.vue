@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
+import { ArrowLeft, ShoppingCart } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { addCartItem } from '../api/cart'
 import { listCategories } from '../api/category'
@@ -23,6 +24,14 @@ const product = reactive({
 
 const unavailable = computed(() => product.stock <= 0 || product.status === 'OFF_SALE')
 const quantity = ref(1)
+
+const statusMap = {
+  ON_SALE: '在售',
+  OFF_SALE: '已下架',
+}
+
+const formattedPrice = computed(() => `¥${Number(product.price || 0).toFixed(2)}`)
+const statusText = computed(() => statusMap[product.status] || '状态未知')
 
 async function loadProductDetail() {
   loading.value = true
@@ -59,6 +68,7 @@ async function addToCart() {
       productId: Number(route.params.id),
       quantity: quantity.value,
     })
+    ElMessage.success('已加入购物车')
   } catch (error) {
     ElMessage.error(error?.message || '加入购物车失败')
   }
@@ -69,21 +79,33 @@ onMounted(loadProductDetail)
 
 <template>
   <section class="content-stack">
+    <el-button data-testid="back-to-store" class="back-button" text @click="$router.back()">
+      <el-icon><ArrowLeft /></el-icon>
+      返回店铺
+    </el-button>
+
     <div v-if="loading">加载中...</div>
     <template v-else>
       <el-descriptions :title="product.name" border>
         <el-descriptions-item label="所属店铺">{{ product.shopName }}</el-descriptions-item>
         <el-descriptions-item label="分类">{{ product.categoryName }}</el-descriptions-item>
         <el-descriptions-item label="商品描述">{{ product.description || '暂无描述' }}</el-descriptions-item>
-        <el-descriptions-item label="价格">{{ product.price }} 元</el-descriptions-item>
+        <el-descriptions-item label="价格">{{ formattedPrice }}</el-descriptions-item>
         <el-descriptions-item label="库存">{{ product.stock }}</el-descriptions-item>
-        <el-descriptions-item label="状态">{{ product.status }}</el-descriptions-item>
+        <el-descriptions-item label="状态">{{ statusText }}</el-descriptions-item>
       </el-descriptions>
 
       <div class="action-bar">
         <el-input-number v-model="quantity" :min="1" :max="product.stock" />
-        <el-button type="primary" :disabled="unavailable" @click="addToCart">加入购物车</el-button>
+        <el-button data-testid="add-to-cart" type="primary" :disabled="unavailable" @click="addToCart">
+          <el-icon><ShoppingCart /></el-icon>
+          {{ unavailable ? '暂不可购买' : '加入购物车' }}
+        </el-button>
       </div>
     </template>
   </section>
 </template>
+
+<style scoped>
+.back-button { justify-self: start; padding-left: 0; }
+</style>

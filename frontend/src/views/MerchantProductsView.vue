@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import ConfirmAction from '../components/common/ConfirmAction.vue'
 import {
@@ -25,6 +25,21 @@ const productForm = reactive({
   stock: 0,
   version: null,
 })
+
+const productStatusMap = {
+  ON_SALE: '在售',
+  OFF_SALE: '已下架',
+}
+
+const onSaleCount = computed(() => products.value.filter((product) => product.status === 'ON_SALE').length)
+
+function formatPrice(price) {
+  return `¥${Number(price || 0).toFixed(2)}`
+}
+
+function formatStatus(status) {
+  return productStatusMap[status] || '状态未知'
+}
 
 function resetProductForm() {
   productForm.id = null
@@ -141,6 +156,21 @@ onMounted(loadProducts)
 
 <template>
   <section class="content-stack">
+    <section class="product-summary">
+      <div>
+        <span>商品总数</span>
+        <strong>{{ products.length }}</strong>
+      </div>
+      <div>
+        <span>在售商品</span>
+        <strong>{{ onSaleCount }}</strong>
+      </div>
+      <div>
+        <span>已下架</span>
+        <strong>{{ products.length - onSaleCount }}</strong>
+      </div>
+    </section>
+
     <div class="manage-panel">
       <h2>分类管理</h2>
       <div class="inline-form">
@@ -155,7 +185,12 @@ onMounted(loadProducts)
     </div>
 
     <div class="manage-panel">
-      <h2>{{ productForm.id ? '编辑商品' : '新增商品' }}</h2>
+      <div class="section-heading">
+        <div>
+          <h2>{{ productForm.id ? '编辑商品' : '新增商品' }}</h2>
+          <p>完善价格和库存后再保存商品</p>
+        </div>
+      </div>
       <div class="inline-form product-form">
         <el-select v-model="productForm.categoryId" placeholder="商品分类">
           <el-option
@@ -175,25 +210,44 @@ onMounted(loadProducts)
           <span>库存数量（个）</span>
           <el-input-number v-model="productForm.stock" :min="0" />
         </label>
-        <el-button type="primary" @click="saveProduct">{{ productForm.id ? '保存商品' : '新增商品' }}</el-button>
+        <el-button
+          :data-testid="productForm.id ? 'save-product' : 'add-product'"
+          type="primary"
+          @click="saveProduct"
+        >
+          {{ productForm.id ? '保存商品' : '新增商品' }}
+        </el-button>
       </div>
     </div>
 
     <div v-if="products.length === 0" class="empty-list">暂无商品</div>
 
     <div v-else class="product-list">
-      <div v-for="product in products" :key="product.id" class="product-row">
+      <div
+        v-for="product in products"
+        :key="product.id"
+        :data-testid="`product-row-${product.id}`"
+        class="product-row"
+      >
         <div>商品：{{ product.name }}</div>
         <div>分类：{{ product.categoryId }}</div>
-        <div>价格：{{ product.price }}</div>
-        <div>库存：{{ product.stock }}</div>
-        <div>状态：{{ product.status }}</div>
-        <el-button size="small" @click="fillProductForm(product)">编辑</el-button>
+        <div>价格：{{ formatPrice(product.price) }}</div>
+        <div>库存：{{ product.stock }} 个</div>
+        <div>状态：{{ formatStatus(product.status) }}</div>
+        <el-button
+          :data-testid="`product-edit-${product.id}`"
+          size="small"
+          @click="fillProductForm(product)"
+        >编辑</el-button>
         <ConfirmAction
           :title="product.status === 'OFF_SALE' ? '确认上架该商品？' : '确认下架该商品？'"
           @confirm="offShelf(product)"
         >
-          <el-button size="small" type="warning">
+          <el-button
+            :data-testid="`product-toggle-${product.id}`"
+            size="small"
+            type="warning"
+          >
             {{ product.status === 'OFF_SALE' ? '上架' : '下架' }}
           </el-button>
         </ConfirmAction>
@@ -201,3 +255,25 @@ onMounted(loadProducts)
     </div>
   </section>
 </template>
+
+<style scoped>
+.product-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.product-summary > div {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  background: #fff;
+  border: 1px solid #e1e6e3;
+  border-radius: 8px;
+}
+.product-summary span, .section-heading p { color: #6c7772; font-size: 13px; }
+.product-summary strong { color: #c8473d; font-size: 22px; }
+.section-heading { display: flex; justify-content: space-between; margin-bottom: 12px; }
+.section-heading h2 { margin: 0; }
+.section-heading p { margin: 6px 0 0; }
+.product-row { padding: 14px 0; border-top: 1px solid #edf0ee; }
+
+@media (max-width: 640px) {
+  .product-summary { grid-template-columns: 1fr; }
+}
+</style>

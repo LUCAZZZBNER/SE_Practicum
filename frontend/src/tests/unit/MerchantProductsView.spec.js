@@ -88,7 +88,8 @@ function mountView() {
           template: '<option :value="value">{{ label }}</option>',
         },
         'el-button': {
-          template: '<button type="button" @click="$emit(\'click\')"><slot /></button>',
+          props: ['disabled', 'loading'],
+          template: '<button type="button" :disabled="disabled || loading" @click="$emit(\'click\')"><slot /></button>',
         },
       },
     },
@@ -137,9 +138,13 @@ describe('MerchantProductsView', () => {
     })
     expect(wrapper.text()).toContain('主食')
     expect(wrapper.text()).toContain('招牌牛肉饭')
-    expect(wrapper.text()).toContain('18.8')
-    expect(wrapper.text()).toContain('20')
-    expect(wrapper.text()).toContain('ON_SALE')
+    expect(wrapper.get('[data-testid="product-row-1"]')).toBeTruthy()
+    expect(wrapper.text()).toContain('¥18.80')
+    expect(wrapper.text()).toContain('库存：20 个')
+    expect(wrapper.text()).toContain('在售')
+    expect(wrapper.text()).not.toContain('ON_SALE')
+    expect(wrapper.get('[data-testid="product-edit-1"]')).toBeTruthy()
+    expect(wrapper.get('[data-testid="product-toggle-1"]')).toBeTruthy()
   })
 
   it('submits category create, rename and delete actions', async () => {
@@ -153,6 +158,7 @@ describe('MerchantProductsView', () => {
 
     expect(wrapper.text()).toContain('商品价格（元）')
     expect(wrapper.text()).toContain('库存数量（个）')
+    expect(wrapper.get('[data-testid="add-product"]')).toBeTruthy()
 
     const inputs = wrapper.findAll('input')
     await inputs[0].setValue('饮品')
@@ -177,7 +183,7 @@ describe('MerchantProductsView', () => {
     await inputs[2].setValue('牛肉饭')
     await inputs[3].setValue('18.8')
     await inputs[4].setValue('20')
-    await wrapper.findAll('button').find((button) => button.text() === '新增商品').trigger('click')
+    await wrapper.get('[data-testid="add-product"]').trigger('click')
 
     expect(mocks.createProduct).toHaveBeenCalledWith({
       shopId: 7,
@@ -202,7 +208,7 @@ describe('MerchantProductsView', () => {
     const numberInputs = wrapper.findAll('input[type="number"]')
     await numberInputs[0].setValue('18.8')
     await numberInputs[1].setValue('20')
-    await wrapper.findAll('button').find((button) => button.text() === '新增商品').trigger('click')
+    await wrapper.get('[data-testid="add-product"]').trigger('click')
 
     expect(mocks.createProduct).toHaveBeenCalledWith({
       shopId: 7,
@@ -220,7 +226,7 @@ describe('MerchantProductsView', () => {
     const wrapper = mountView()
     await flushPromises()
 
-    await wrapper.findAll('button').find((button) => button.text() === '新增商品').trigger('click')
+    await wrapper.get('[data-testid="add-product"]').trigger('click')
 
     expect(mocks.createProduct).not.toHaveBeenCalled()
     expect(mocks.messageError).toHaveBeenCalledWith('请填写有效商品信息')
@@ -245,12 +251,12 @@ describe('MerchantProductsView', () => {
     const wrapper = mountView()
     await flushPromises()
 
-    await wrapper.findAll('button').find((button) => button.text() === '编辑').trigger('click')
+    await wrapper.get('[data-testid="product-edit-1"]').trigger('click')
     const inputs = wrapper.findAll('input')
     await inputs[2].setValue('升级牛肉饭')
     await inputs[3].setValue('20')
     await inputs[4].setValue('18')
-    await wrapper.findAll('button').find((button) => button.text() === '保存商品').trigger('click')
+    await wrapper.get('[data-testid="save-product"]').trigger('click')
 
     expect(mocks.updateProduct).toHaveBeenCalledWith(1, {
       categoryId: 21,
@@ -282,11 +288,11 @@ describe('MerchantProductsView', () => {
     const wrapper = mountView()
     await flushPromises()
 
-    await wrapper.findAll('button').find((button) => button.text() === '编辑').trigger('click')
+    await wrapper.get('[data-testid="product-edit-1"]').trigger('click')
     const descriptionInput = wrapper.find('textarea[placeholder="商品描述"]')
     expect(descriptionInput.element.value).toBe('原商品描述')
     await descriptionInput.setValue('升级后的描述')
-    await wrapper.findAll('button').find((button) => button.text() === '保存商品').trigger('click')
+    await wrapper.get('[data-testid="save-product"]').trigger('click')
 
     expect(mocks.updateProduct).toHaveBeenCalledWith(1, {
       categoryId: 21,
@@ -317,6 +323,7 @@ describe('MerchantProductsView', () => {
     const wrapper = mountView()
     await flushPromises()
 
+    await wrapper.get('[data-testid="product-toggle-1"]').trigger('click')
     await wrapper.find('.confirm-button').trigger('click')
 
     expect(mocks.updateProduct).toHaveBeenCalledWith(1, {
@@ -345,6 +352,7 @@ describe('MerchantProductsView', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('上架')
+    await wrapper.get('[data-testid="product-toggle-2"]').trigger('click')
     await wrapper.find('.confirm-button').trigger('click')
 
     expect(mocks.updateProduct).toHaveBeenCalledWith(2, {

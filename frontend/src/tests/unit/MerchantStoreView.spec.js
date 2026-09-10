@@ -51,7 +51,9 @@ function mountView() {
           template: '<button type="button"><slot /></button>',
         },
         'el-button': {
-          template: '<button type="button"><slot /></button>',
+          props: ['disabled', 'loading'],
+          emits: ['click'],
+          template: '<button type="button" :disabled="disabled || loading" @click="$emit(\'click\')"><slot /></button>',
         },
       },
     },
@@ -84,10 +86,14 @@ describe('MerchantStoreView', () => {
 
     expect(mocks.listStores).toHaveBeenCalledWith({ mine: true, page: 1, pageSize: 100 })
     expect(mocks.getStoreDetail).toHaveBeenCalledWith(7)
+    expect(wrapper.get('[data-testid="store-summary"]')).toBeTruthy()
     expect(wrapper.text()).toContain('示例快餐店')
-    expect(wrapper.text()).toContain('OPEN')
+    expect(wrapper.text()).toContain('营业中')
+    expect(wrapper.text()).not.toContain('OPEN')
     expect(wrapper.text()).toContain('欢迎下单')
-    expect(wrapper.text()).toContain('保存店铺')
+    expect(wrapper.text()).toContain('店铺资料')
+    expect(wrapper.text()).toContain('营业设置')
+    expect(wrapper.get('[data-testid="save-store"]')).toBeTruthy()
   })
 
   it('submits store status change with edited form values', async () => {
@@ -108,7 +114,7 @@ describe('MerchantStoreView', () => {
     const inputs = wrapper.findAll('input')
     await inputs[0].setValue('新店铺名')
     await inputs[1].setValue('临时休息')
-    await wrapper.find('button').trigger('click')
+    await wrapper.get('[data-testid="save-store"]').trigger('click')
 
     expect(mocks.updateStoreStatus).toHaveBeenCalledWith(7, {
       name: '新店铺名',
@@ -132,10 +138,11 @@ describe('MerchantStoreView', () => {
     const wrapper = mountView()
     await flushPromises()
 
+    expect(wrapper.text()).toContain('请创建你的店铺')
     const inputs = wrapper.findAll('input')
     await inputs[0].setValue('新店铺')
     await inputs[1].setValue('新店介绍')
-    await wrapper.find('button').trigger('click')
+    await wrapper.get('[data-testid="save-store"]').trigger('click')
 
     expect(mocks.getStoreDetail).not.toHaveBeenCalled()
     expect(mocks.createShop).toHaveBeenCalledWith({
@@ -160,7 +167,7 @@ describe('MerchantStoreView', () => {
     const wrapper = mountView()
     await flushPromises()
 
-    await wrapper.find('button').trigger('click')
+    await wrapper.get('[data-testid="save-store"]').trigger('click')
     await flushPromises()
 
     expect(mocks.messageError).toHaveBeenCalledWith('保存失败')
