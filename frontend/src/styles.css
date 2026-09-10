@@ -18,6 +18,7 @@ body { margin: 0; min-width: 320px; }
 .app-aside .el-menu { border-right: 0; }
 .app-main { max-width: 1200px; width: 100%; margin: 0 auto; }
 .customer-mobile-nav { display: none; }
+.merchant-mobile-nav { display: none; }
 .page-heading { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 24px; }
 .page-heading h1 { margin: 0; font-size: 24px; }
 .page-heading span { color: #909399; font-size: 13px; }
@@ -81,6 +82,32 @@ body { margin: 0; min-width: 320px; }
   }
   .customer-mobile-nav a.active { color: #c8473d; font-weight: 600; }
   .customer-mobile-nav .el-icon { font-size: 20px; }
+  .merchant-mobile-nav {
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 20;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    min-height: 64px;
+    padding-bottom: env(safe-area-inset-bottom);
+    background: #ffffff;
+    border-top: 1px solid #e5e7eb;
+  }
+  .merchant-mobile-nav a {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 3px;
+    color: #7a8580;
+    font-size: 12px;
+    text-decoration: none;
+  }
+  .merchant-mobile-nav a.active { color: #c8473d; font-weight: 600; }
+  .merchant-mobile-nav .el-icon { font-size: 20px; }
   .action-bar { align-items: stretch; flex-direction: column; }
   .auth-grid { grid-template-columns: 1fr; }
   .auth-intro h1 { font-size: 24px; }
