@@ -16,6 +16,40 @@ body { margin: 0; min-width: 320px; }
 .header-icon-link:hover, .header-icon-button:hover { color: #c8473d; background: #f7efed; }
 .app-aside { background: #ffffff; border-right: 1px solid #e5e7eb; }
 .app-aside .el-menu { border-right: 0; }
+.app-aside .sidebar-menu { padding: 8px 0; }
+.app-aside .sidebar-menu-item {
+  position: relative;
+  height: auto;
+  min-height: 44px;
+  margin: 4px 10px;
+  padding: 10px 16px;
+  color: #606b66;
+  border-radius: 8px;
+  gap: 12px;
+  line-height: 1.4;
+  transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+}
+.app-aside .sidebar-menu-item:hover {
+  color: #303a35;
+  background: #f3f4f6;
+}
+.app-aside .sidebar-menu-item.is-active {
+  color: #c8473d;
+  font-weight: 600;
+  background: rgba(200, 71, 61, 0.08);
+}
+.app-aside .sidebar-menu-item.is-active::before {
+  position: absolute;
+  top: 50%;
+  left: 4px;
+  width: 3px;
+  height: 20px;
+  background: #c8473d;
+  border-radius: 3px;
+  content: '';
+  transform: translateY(-50%);
+}
+.app-aside .sidebar-menu-item .el-icon { margin-right: 0; }
 .app-main { max-width: 1200px; width: 100%; margin: 0 auto; }
 .customer-mobile-nav { display: none; }
 .merchant-mobile-nav { display: none; }

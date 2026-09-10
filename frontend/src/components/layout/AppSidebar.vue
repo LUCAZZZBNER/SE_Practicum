@@ -27,8 +27,13 @@ const activePath = computed(() => {
 
 <template>
   <el-aside width="220px" class="app-aside">
-    <el-menu :default-active="activePath" router>
-      <el-menu-item v-for="item in menuItems" :key="item.path" :index="item.path">
+    <el-menu class="sidebar-menu" :default-active="activePath" router>
+      <el-menu-item
+        v-for="item in menuItems"
+        :key="item.path"
+        class="sidebar-menu-item"
+        :index="item.path"
+      >
         <el-icon><component :is="item.icon" /></el-icon>
         <span>{{ item.label }}</span>
       </el-menu-item>
