@@ -34,6 +34,8 @@ function mountView() {
         'el-button': {
           template: '<button type="button" @click="$emit(\'click\')"><slot /></button>',
         },
+        'el-tag': { template: '<span><slot /></span>' },
+        'el-icon': { template: '<i><slot /></i>' },
       },
     },
   })
@@ -54,8 +56,8 @@ describe('MerchantOrdersView', () => {
           orderNumber: 'MO202609060001',
           shopName: '示例快餐店',
           total: 48.6,
-          status: '待接单',
-          createdAt: '2026-09-06 10:30',
+          status: 'PREPARING',
+          createdAt: '2026-09-06T02:30:00Z',
         },
       ],
       total: 1,
@@ -65,12 +67,14 @@ describe('MerchantOrdersView', () => {
     await flushPromises()
 
     expect(mocks.listMerchantOrders).toHaveBeenCalledWith({ page: 1, pageSize: 10 })
+    expect(wrapper.get('[data-testid="merchant-order-card-1001"]')).toBeTruthy()
     expect(wrapper.text()).toContain('MO202609060001')
     expect(wrapper.text()).toContain('示例快餐店')
-    expect(wrapper.text()).toContain('48.6')
-    expect(wrapper.text()).toContain('待接单')
-    expect(wrapper.text()).toContain('2026-09-06 10:30')
-    expect(wrapper.text()).toContain('查看')
+    expect(wrapper.text()).toContain('¥48.60')
+    expect(wrapper.text()).toContain('制作中')
+    expect(wrapper.text()).not.toContain('PREPARING')
+    expect(wrapper.text()).toContain('2026/09/06 10:30')
+    expect(wrapper.get('[data-testid="view-merchant-order-1001"]').text()).toContain('查看详情')
   })
 
   it('shows empty state when no merchant orders exist', async () => {
@@ -93,8 +97,8 @@ describe('MerchantOrdersView', () => {
           orderNumber: 'MO202609060001',
           shopName: '示例快餐店',
           total: 48.6,
-          status: '待接单',
-          createdAt: '2026-09-06 10:30',
+          status: 'PREPARING',
+          createdAt: '2026-09-06T02:30:00Z',
         },
       ],
       total: 1,
@@ -103,7 +107,7 @@ describe('MerchantOrdersView', () => {
     const wrapper = mountView()
     await flushPromises()
 
-    await wrapper.find('button').trigger('click')
+    await wrapper.get('[data-testid="view-merchant-order-1001"]').trigger('click')
 
     expect(mocks.routerPush).toHaveBeenCalledWith('/merchant/orders/1001')
   })
