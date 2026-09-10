@@ -8,14 +8,16 @@
 body { margin: 0; min-width: 320px; }
 .app-shell { min-height: 100vh; }
 .app-header { display: flex; align-items: center; justify-content: space-between; background: #ffffff; border-bottom: 1px solid #e5e7eb; }
-.brand, .header-user { display: flex; align-items: center; gap: 8px; }
-.brand { color: #2563eb; font-weight: 700; }
+.brand, .header-actions { display: flex; align-items: center; gap: 8px; }
+.brand { color: #c8473d; font-weight: 700; }
 .brand a { color: inherit; text-decoration: none; }
-.header-user { color: #6b7280; }
-.header-user a { color: inherit; text-decoration: none; }
+.header-actions { gap: 4px; color: #606b66; }
+.header-icon-link, .header-icon-button { display: grid; width: 36px; height: 36px; place-items: center; color: inherit; text-decoration: none; border-radius: 6px; }
+.header-icon-link:hover, .header-icon-button:hover { color: #c8473d; background: #f7efed; }
 .app-aside { background: #ffffff; border-right: 1px solid #e5e7eb; }
 .app-aside .el-menu { border-right: 0; }
 .app-main { max-width: 1200px; width: 100%; margin: 0 auto; }
+.customer-mobile-nav { display: none; }
 .page-heading { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 24px; }
 .page-heading h1 { margin: 0; font-size: 24px; }
 .page-heading span { color: #909399; font-size: 13px; }
@@ -48,12 +50,37 @@ body { margin: 0; min-width: 320px; }
 .auth-form-card { width: min(560px, 100%); border-radius: 8px; }
 
 @media (max-width: 640px) {
-  .app-aside { width: 64px !important; }
-  .app-aside .el-menu-item span { display: none; }
-  .app-main { padding: 18px; }
+  .app-aside { display: none; }
+  .app-main { padding: 18px 18px 88px; }
   .brand span { display: none; }
   .page-heading { display: block; }
   .page-heading h1 { margin-bottom: 6px; }
+  .customer-mobile-nav {
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 20;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    min-height: 64px;
+    padding-bottom: env(safe-area-inset-bottom);
+    background: #ffffff;
+    border-top: 1px solid #e5e7eb;
+  }
+  .customer-mobile-nav a {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 3px;
+    color: #7a8580;
+    font-size: 12px;
+    text-decoration: none;
+  }
+  .customer-mobile-nav a.active { color: #c8473d; font-weight: 600; }
+  .customer-mobile-nav .el-icon { font-size: 20px; }
   .action-bar { align-items: stretch; flex-direction: column; }
   .auth-grid { grid-template-columns: 1fr; }
   .auth-intro h1 { font-size: 24px; }

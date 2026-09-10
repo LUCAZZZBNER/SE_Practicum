@@ -13,7 +13,7 @@ const menuItems = [
 
 <template>
   <el-container class="app-shell" direction="vertical">
-    <AppHeader title="商家管理端" status-text="商家" />
+    <AppHeader title="商家管理端" profile-path="/merchant/profile" />
 
     <el-container>
       <AppSidebar :menu-items="menuItems" />
