@@ -5,12 +5,6 @@ export default [
     redirect: '/merchant/store',
     children: [
       {
-        path: 'dashboard',
-        name: 'MerchantDashboard',
-        component: () => import('../../views/MerchantDashboardView.vue'),
-        meta: { title: '工作台' },
-      },
-      {
         path: 'store',
         name: 'MerchantStore',
         component: () => import('../../views/MerchantStoreView.vue'),
