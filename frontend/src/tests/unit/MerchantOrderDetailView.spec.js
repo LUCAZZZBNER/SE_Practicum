@@ -30,6 +30,9 @@ function mountView() {
         $router: { back: mocks.routerBack },
       },
       stubs: {
+        'el-button': {
+          template: '<button type="button"><slot /></button>',
+        },
         'el-descriptions': {
           props: ['title', 'border'],
           template: '<section><h1>{{ title }}</h1><slot /></section>',
