@@ -29,11 +29,11 @@ describe('AppSidebar', () => {
           },
           'el-menu': {
             props: ['defaultActive'],
-            template: '<nav :data-active="defaultActive"><slot /></nav>',
+            template: '<nav :class="$attrs.class" :data-active="defaultActive"><slot /></nav>',
           },
           'el-menu-item': {
             props: ['index'],
-            template: '<div class="menu-item"><slot /></div>',
+            template: '<div :class="$attrs.class" :data-index="index"><slot /></div>',
           },
           'el-icon': {
             template: '<i><slot /></i>',
@@ -49,6 +49,9 @@ describe('AppSidebar', () => {
     expect(wrapper.text()).toContain('店铺')
     expect(wrapper.text()).toContain('订单')
     expect(wrapper.get('nav').attributes('data-active')).toBe('/customer/stores')
+    expect(wrapper.get('nav').classes()).toContain('sidebar-menu')
+    expect(wrapper.findAll('.sidebar-menu-item')).toHaveLength(2)
+    expect(wrapper.get('[data-index="/customer/stores"]')).toBeTruthy()
   })
 
   it.each([
