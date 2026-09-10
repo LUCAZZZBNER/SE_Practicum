@@ -54,18 +54,16 @@ describe('MerchantLayout', () => {
   it('provides merchant sections in operational order on desktop and mobile', () => {
     const wrapper = mountLayout()
 
-    expect(wrapper.get('[data-testid="desktop-navigation"]').text()).toBe('工作台店铺管理商品管理订单管理个人信息')
+    expect(wrapper.get('[data-testid="desktop-navigation"]').text()).toBe('店铺管理商品管理订单管理个人信息')
     const mobileNavigation = wrapper.get('[data-testid="mobile-navigation"]')
     const destinations = mobileNavigation.findAll('a').map((link) => link.attributes('data-to'))
 
     expect(destinations).toEqual([
-      '/merchant/dashboard',
       '/merchant/store',
       '/merchant/products',
       '/merchant/orders',
       '/merchant/profile',
     ])
-    expect(mobileNavigation.text()).toContain('工作台')
     expect(mobileNavigation.text()).toContain('店铺')
     expect(mobileNavigation.text()).toContain('商品')
     expect(mobileNavigation.text()).toContain('订单')
