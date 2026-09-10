@@ -123,9 +123,9 @@ Refactor：自动测试仍全绿时整理重复代码和命名
 |    1 | `7b2274b test: add product and cart requirement red coverage` | 先加入商品描述、目标数量和防重复提交的失败测试                                         |
 |    2 | `7b257f8 feat:add product and cart requirement red coverage`  | 实际是 Green：修改三个页面让 Red 通过；提交标题写成了 red coverage，但代码内容没有问题 |
 |    3 | `1168626 test: complete cart regression evidence`             | 补齐删除、刷新和下单成功的回归断言                                                     |
-|    4 | `b607c38 fix(frontend): label product price and stock fields` | 给商品价格、库存输入框补明确标签和对应测试 |
-|    5 | `77e3226 test(frontend): cover logout behavior [RED]` | 正式保存退出不清登录状态的失败测试 |
-|    6 | `312b6fd fix(frontend): clear auth state on logout [GREEN]` | 清除Token和角色并返回首页 |
+|    4 | `b607c38 fix(frontend): label product price and stock fields` | 给商品价格、库存输入框补明确标签和对应测试                                             |
+|    5 | `77e3226 test(frontend): cover logout behavior [RED]`         | 正式保存退出不清登录状态的失败测试                                                     |
+|    6 | `312b6fd fix(frontend): clear auth state on logout [GREEN]`   | 清除Token和角色并返回首页                                                              |
 
 Git 顺序保留了 R1 至 R3 的 `Red → Green`。最后一个提交是对已经存在的购物车刷新实现补回归证据，因此直接 Green 是正常的，不要伪造失败记录。
 
@@ -1008,20 +1008,20 @@ $productAfterCancel = Invoke-ApiCheck -Method GET -Path "/products/$productId" -
 
 每做完一项，只需向 `docs/test/test-log.md` 追加一行：
 
-| 场景                     | 预期                                 | 实际       | 结论 |
-| ------------------------ | ------------------------------------ | ---------- | ---- |
-| 重复商家注册             | HTTP 409 / code 1201                 | 与预期一致 | 通过 |
-| 重复用户注册             | HTTP 409 / code 1101                 | 与预期一致 | 通过 |
-| 同名分类                 | HTTP 409 / code 1005                 | 与预期一致 | 通过 |
-| 无 Token                 | HTTP 401 / code 1002                 | 与预期一致 | 通过 |
-| 错误角色                 | HTTP 403 / code 1003                 | 与预期一致 | 通过 |
-| 第二商家修改第一商家店铺 | HTTP 403 或 404                      | 与预期一致，数据未变 | 通过 |
-| 旧商品版本修改           | HTTP 409 / code 1005                 | 与预期一致，数据未变 | 通过 |
-| 下单版本变化             | HTTP 409 / code 1601                 | 与预期一致 | 通过 |
+| 场景                     | 预期                                 | 实际                   | 结论 |
+| ------------------------ | ------------------------------------ | ---------------------- | ---- |
+| 重复商家注册             | HTTP 409 / code 1201                 | 与预期一致             | 通过 |
+| 重复用户注册             | HTTP 409 / code 1101                 | 与预期一致             | 通过 |
+| 同名分类                 | HTTP 409 / code 1005                 | 与预期一致             | 通过 |
+| 无 Token                 | HTTP 401 / code 1002                 | 与预期一致             | 通过 |
+| 错误角色                 | HTTP 403 / code 1003                 | 与预期一致             | 通过 |
+| 第二商家修改第一商家店铺 | HTTP 403 或 404                      | 与预期一致，数据未变   | 通过 |
+| 旧商品版本修改           | HTTP 409 / code 1005                 | 与预期一致，数据未变   | 通过 |
+| 下单版本变化             | HTTP 409 / code 1601                 | 与预期一致             | 通过 |
 | 库存不足下单             | HTTP 409 / code 1402                 | 与预期一致，库存已恢复 | 通过 |
-| 相同幂等键和Body重试     | 返回同一订单ID                       | 与预期一致 | 通过 |
-| 相同幂等键不同Body       | HTTP 409 / code 1603                 | 与预期一致 | 通过 |
-| 第二次取消订单           | HTTP 409 / code 1602，库存不重复恢复 | 与预期一致 | 通过 |
+| 相同幂等键和Body重试     | 返回同一订单ID                       | 与预期一致             | 通过 |
+| 相同幂等键不同Body       | HTTP 409 / code 1603                 | 与预期一致             | 通过 |
+| 第二次取消订单           | HTTP 409 / code 1602，库存不重复恢复 | 与预期一致             | 通过 |
 
 实际与预期完全一致就把结论写“通过”；不一致时写“失败”，立即执行10.6。测试完成后关闭这个 PowerShell 窗口，Token 变量随窗口销毁，不保存到磁盘。
 
