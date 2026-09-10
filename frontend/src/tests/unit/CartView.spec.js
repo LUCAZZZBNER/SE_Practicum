@@ -40,7 +40,7 @@ function mountView() {
       stubs: {
         EmptyState: {
           props: ['description'],
-          template: '<div class="empty">{{ description }}</div>',
+          template: '<div class="empty">{{ description }}<slot /></div>',
         },
         ConfirmAction: {
           emits: ['confirm'],
@@ -62,6 +62,7 @@ function mountView() {
           props: ['disabled'],
           template: '<button :disabled="disabled" @click="$emit(\'click\')"><slot /></button>',
         },
+        'el-icon': { template: '<i><slot /></i>' },
       },
     },
   })
@@ -110,9 +111,12 @@ describe('CartView', () => {
     await flushPromises()
 
     expect(mocks.getCart).toHaveBeenCalledTimes(1)
+    expect(wrapper.get('[data-testid="cart-item-1"]')).toBeTruthy()
     expect(wrapper.text()).toContain('招牌牛肉饭')
-    expect(wrapper.text()).toContain('37.6')
-    expect(wrapper.text()).toContain('创建订单')
+    expect(wrapper.text()).toContain('¥18.80')
+    expect(wrapper.text()).toContain('小计：¥37.60')
+    expect(wrapper.get('[data-testid="checkout-bar"]').text()).toContain('合计：¥37.60')
+    expect(wrapper.get('[data-testid="checkout-button"]').text()).toBe('提交订单')
   })
 
   it('shows empty state when cart is empty', async () => {
@@ -122,6 +126,10 @@ describe('CartView', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('购物车暂为空')
+    const browseButton = wrapper.get('[data-testid="browse-stores"]')
+    expect(browseButton.text()).toBe('去逛店铺')
+    await browseButton.trigger('click')
+    expect(mocks.routerPush).toHaveBeenCalledWith('/customer/stores')
   })
 
   it('submits quantity update for a cart item', async () => {
@@ -149,7 +157,7 @@ describe('CartView', () => {
     const wrapper = mountView()
     await flushPromises()
 
-    await wrapper.findAll('button')[0].trigger('click')
+    await wrapper.get('[data-testid="update-item-1"]').trigger('click')
 
     expect(mocks.updateCartItem).toHaveBeenCalled()
     expect(mocks.getCart).toHaveBeenCalledTimes(2)
@@ -182,7 +190,7 @@ describe('CartView', () => {
 
     const quantityInput = wrapper.find('input[data-testid="cart-quantity"]')
     await quantityInput.setValue('5')
-    await wrapper.find('button').trigger('click')
+    await wrapper.get('[data-testid="update-item-1"]').trigger('click')
 
     expect(mocks.updateCartItem).toHaveBeenCalledWith(1, { quantity: 5 })
   })
@@ -212,7 +220,8 @@ describe('CartView', () => {
     const wrapper = mountView()
     await flushPromises()
 
-    expect(wrapper.text()).toContain('删除')
+    const deleteButton = wrapper.get('[data-testid="delete-item-1"]')
+    expect(deleteButton.attributes('aria-label')).toBe('删除招牌牛肉饭')
     await wrapper.find('.confirm-button').trigger('click')
     await flushPromises()
 
@@ -246,7 +255,7 @@ describe('CartView', () => {
     const wrapper = mountView()
     await flushPromises()
 
-    await wrapper.findAll('button').find((button) => button.text() === '创建订单').trigger('click')
+    await wrapper.get('[data-testid="checkout-button"]').trigger('click')
     await flushPromises()
 
     expect(mocks.createOrder).toHaveBeenCalledWith(
@@ -294,9 +303,9 @@ describe('CartView', () => {
     const wrapper = mountView()
     await flushPromises()
 
-    await wrapper.findAll('button').find((button) => button.text() === '创建订单').trigger('click')
+    await wrapper.get('[data-testid="checkout-button"]').trigger('click')
     await flushPromises()
-    await wrapper.findAll('button').find((button) => button.text() === '创建订单').trigger('click')
+    await wrapper.get('[data-testid="checkout-button"]').trigger('click')
     await flushPromises()
 
     expect(crypto.randomUUID).toHaveBeenCalledTimes(1)
@@ -334,7 +343,7 @@ describe('CartView', () => {
     const wrapper = mountView()
     await flushPromises()
 
-    const checkoutButton = wrapper.findAll('button').find((button) => button.text() === '创建订单')
+    const checkoutButton = wrapper.get('[data-testid="checkout-button"]')
     const request = checkoutButton.trigger('click')
     await flushPromises()
 
