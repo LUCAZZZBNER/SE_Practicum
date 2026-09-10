@@ -94,6 +94,8 @@ describe('ProfileView', () => {
     expect(identity.text()).toContain('账号：alice01')
     expect(identity.text()).toContain('状态：正常')
     expect(identity.text()).not.toContain('ACTIVE')
+    expect(wrapper.text()).toContain('账户信息')
+    expect(wrapper.text()).toContain('可编辑资料')
     expect(wrapper.text().match(/昵称/g)).toHaveLength(1)
     expect(wrapper.text().match(/手机号/g)).toHaveLength(1)
     expect(wrapper.findAll('input')).toHaveLength(2)
@@ -152,7 +154,7 @@ describe('ProfileView', () => {
       account: 'merchant01',
       name: '示例快餐店商家',
       phone: '13900000000',
-      status: 'ACTIVE',
+      status: 'SUSPENDED',
     })
 
     const wrapper = mountView()
@@ -161,8 +163,10 @@ describe('ProfileView', () => {
     expect(state.getMerchantProfile).toHaveBeenCalledTimes(1)
     const identity = wrapper.get('[data-testid="profile-identity"]')
     expect(identity.text()).toContain('账号：merchant01')
-    expect(identity.text()).toContain('状态：正常')
-    expect(identity.text()).not.toContain('ACTIVE')
+    expect(identity.text()).toContain('状态：已暂停')
+    expect(identity.text()).not.toContain('SUSPENDED')
+    expect(wrapper.text()).toContain('账户信息')
+    expect(wrapper.text()).toContain('可编辑资料')
     expect(wrapper.text().match(/商家名称/g)).toHaveLength(1)
     expect(wrapper.text().match(/手机号/g)).toHaveLength(1)
     expect(wrapper.findAll('input')).toHaveLength(2)
