@@ -96,6 +96,13 @@ public class OrderController {
 		return ApiResponse.success(orderService.confirmReceipt(principal.id(), orderId, idempotencyKey));
 	}
 
+	@GetMapping("/orders/{orderId}/refund")
+	@RequireRole(Role.USER)
+	public ApiResponse<OrderService.RefundView> refund(@RequestAttribute("currentPrincipal") CurrentPrincipal principal,
+			@PathVariable @Positive long orderId) {
+		return ApiResponse.success(orderService.getRefund(principal.id(), orderId));
+	}
+
 	@GetMapping("/merchant/orders")
 	@RequireRole(Role.MERCHANT)
 	public ApiResponse<PageResult<OrderService.OrderSummaryView>> listMerchantOrders(

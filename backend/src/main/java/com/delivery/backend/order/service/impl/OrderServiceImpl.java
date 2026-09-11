@@ -140,18 +140,23 @@ public class OrderServiceImpl implements OrderService {
 	@Override
 	@Transactional
 	public OrderView cancel(long userId, long orderId) {
+		return cancel(userId, orderId, null, null);
+	}
+
+	@Override
+	@Transactional
+	public OrderView cancel(long userId, long orderId, String idempotencyKey, String reason) {
 		userService.requireActive(userId);
 		OrderEntity order = findMine(userId, orderId);
-		if (!PENDING_PAYMENT.equals(order.getStatus())) {
+		if (!Set.of(PENDING_PAYMENT, "PAID", "PREPARING").contains(order.getStatus())) {
 			throw new BusinessException(ApiError.ORDER_STATE_CONFLICT);
 		}
 		List<OrderItemEntity> lines = orderDao.listItems(orderId);
-		if (orderDao.cancelPending(userId, orderId) != 1) {
+		boolean restore = !PENDING_PAYMENT.equals(order.getStatus());
+		if (orderDao.cancelEligible(userId, orderId, normalizeReason(reason), restore) != 1) {
 			throw new BusinessException(ApiError.ORDER_STATE_CONFLICT);
 		}
-		itemService.restoreStock(lines.stream()
-				.map(line -> new ItemService.StockRestore(line.getProductId(), line.getQuantity()))
-				.toList());
+		if (restore) itemService.restoreStock(lines.stream().map(line -> new ItemService.StockRestore(line.getProductId(), line.getQuantity())).toList());
 		return requireMine(userId, orderId);
 	}
 
@@ -197,6 +202,15 @@ public class OrderServiceImpl implements OrderService {
 			throw new BusinessException(ApiError.ORDER_STATE_CONFLICT);
 		}
 		return toOrderView(orderDao.findMerchantOrder(merchantId, orderId), orderDao.listItems(orderId));
+	}
+
+	@Override
+	@Transactional(readOnly = true)
+	public RefundView getRefund(long userId, long orderId) {
+		userService.requireActive(userId);
+		OrderEntity order = findMine(userId, orderId);
+		if (!"REFUNDED".equals(order.getRefundStatus())) throw new BusinessException(ApiError.RESOURCE_NOT_FOUND);
+		return new RefundView(orderId, "REFUND-" + orderId, order.getTotalAmount(), order.getRefundStatus());
 	}
 
 	@Override
@@ -272,6 +286,13 @@ public class OrderServiceImpl implements OrderService {
 		if (normalized.isEmpty() || normalized.length() > 100) {
 			throw new BusinessException(ApiError.VALIDATION_ERROR);
 		}
+		return normalized;
+	}
+
+	private static String normalizeReason(String reason) {
+		if (reason == null || reason.isBlank()) return null;
+		String normalized = reason.trim();
+		if (normalized.length() > 200) throw new BusinessException(ApiError.VALIDATION_ERROR);
 		return normalized;
 	}
 

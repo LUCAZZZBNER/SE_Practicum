@@ -35,6 +35,8 @@ public interface OrderService {
 
 	OrderView deliver(long merchantId, long orderId, String idempotencyKey);
 
+	RefundView getRefund(long userId, long orderId);
+
 	PageResult<OrderSummaryView> listMerchantOrders(long merchantId, MerchantListQuery query);
 
 	OrderView getMerchantOrder(long merchantId, long orderId);
@@ -82,6 +84,8 @@ public interface OrderService {
 	record OrderSummaryView(long id, String orderNumber, long shopId, String shopName, BigDecimal total,
 			String status, Instant createdAt) {
 	}
+
+	record RefundView(long orderId, String refundNumber, BigDecimal amount, String status) {}
 
 	record PriceChangeData(List<ShoppingService.CartItemView> currentItems) {
 		public PriceChangeData {

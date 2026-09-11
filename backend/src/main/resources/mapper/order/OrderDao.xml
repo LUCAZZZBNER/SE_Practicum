@@ -161,8 +161,18 @@
 
     <update id="transitionStatus">
         UPDATE orders
-        SET status = #{status}, updated_at = CURRENT_TIMESTAMP(3)
+        SET status = #{status}, updated_at = CURRENT_TIMESTAMP(3),
+            payment_status = CASE WHEN #{status} = 'PAID' THEN 'PAID' ELSE payment_status END,
+            completed_at = CASE WHEN #{status} = 'COMPLETED' THEN CURRENT_TIMESTAMP(3) ELSE completed_at END
         WHERE id = #{orderId} AND status = #{fromStatus}
+    </update>
+
+    <update id="cancelEligible">
+        UPDATE orders
+        SET status='CANCELLED', cancelled_at=CURRENT_TIMESTAMP(3), cancel_reason=#{reason},
+            refund_status=CASE WHEN #{refund} THEN 'REFUNDED' ELSE refund_status END,
+            updated_at=CURRENT_TIMESTAMP(3)
+        WHERE id=#{orderId} AND user_id=#{userId} AND status IN ('PENDING_PAYMENT','PAID','PREPARING')
     </update>
 
 </mapper>
