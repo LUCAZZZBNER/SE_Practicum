@@ -7,6 +7,17 @@ const statusMap = {
   CANCELLED: { text: '已取消', type: 'info' },
 }
 
+const paymentStatusMap = {
+  UNPAID: { text: '未支付', type: 'warning' },
+  PAID: { text: '已支付', type: 'success' },
+}
+
+const refundStatusMap = {
+  NOT_REFUNDED: { text: '未退款', type: 'info' },
+  REFUNDING: { text: '退款中', type: 'warning' },
+  REFUNDED: { text: '已退款', type: 'success' },
+}
+
 const chinaDateTimeFormatter = new Intl.DateTimeFormat('zh-CN', {
   timeZone: 'Asia/Shanghai',
   year: 'numeric',
@@ -19,6 +30,14 @@ const chinaDateTimeFormatter = new Intl.DateTimeFormat('zh-CN', {
 
 export function getOrderStatus(status) {
   return statusMap[status] || { text: '状态未知', type: 'info' }
+}
+
+export function getPaymentStatus(status) {
+  return paymentStatusMap[status] || { text: '状态未知', type: 'info' }
+}
+
+export function getRefundStatus(status) {
+  return refundStatusMap[status] || { text: '状态未知', type: 'info' }
 }
 
 export function formatOrderPrice(value) {
