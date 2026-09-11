@@ -118,6 +118,8 @@ public interface ItemService {
 		private String status;
 		@Positive
 		private Long version;
+		@Positive
+		private Long imageId;
 		private boolean categoryIdSpecified;
 		private boolean nameSpecified;
 		private boolean descriptionSpecified;
@@ -125,6 +127,7 @@ public interface ItemService {
 		private boolean stockSpecified;
 		private boolean statusSpecified;
 		private boolean versionSpecified;
+		private boolean imageIdSpecified;
 
 		public UpdateProductRequest() {
 		}
@@ -206,6 +209,9 @@ public interface ItemService {
 			markUpdateSpecified();
 		}
 
+		public Long imageId() { return imageId; }
+		public void setImageId(Long imageId) { this.imageId = imageId; this.imageIdSpecified = true; markUpdateSpecified(); }
+
 		@JsonIgnore
 		public boolean isCategoryIdSpecified() {
 			return categoryIdSpecified;
@@ -240,6 +246,9 @@ public interface ItemService {
 		public boolean isVersionSpecified() {
 			return versionSpecified;
 		}
+
+		@JsonIgnore
+		public boolean isImageIdSpecified() { return imageIdSpecified; }
 	}
 
 	record ProductQuery(Long categoryId, String keyword, Integer page, Integer pageSize, String sortBy,

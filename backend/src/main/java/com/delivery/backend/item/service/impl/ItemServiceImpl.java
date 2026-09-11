@@ -141,6 +141,7 @@ public class ItemServiceImpl implements ItemService {
 		product.setStock(stock);
 		product.setStatus(OFF_SALE);
 		product.setVersion(1L);
+		product.setImageId(request.imageId());
 		itemDao.insertProduct(product);
 		if(skuDao!=null) for(SkuService.CreateRequest requestSku:skus){var sku=new com.delivery.backend.item.entity.SkuEntity();sku.setProductId(product.getId());sku.setName(requestSku.name().trim());sku.setPrice(requestSku.price());sku.setStock(requestSku.stock());sku.setStatus(OFF_SALE);sku.setVersion(1L);skuDao.insert(sku);}
 		return toProductView(requireProduct(product.getId()));
@@ -194,7 +195,7 @@ public class ItemServiceImpl implements ItemService {
 	@Override
 	@Transactional
 	public ProductView updateProduct(long merchantId, long productId, UpdateProductRequest request) {
-		if (!request.isUpdateSpecified() || request.version() == null) {
+		if (!request.isUpdateSpecified()) {
 			throw new BusinessException(ApiError.VALIDATION_ERROR);
 		}
 		ProductEntity product = requireProduct(productId);
@@ -213,13 +214,14 @@ public class ItemServiceImpl implements ItemService {
 			throw new BusinessException(ApiError.VALIDATION_ERROR);
 		}
 		String status = request.isStatusSpecified() ? validateProductStatus(request.status()) : null;
-		int updated = itemDao.updateProduct(productId, request.version(),
+		long expectedVersion = request.version() == null ? product.getVersion() : request.version();
+		int updated = itemDao.updateProduct(productId, expectedVersion,
 				request.isCategoryIdSpecified(), request.categoryId(),
 				request.isNameSpecified(), name,
 				request.isDescriptionSpecified(), request.description(),
 				request.isPriceSpecified(), request.price(),
 				request.isStockSpecified(), request.stock(),
-				request.isStatusSpecified(), status);
+				request.isStatusSpecified(), status, request.isImageIdSpecified(), request.imageId());
 		if (updated != 1) {
 			throw new BusinessException(ApiError.RESOURCE_CONFLICT);
 		}
@@ -305,9 +307,12 @@ public class ItemServiceImpl implements ItemService {
 
 	private ProductView toProductView(ProductEntity product) {
 		List<SkuService.SkuView> skus=skuDao==null?List.of():skuDao.listByProduct(product.getId()).stream().map(s->new SkuService.SkuView(s.getId(),s.getProductId(),s.getName(),s.getPrice(),s.getStock(),s.getStatus(),s.getVersion(),s.getCreatedAt(),s.getUpdatedAt())).toList();
+		ImageView image = product.getImageId() == null ? null : new ImageView(product.getImageId(), product.getImageUrl());
+		BigDecimal minPrice = skus.stream().map(SkuService.SkuView::price).min(BigDecimal::compareTo).orElse(product.getPrice());
+		int stock = skus.stream().mapToInt(SkuService.SkuView::stock).sum();
 		return new ProductView(product.getId(), product.getShopId(), product.getCategoryId(),
-				product.getName(), product.getDescription(), product.getPrice(), product.getStock(),
-				product.getStatus(), product.getVersion(), product.getCreatedAt(), product.getUpdatedAt(),null,skus);
+				product.getName(), product.getDescription(), minPrice, stock,
+				product.getStatus(), product.getVersion(), product.getCreatedAt(), product.getUpdatedAt(),image,skus);
 	}
 
 	private static int defaultPage(Integer page) {

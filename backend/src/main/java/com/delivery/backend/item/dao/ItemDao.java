@@ -49,7 +49,9 @@ public interface ItemDao {
 			@Param("stockSpecified") boolean stockSpecified,
 			@Param("stock") Integer stock,
 			@Param("statusSpecified") boolean statusSpecified,
-			@Param("status") String status);
+			@Param("status") String status,
+			@Param("imageIdSpecified") boolean imageIdSpecified,
+			@Param("imageId") Long imageId);
 
 	List<ProductEntity> listProducts(@Param("shopId") long shopId,
 			@Param("categoryId") Long categoryId,
