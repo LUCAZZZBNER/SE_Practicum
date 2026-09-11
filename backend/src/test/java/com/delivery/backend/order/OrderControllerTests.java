@@ -19,6 +19,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 
 import java.util.List;
 
@@ -95,7 +96,7 @@ class OrderControllerTests {
 	void refundLookupForwardsUserOwnershipAndOrderId() throws Exception {
 		when(service.getRefund(7, 40)).thenReturn(new OrderService.RefundView(40, "REFUND-40", new java.math.BigDecimal("12.50"), "REFUNDED"));
 		mvc.perform(get("/api/v1/orders/40/refund").requestAttr("currentPrincipal", userPrincipal(7)))
-				.andExpect(status().isOk()).andExpect(successfulDataId(40));
+				.andExpect(status().isOk()).andExpect(jsonPath("$.data.orderId").value(40));
 		verify(service).getRefund(7, 40);
 	}
 
