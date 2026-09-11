@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.delivery.backend.ServiceContractTestSupport;
 import com.delivery.backend.common.ApiError;
+import com.delivery.backend.address.service.UserAddressService;
 import com.delivery.backend.item.service.ItemService;
 import com.delivery.backend.merchant.service.MerchantService;
 import com.delivery.backend.order.service.OrderService;
@@ -37,6 +38,8 @@ class OrderServiceContractTests extends ServiceContractTestSupport {
 	private ItemService itemService;
 	@Autowired
 	private ShoppingService shoppingService;
+	@Autowired
+	private UserAddressService addressService;
 	@Autowired
 	private JdbcTemplate jdbcTemplate;
 	@Autowired
@@ -193,7 +196,9 @@ class OrderServiceContractTests extends ServiceContractTestSupport {
 		product = itemService.updateProduct(merchantId, product.id(), onSale);
 		ShoppingService.CartItemView cartItem = shoppingService.add(userId,
 				new ShoppingService.AddRequest(product.id(), 2)).item();
-		return new Fixture(userId, merchantId, shop.id(), product.id(), product.version(), cartItem.id());
+		long addressId = addressService.create(userId,
+				new UserAddressService.CreateRequest("张三", "13800000000", "杭州", "学院路", true)).id();
+		return new Fixture(userId, merchantId, shop.id(), product.id(), product.version(), cartItem.id(), addressId);
 	}
 
 	private UserService.UserView user(String account) {
@@ -208,10 +213,10 @@ class OrderServiceContractTests extends ServiceContractTestSupport {
 
 	private static OrderService.CreateRequest request(Fixture fixture) {
 		return new OrderService.CreateRequest(List.of(
-				new OrderService.ItemRequest(fixture.cartItemId(), fixture.productVersion())));
+				new OrderService.ItemRequest(fixture.cartItemId(), fixture.productVersion())), fixture.addressId(), null);
 	}
 
 	private record Fixture(long userId, long merchantId, long shopId, long productId, long productVersion,
-			long cartItemId) {
+			long cartItemId, long addressId) {
 	}
 }

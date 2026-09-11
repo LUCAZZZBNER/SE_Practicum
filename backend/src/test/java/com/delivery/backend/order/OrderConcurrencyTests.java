@@ -16,6 +16,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 
 import com.delivery.backend.common.ApiError;
 import com.delivery.backend.common.BusinessException;
+import com.delivery.backend.address.service.UserAddressService;
 import com.delivery.backend.item.service.ItemService;
 import com.delivery.backend.merchant.service.MerchantService;
 import com.delivery.backend.order.service.OrderService;
@@ -38,6 +39,8 @@ class OrderConcurrencyTests {
 	private ItemService itemService;
 	@Autowired
 	private ShoppingService shoppingService;
+	@Autowired
+	private UserAddressService addressService;
 
 	@Test
 	void concurrentRetriesWithTheSameKeyReturnTheSameOrder() throws Exception {
@@ -90,8 +93,10 @@ class OrderConcurrencyTests {
 		product = itemService.updateProduct(merchantId, product.id(), onSale);
 		ShoppingService.CartItemView cartItem = shoppingService.add(userId,
 				new ShoppingService.AddRequest(product.id(), 2)).item();
+		long addressId = addressService.create(userId,
+				new UserAddressService.CreateRequest("张三", "13800000000", "杭州", "学院路", true)).id();
 		OrderService.CreateRequest request = new OrderService.CreateRequest(
-				List.of(new OrderService.ItemRequest(cartItem.id(), product.version())));
+				List.of(new OrderService.ItemRequest(cartItem.id(), product.version())), addressId, null);
 		return new Fixture(userId, merchantId, product.id(), request);
 	}
 
