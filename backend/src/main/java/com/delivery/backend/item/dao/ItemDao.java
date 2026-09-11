@@ -53,6 +53,15 @@ public interface ItemDao {
 			@Param("imageIdSpecified") boolean imageIdSpecified,
 			@Param("imageId") Long imageId);
 
+	default int updateProduct(Long id, long version, boolean categoryIdSpecified, Long categoryId,
+			boolean nameSpecified, String name, boolean descriptionSpecified, String description,
+			boolean priceSpecified, java.math.BigDecimal price, boolean stockSpecified, Integer stock,
+			boolean statusSpecified, String status) {
+		return updateProduct(id, version, categoryIdSpecified, categoryId, nameSpecified, name,
+				descriptionSpecified, description, priceSpecified, price, stockSpecified, stock,
+				statusSpecified, status, false, null);
+	}
+
 	List<ProductEntity> listProducts(@Param("shopId") long shopId,
 			@Param("categoryId") Long categoryId,
 			@Param("keyword") String keyword,

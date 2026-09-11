@@ -72,7 +72,7 @@ public class OrderController {
 	public ApiResponse<OrderService.OrderView> cancel(
 			@RequestAttribute("currentPrincipal") CurrentPrincipal principal,
 			@PathVariable @Positive long orderId,
-			@RequestHeader(value = "X-Idempotency-Key", required = false) String idempotencyKey,
+			@RequestHeader("X-Idempotency-Key") @NotBlank String idempotencyKey,
 			@RequestBody(required = false) CancelRequest request) {
 		return ApiResponse.success(orderService.cancel(principal.id(), orderId, idempotencyKey,
 				request == null ? null : request.reason()));

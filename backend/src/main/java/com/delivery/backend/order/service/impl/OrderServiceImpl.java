@@ -14,8 +14,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,6 +28,8 @@ import com.delivery.backend.merchant.service.MerchantService;
 import com.delivery.backend.order.dao.OrderDao;
 import com.delivery.backend.order.entity.OrderEntity;
 import com.delivery.backend.order.entity.OrderItemEntity;
+import com.delivery.backend.order.entity.PaymentEntity;
+import com.delivery.backend.order.entity.RefundEntity;
 import com.delivery.backend.order.service.OrderService;
 import com.delivery.backend.restaurant.service.RestaurantService;
 import com.delivery.backend.shopping.service.ShoppingService;
@@ -52,17 +52,16 @@ public class OrderServiceImpl implements OrderService {
 	private final ShoppingService shoppingService;
 	private final ItemService itemService;
 	private final UserAddressService addressService;
-	private final ObjectMapper objectMapper;
 
 	public OrderServiceImpl(OrderDao orderDao, UserService userService, MerchantService merchantService,
 			RestaurantService restaurantService, ShoppingService shoppingService, ItemService itemService) {
-		this(orderDao, userService, merchantService, restaurantService, shoppingService, itemService, null, new ObjectMapper());
+		this(orderDao, userService, merchantService, restaurantService, shoppingService, itemService, null);
 	}
 
 	@Autowired
 	public OrderServiceImpl(OrderDao orderDao, UserService userService, MerchantService merchantService,
 			RestaurantService restaurantService, ShoppingService shoppingService, ItemService itemService,
-			UserAddressService addressService, ObjectMapper objectMapper) {
+			UserAddressService addressService) {
 		this.orderDao = orderDao;
 		this.userService = userService;
 		this.merchantService = merchantService;
@@ -70,7 +69,6 @@ public class OrderServiceImpl implements OrderService {
 		this.shoppingService = shoppingService;
 		this.itemService = itemService;
 		this.addressService = addressService;
-		this.objectMapper = objectMapper;
 	}
 
 	@Override
@@ -132,8 +130,9 @@ public class OrderServiceImpl implements OrderService {
 		order.setPaymentStatus("UNPAID");
 		order.setRefundStatus("NOT_REFUNDED");
 		order.setRemark(normalizeReason(request.remark()));
-		order.setUserAddressSnapshot(writeSnapshot(new OrderService.AddressSnapshot(address.recipient(), address.phone(), address.region(), address.detail())));
-		order.setShopAddressSnapshot(writeSnapshot(new OrderService.ShopAddressSnapshot(shop.region(), shop.detail(), shop.phone())));
+		order.setUserAddressSnapshot(writeSnapshot("recipient", address.recipient(), "phone", address.phone(),
+				"region", address.region(), "detail", address.detail()));
+		order.setShopAddressSnapshot(writeSnapshot("region", shop.region(), "detail", shop.detail(), "phone", shop.phone()));
 		orderDao.insertOrder(order);
 
 		List<OrderItemEntity> lines = snapshots.stream().map(snapshot -> toEntity(order.getId(), snapshot)).toList();
@@ -175,7 +174,12 @@ public class OrderServiceImpl implements OrderService {
 	@Transactional
 	public OrderView cancel(long userId, long orderId, String idempotencyKey, String reason) {
 		userService.requireActive(userId);
+		String key = idempotencyKey == null ? null : normalizeIdempotencyKey(idempotencyKey);
 		OrderEntity order = findMine(userId, orderId);
+		if (key != null) {
+			RefundEntity prior = orderDao.findRefundByKey(key);
+			if (prior != null && prior.getOrderId().equals(orderId)) return requireMine(userId, orderId);
+		}
 		if (!Set.of(PENDING_PAYMENT, "PAID", "PREPARING").contains(order.getStatus())) {
 			throw new BusinessException(ApiError.ORDER_STATE_CONFLICT);
 		}
@@ -185,6 +189,12 @@ public class OrderServiceImpl implements OrderService {
 			throw new BusinessException(ApiError.ORDER_STATE_CONFLICT);
 		}
 		if (restore) itemService.restoreStock(lines.stream().map(line -> new ItemService.StockRestore(line.getProductId(), line.getQuantity())).toList());
+		if (restore && key != null) {
+			RefundEntity refund = new RefundEntity();
+			refund.setOrderId(orderId); refund.setRefundNumber("REFUND-" + orderId);
+			refund.setAmount(order.getTotalAmount()); refund.setStatus("REFUNDED"); refund.setIdempotencyKey(key);
+			orderDao.insertRefund(refund);
+		}
 		return requireMine(userId, orderId);
 	}
 
@@ -192,10 +202,20 @@ public class OrderServiceImpl implements OrderService {
 	@Transactional
 	public OrderView pay(long userId, long orderId, String idempotencyKey) {
 		userService.requireActive(userId);
-		findMine(userId, orderId);
+		String key = normalizeIdempotencyKey(idempotencyKey);
+		OrderEntity order = findMine(userId, orderId);
+		PaymentEntity prior = orderDao.findPayment(orderId);
+		if (prior != null) {
+			if (key.equals(prior.getIdempotencyKey())) return requireMine(userId, orderId);
+			throw new BusinessException(ApiError.ORDER_STATE_CONFLICT);
+		}
 		if (orderDao.transitionStatus(orderId, "PAID", PENDING_PAYMENT) != 1) {
 			throw new BusinessException(ApiError.ORDER_STATE_CONFLICT);
 		}
+		PaymentEntity payment = new PaymentEntity();
+		payment.setOrderId(orderId); payment.setPaymentNumber("PAY-" + orderId);
+		payment.setAmount(order.getTotalAmount()); payment.setStatus("PAID"); payment.setIdempotencyKey(key);
+		orderDao.insertPayment(payment);
 		return requireMine(userId, orderId);
 	}
 
@@ -238,7 +258,9 @@ public class OrderServiceImpl implements OrderService {
 		userService.requireActive(userId);
 		OrderEntity order = findMine(userId, orderId);
 		if (!"REFUNDED".equals(order.getRefundStatus())) throw new BusinessException(ApiError.RESOURCE_NOT_FOUND);
-		return new RefundView(orderId, "REFUND-" + orderId, order.getTotalAmount(), order.getRefundStatus());
+		RefundEntity refund = orderDao.findRefund(orderId);
+		if (refund == null) throw new BusinessException(ApiError.RESOURCE_NOT_FOUND);
+		return new RefundView(orderId, refund.getRefundNumber(), refund.getAmount(), refund.getStatus());
 	}
 
 	@Override
@@ -324,22 +346,23 @@ public class OrderServiceImpl implements OrderService {
 		return normalized;
 	}
 
-	private String writeSnapshot(Object value) {
-		try {
-			return objectMapper.writeValueAsString(value);
-		} catch (JsonProcessingException exception) {
-			throw new IllegalStateException("Unable to serialize order snapshot", exception);
+	private static String writeSnapshot(String... values) {
+		StringBuilder json = new StringBuilder("{");
+		for (int i = 0; i < values.length; i += 2) {
+			if (i > 0) json.append(',');
+			json.append('"').append(values[i]).append("\":\"").append(escape(values[i + 1])).append('"');
 		}
+		return json.append('}').toString();
 	}
 
-	private <T> T readSnapshot(String value, Class<T> type) {
+	private static Map<String, String> readSnapshot(String value) {
 		if (value == null || value.isBlank()) return null;
-		try {
-			return objectMapper.readValue(value, type);
-		} catch (JsonProcessingException exception) {
-			return null;
-		}
+		Map<String, String> result = new java.util.LinkedHashMap<>();
+		java.util.regex.Matcher matcher = java.util.regex.Pattern.compile("\\\"([^\\\"]+)\\\":\\\"([^\\\"]*)\\\"").matcher(value);
+		while (matcher.find()) result.put(matcher.group(1), matcher.group(2));
+		return result;
 	}
+	private static String escape(String value) { return value == null ? "" : value.replace("\\", "\\\\").replace("\"", "\\\""); }
 
 	private static String fingerprint(List<ItemRequest> items) {
 		List<ItemRequest> sorted = new ArrayList<>(items);
@@ -375,8 +398,7 @@ public class OrderServiceImpl implements OrderService {
 				order.getShopName(), lines, order.getTotalAmount(), order.getStatus(), order.getCreatedAt(),
 				order.getUpdatedAt(), order.getCancelledAt(), order.getPaymentStatus(), order.getRefundStatus(),
 				order.getRemark(), order.getCancelReason(), order.getCompletedAt(),
-				readSnapshot(order.getUserAddressSnapshot(), OrderService.AddressSnapshot.class),
-				readSnapshot(order.getShopAddressSnapshot(), OrderService.ShopAddressSnapshot.class));
+				readSnapshot(order.getUserAddressSnapshot()), readSnapshot(order.getShopAddressSnapshot()));
 	}
 
 	private static OrderSummaryView toSummaryView(OrderEntity order) {

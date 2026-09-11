@@ -155,13 +155,14 @@ class OrderControllerTests {
 	@Test
 	void userGetAndCancelForwardOwnershipAndOrderId() throws Exception {
 		when(service.getMine(7, 40)).thenReturn(order(40));
-		when(service.cancel(7, 40, null, null)).thenReturn(order(40));
+		when(service.cancel(7, 40, "cancel-key", null)).thenReturn(order(40));
 		mvc.perform(get("/api/v1/orders/40").requestAttr("currentPrincipal", userPrincipal(7)))
 				.andExpect(status().isOk()).andExpect(successfulDataId(40));
-		mvc.perform(post("/api/v1/orders/40/cancel").requestAttr("currentPrincipal", userPrincipal(7)))
+		mvc.perform(post("/api/v1/orders/40/cancel").requestAttr("currentPrincipal", userPrincipal(7))
+				.header("X-Idempotency-Key", "cancel-key").contentType(JSON).content("{}"))
 				.andExpect(status().isOk()).andExpect(successfulDataId(40));
 		verify(service).getMine(7, 40);
-		verify(service).cancel(7, 40, null, null);
+		verify(service).cancel(7, 40, "cancel-key", null);
 	}
 
 	@Test

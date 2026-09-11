@@ -3,6 +3,7 @@ package com.delivery.backend.order.service;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
@@ -76,7 +77,7 @@ public interface OrderService {
 	record OrderView(long id, String orderNumber, long userId, long shopId, String shopName,
 			List<OrderLineView> lines, BigDecimal total, String status, Instant createdAt, Instant updatedAt,
 			Instant cancelledAt, String paymentStatus, String refundStatus, String remark, String cancelReason,
-			Instant completedAt, AddressSnapshot userAddressSnapshot, ShopAddressSnapshot shopAddressSnapshot) {
+			Instant completedAt, Map<String, String> userAddressSnapshot, Map<String, String> shopAddressSnapshot) {
 		public OrderView(long id, String orderNumber, long userId, long shopId, String shopName,
 				List<OrderLineView> lines, BigDecimal total, String status, Instant createdAt, Instant updatedAt,
 				Instant cancelledAt) {
@@ -88,8 +89,6 @@ public interface OrderService {
 		}
 	}
 
-	record AddressSnapshot(String recipient, String phone, String region, String detail) {}
-	record ShopAddressSnapshot(String region, String detail, String phone) {}
 
 	record OrderSummaryView(long id, String orderNumber, long shopId, String shopName, BigDecimal total,
 			String status, Instant createdAt) {

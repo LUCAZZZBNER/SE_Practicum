@@ -178,4 +178,29 @@
         WHERE id=#{orderId} AND user_id=#{userId} AND status IN ('PENDING_PAYMENT','PAID','PREPARING')
     </update>
 
+    <resultMap id="paymentResultMap" type="com.delivery.backend.order.entity.PaymentEntity">
+        <id property="id" column="id"/><result property="orderId" column="order_id"/>
+        <result property="paymentNumber" column="payment_number"/><result property="amount" column="amount"/>
+        <result property="status" column="status"/><result property="idempotencyKey" column="idempotency_key"/>
+        <result property="paidAt" column="paid_at"/><result property="createdAt" column="created_at"/>
+    </resultMap>
+    <select id="findPayment" resultMap="paymentResultMap">SELECT * FROM payments WHERE order_id=#{orderId}</select>
+    <select id="findPaymentByKey" resultMap="paymentResultMap">SELECT * FROM payments WHERE idempotency_key=#{idempotencyKey}</select>
+    <insert id="insertPayment" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO payments(order_id,payment_number,amount,status,idempotency_key,paid_at)
+        VALUES(#{orderId},#{paymentNumber},#{amount},#{status},#{idempotencyKey},CURRENT_TIMESTAMP(3))
+    </insert>
+    <resultMap id="refundResultMap" type="com.delivery.backend.order.entity.RefundEntity">
+        <id property="id" column="id"/><result property="orderId" column="order_id"/>
+        <result property="refundNumber" column="refund_number"/><result property="amount" column="amount"/>
+        <result property="status" column="status"/><result property="idempotencyKey" column="idempotency_key"/>
+        <result property="completedAt" column="completed_at"/><result property="createdAt" column="created_at"/>
+    </resultMap>
+    <select id="findRefund" resultMap="refundResultMap">SELECT * FROM refunds WHERE order_id=#{orderId}</select>
+    <select id="findRefundByKey" resultMap="refundResultMap">SELECT * FROM refunds WHERE idempotency_key=#{idempotencyKey}</select>
+    <insert id="insertRefund" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO refunds(order_id,refund_number,amount,status,idempotency_key,completed_at)
+        VALUES(#{orderId},#{refundNumber},#{amount},#{status},#{idempotencyKey},CURRENT_TIMESTAMP(3))
+    </insert>
+
 </mapper>

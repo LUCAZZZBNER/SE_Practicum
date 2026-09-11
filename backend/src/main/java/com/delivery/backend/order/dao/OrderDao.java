@@ -7,6 +7,8 @@ import org.apache.ibatis.annotations.Param;
 
 import com.delivery.backend.order.entity.OrderEntity;
 import com.delivery.backend.order.entity.OrderItemEntity;
+import com.delivery.backend.order.entity.PaymentEntity;
+import com.delivery.backend.order.entity.RefundEntity;
 
 /** MyBatis data-access contract for order headers, line snapshots, and history queries. */
 @Mapper
@@ -54,4 +56,11 @@ public interface OrderDao {
 
 	int cancelEligible(@Param("userId") long userId, @Param("orderId") long orderId, @Param("reason") String reason,
 			@Param("refund") boolean refund);
+
+	PaymentEntity findPayment(@Param("orderId") long orderId);
+	PaymentEntity findPaymentByKey(@Param("idempotencyKey") String idempotencyKey);
+	int insertPayment(PaymentEntity payment);
+	RefundEntity findRefund(@Param("orderId") long orderId);
+	RefundEntity findRefundByKey(@Param("idempotencyKey") String idempotencyKey);
+	int insertRefund(RefundEntity refund);
 }
