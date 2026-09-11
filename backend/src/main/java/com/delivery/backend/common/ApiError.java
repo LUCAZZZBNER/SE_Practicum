@@ -23,6 +23,7 @@ public enum ApiError {
 	ORDER_STATE_CONFLICT(HttpStatus.CONFLICT, 1602, "当前订单状态不允许该操作"),
 	IDEMPOTENCY_CONFLICT(HttpStatus.CONFLICT, 1603, "幂等键对应的请求不一致"),
 	SKU_VERSION_CONFLICT(HttpStatus.CONFLICT, 1604, "规格版本已变化"),
+	IMAGE_INVALID(HttpStatus.BAD_REQUEST, 1405, "图片格式或大小不合法"),
 	INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, 9000, "服务器内部错误");
 
 	private final HttpStatus status;

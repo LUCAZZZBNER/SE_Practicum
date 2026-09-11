@@ -13,10 +13,11 @@
         <result property="createdAt" column="created_at"/>
         <result property="updatedAt" column="updated_at"/>
         <result property="deletedAt" column="deleted_at"/>
+        <result property="addressRegion" column="address_region"/><result property="addressDetail" column="address_detail"/><result property="addressPhone" column="address_phone"/>
     </resultMap>
 
     <sql id="shopColumns">
-        id, merchant_id, name, description, status, created_at, updated_at, deleted_at
+        id, merchant_id, name, description, status, created_at, updated_at, deleted_at, address_region, address_detail, address_phone
     </sql>
 
     <sql id="shopFilters">
@@ -81,6 +82,7 @@
         WHERE id = #{id}
           AND deleted_at IS NULL
     </update>
+    <update id="updateAddress">UPDATE shops SET address_region=#{region}, address_detail=#{detail}, address_phone=#{phone} WHERE id=#{id} AND deleted_at IS NULL</update>
 
     <select id="list" resultMap="shopResultMap">
         SELECT <include refid="shopColumns"/>

@@ -1,0 +1,3 @@
+package com.delivery.backend.image.entity;
+import java.time.Instant;
+public class ImageEntity { private Long id; private String url; private String contentType; private Long size; private Instant createdAt; public Long getId(){return id;} public void setId(Long v){id=v;} public String getUrl(){return url;} public void setUrl(String v){url=v;} public String getContentType(){return contentType;} public void setContentType(String v){contentType=v;} public Long getSize(){return size;} public void setSize(Long v){size=v;} public Instant getCreatedAt(){return createdAt;} public void setCreatedAt(Instant v){createdAt=v;} }

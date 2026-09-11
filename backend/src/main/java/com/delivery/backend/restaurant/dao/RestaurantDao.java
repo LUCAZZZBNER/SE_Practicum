@@ -25,6 +25,7 @@ public interface RestaurantDao {
 			@Param("description") String description,
 			@Param("statusSpecified") boolean statusSpecified,
 			@Param("status") String status);
+	int updateAddress(@Param("id") long id, @Param("region") String region, @Param("detail") String detail, @Param("phone") String phone);
 
 	List<ShopEntity> list(@Param("mine") boolean mine,
 			@Param("merchantId") Long merchantId,

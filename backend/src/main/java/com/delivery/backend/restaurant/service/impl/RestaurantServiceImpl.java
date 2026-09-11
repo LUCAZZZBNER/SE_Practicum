@@ -108,6 +108,18 @@ public class RestaurantServiceImpl implements RestaurantService {
 	}
 
 	@Override
+	@Transactional
+	public ShopView updateAddress(long merchantId, long shopId, AddressRequest request) {
+		ShopEntity shop = requireOwnedEntity(merchantId, shopId);
+		if (request == null || request.region() == null || request.region().isBlank() || request.detail() == null
+				|| request.detail().isBlank() || request.phone() == null || !request.phone().matches("1[0-9]{10}|0[0-9]{10,11}")) {
+			throw new BusinessException(ApiError.VALIDATION_ERROR);
+		}
+		restaurantDao.updateAddress(shopId, request.region().trim(), request.detail().trim(), request.phone().trim());
+		return toView(requireById(shopId));
+	}
+
+	@Override
 	@Transactional(readOnly = true)
 	public ShopSnapshot requireOrderable(long shopId) {
 		ShopEntity shop = requireById(shopId);
@@ -152,7 +164,7 @@ public class RestaurantServiceImpl implements RestaurantService {
 
 	private static ShopView toView(ShopEntity shop) {
 		return new ShopView(shop.getId(), shop.getMerchantId(), shop.getName(), shop.getDescription(),
-				shop.getStatus(), shop.getCreatedAt(), shop.getUpdatedAt());
+				shop.getStatus(), shop.getAddressRegion(), shop.getAddressDetail(), shop.getAddressPhone(), shop.getCreatedAt(), shop.getUpdatedAt());
 	}
 
 	private static ShopSnapshot toSnapshot(ShopEntity shop) {

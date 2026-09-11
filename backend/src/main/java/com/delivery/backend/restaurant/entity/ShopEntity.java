@@ -13,6 +13,9 @@ public class ShopEntity {
 	private Instant createdAt;
 	private Instant updatedAt;
 	private Instant deletedAt;
+	private String addressRegion;
+	private String addressDetail;
+	private String addressPhone;
 
 	public Long getId() {
 		return id;
@@ -77,4 +80,7 @@ public class ShopEntity {
 	public void setDeletedAt(Instant deletedAt) {
 		this.deletedAt = deletedAt;
 	}
+	public String getAddressRegion(){return addressRegion;} public void setAddressRegion(String v){addressRegion=v;}
+	public String getAddressDetail(){return addressDetail;} public void setAddressDetail(String v){addressDetail=v;}
+	public String getAddressPhone(){return addressPhone;} public void setAddressPhone(String v){addressPhone=v;}
 }
