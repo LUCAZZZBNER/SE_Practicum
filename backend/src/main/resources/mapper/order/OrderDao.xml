@@ -10,6 +10,7 @@
         <result property="userId" column="user_id"/>
         <result property="idempotencyKey" column="idempotency_key"/>
         <result property="requestFingerprint" column="request_fingerprint"/>
+        <result property="cancelIdempotencyKey" column="cancel_idempotency_key"/>
         <result property="shopId" column="shop_id"/>
         <result property="shopName" column="shop_name"/>
         <result property="totalAmount" column="total_amount"/>
@@ -34,7 +35,7 @@
         o.id, o.order_no, o.user_id, o.idempotency_key, o.request_fingerprint,
         o.shop_id, o.shop_name, o.total_amount, o.status, o.created_at,
         o.updated_at, o.cancelled_at
-        , o.payment_status, o.refund_status, o.remark, o.cancel_reason, o.completed_at, o.user_address_snapshot, o.shop_address_snapshot
+        , o.payment_status, o.refund_status, o.remark, o.cancel_reason, o.completed_at, o.user_address_snapshot, o.shop_address_snapshot, o.cancel_idempotency_key
     </sql>
 
     <sql id="orderSort">
@@ -172,7 +173,7 @@
 
     <update id="cancelEligible">
         UPDATE orders
-        SET status='CANCELLED', cancelled_at=CURRENT_TIMESTAMP(3), cancel_reason=#{reason},
+        SET status='CANCELLED', cancelled_at=CURRENT_TIMESTAMP(3), cancel_reason=#{reason}, cancel_idempotency_key=#{idempotencyKey},
             refund_status=CASE WHEN #{refund} THEN 'REFUNDED' ELSE refund_status END,
             updated_at=CURRENT_TIMESTAMP(3)
         WHERE id=#{orderId} AND user_id=#{userId} AND status IN ('PENDING_PAYMENT','PAID','PREPARING')
