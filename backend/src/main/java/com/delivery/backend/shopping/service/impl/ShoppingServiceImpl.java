@@ -55,6 +55,7 @@ public class ShoppingServiceImpl implements ShoppingService {
 			if (legacySkus.isEmpty()) throw new BusinessException(ApiError.RESOURCE_NOT_FOUND);
 			sku = legacySkus.get(0);
 		}
+		skuId = sku.getId();
 		ItemService.ProductView product = requireCartProduct(sku.getProductId());
 		restaurantService.requireOrderable(product.shopId());
 		if (!ON_SALE.equals(product.status())) throw new BusinessException(ApiError.PRODUCT_OFF_SALE);
@@ -68,7 +69,7 @@ public class ShoppingServiceImpl implements ShoppingService {
 		CartItemEntity item = new CartItemEntity();
 		item.setUserId(userId);
 		item.setProductId(product.id());
-		item.setSkuId(skuId);
+		item.setSkuId(sku.getId());
 		item.setQuantity(request.quantity());
 		try {
 			shoppingDao.insert(item);
