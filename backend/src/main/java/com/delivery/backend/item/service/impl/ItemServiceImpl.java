@@ -276,7 +276,7 @@ public class ItemServiceImpl implements ItemService {
 		ProductEntity product = requireProduct(request.productId());
 		if (request.skuId() > 0) {
 			var sku = skuDao.findById(request.skuId());
-			if (sku == null || sku.getProductId() != product.getId()) throw new BusinessException(ApiError.RESOURCE_NOT_FOUND);
+			if (sku == null || !sku.getProductId().equals(product.getId())) throw new BusinessException(ApiError.RESOURCE_NOT_FOUND);
 			if (!ON_SALE.equals(product.getStatus())) throw new BusinessException(ApiError.PRODUCT_OFF_SALE);
 			if (!ON_SALE.equals(sku.getStatus())) throw new BusinessException(ApiError.SKU_OFF_SALE);
 			if (sku.getVersion() != request.expectedVersion()) throw new BusinessException(ApiError.PRICE_CHANGED);

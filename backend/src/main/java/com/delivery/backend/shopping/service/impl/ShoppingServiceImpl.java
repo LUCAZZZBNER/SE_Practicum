@@ -50,12 +50,7 @@ public class ShoppingServiceImpl implements ShoppingService {
 		long skuId=request.skuId();
 		if(skuId<=0) throw new BusinessException(ApiError.VALIDATION_ERROR);
 		var sku=skuDao.findById(skuId);
-		if (sku == null) {
-			var legacySkus = skuDao.listByProduct(skuId);
-			if (legacySkus.isEmpty()) throw new BusinessException(ApiError.RESOURCE_NOT_FOUND);
-			sku = legacySkus.get(0);
-		}
-		skuId = sku.getId();
+		if (sku == null) throw new BusinessException(ApiError.RESOURCE_NOT_FOUND);
 		ItemService.ProductView product = requireCartProduct(sku.getProductId());
 		restaurantService.requireOrderable(product.shopId());
 		if (!ON_SALE.equals(product.status())) throw new BusinessException(ApiError.PRODUCT_OFF_SALE);
