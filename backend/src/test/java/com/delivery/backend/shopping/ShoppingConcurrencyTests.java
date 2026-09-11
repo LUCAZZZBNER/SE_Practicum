@@ -11,8 +11,11 @@ import java.util.concurrent.Future;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
+import java.util.List;
 
 import com.delivery.backend.item.service.ItemService;
+import com.delivery.backend.item.service.SkuService;
 import com.delivery.backend.merchant.service.MerchantService;
 import com.delivery.backend.restaurant.service.RestaurantService;
 import com.delivery.backend.shopping.service.ShoppingService;
@@ -31,6 +34,10 @@ class ShoppingConcurrencyTests {
 	private RestaurantService restaurantService;
 	@Autowired
 	private ItemService itemService;
+	@Autowired
+	private JdbcTemplate jdbcTemplate;
+	@Autowired
+	private SkuService skuService;
 
 	@Test
 	void concurrentAddsIncrementInsteadOfOverwritingQuantity() throws Exception {
@@ -65,13 +72,19 @@ class ShoppingConcurrencyTests {
 		restaurantService.update(merchantId, shop.id(), open);
 		long categoryId = itemService.createCategory(merchantId, shop.id(),
 				new ItemService.CreateCategoryRequest("Meals", 0)).id();
+		jdbcTemplate.update("INSERT INTO images(url,content_type,size) VALUES('/uploads/test.webp','image/webp',4)");
+		long imageId = jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
 		ItemService.ProductView product = itemService.createProduct(merchantId,
 				new ItemService.CreateProductRequest(shop.id(), categoryId, "Rice", null,
-						new BigDecimal("12.50"), 10));
+						new BigDecimal("12.50"), 10, imageId,
+						List.of(new com.delivery.backend.item.service.SkuService.CreateRequest("默认规格", new BigDecimal("12.50"), 10))));
 		ItemService.UpdateProductRequest onSale = new ItemService.UpdateProductRequest();
 		onSale.setStatus("ON_SALE");
 		onSale.setVersion(product.version());
 		product = itemService.updateProduct(merchantId, product.id(), onSale);
+		SkuService.UpdateRequest skuUpdate = new SkuService.UpdateRequest();
+		skuUpdate.setStatus("ON_SALE"); skuUpdate.setVersion(product.skus().get(0).version());
+		skuService.update(merchantId, product.skus().get(0).id(), skuUpdate);
 		return new Fixture(userId, product.id());
 	}
 

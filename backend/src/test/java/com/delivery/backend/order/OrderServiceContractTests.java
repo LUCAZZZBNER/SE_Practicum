@@ -16,6 +16,7 @@ import com.delivery.backend.ServiceContractTestSupport;
 import com.delivery.backend.common.ApiError;
 import com.delivery.backend.address.service.UserAddressService;
 import com.delivery.backend.item.service.ItemService;
+import com.delivery.backend.item.service.SkuService;
 import com.delivery.backend.merchant.service.MerchantService;
 import com.delivery.backend.order.service.OrderService;
 import com.delivery.backend.restaurant.service.RestaurantService;
@@ -40,6 +41,8 @@ class OrderServiceContractTests extends ServiceContractTestSupport {
 	private ShoppingService shoppingService;
 	@Autowired
 	private UserAddressService addressService;
+	@Autowired
+	private SkuService skuService;
 	@Autowired
 	private JdbcTemplate jdbcTemplate;
 	@Autowired
@@ -70,7 +73,7 @@ class OrderServiceContractTests extends ServiceContractTestSupport {
 		assertThat(service.create(fixture.userId(), "same-key", request).id()).isEqualTo(first.id());
 		assertBusinessError(ApiError.IDEMPOTENCY_CONFLICT, () -> service.create(fixture.userId(), "same-key",
 				new OrderService.CreateRequest(List.of(
-						new OrderService.ItemRequest(fixture.cartItemId(), fixture.productVersion() + 1)))));
+						new OrderService.ItemRequest(fixture.cartItemId(), fixture.productVersion() + 1)), fixture.addressId(), null)));
 	}
 
 	@Test
@@ -80,7 +83,7 @@ class OrderServiceContractTests extends ServiceContractTestSupport {
 				() -> service.create(fixture.userId(), "empty-key", new OrderService.CreateRequest(List.of())));
 		assertBusinessError(ApiError.PRICE_CHANGED, () -> service.create(fixture.userId(), "changed-key",
 				new OrderService.CreateRequest(List.of(
-						new OrderService.ItemRequest(fixture.cartItemId(), fixture.productVersion() - 1)))));
+						new OrderService.ItemRequest(fixture.cartItemId(), fixture.productVersion() - 1)), fixture.addressId(), null)));
 
 		assertThat(shoppingService.getCart(fixture.userId()).items()).extracting(ShoppingService.CartItemView::id)
 				.contains(fixture.cartItemId());
@@ -200,13 +203,20 @@ class OrderServiceContractTests extends ServiceContractTestSupport {
 		restaurantService.update(merchantId, shop.id(), open);
 		long categoryId = itemService.createCategory(merchantId, shop.id(),
 				new ItemService.CreateCategoryRequest("Meals", 0)).id();
+		long imageId = insertImage();
 		ItemService.ProductView product = itemService.createProduct(merchantId,
 				new ItemService.CreateProductRequest(shop.id(), categoryId, "Rice", null,
-						new BigDecimal("12.50"), 5));
+						new BigDecimal("12.50"), 5, imageId,
+						List.of(new com.delivery.backend.item.service.SkuService.CreateRequest("默认规格", new BigDecimal("12.50"), 5))));
 		ItemService.UpdateProductRequest onSale = new ItemService.UpdateProductRequest();
 		onSale.setStatus("ON_SALE");
 		onSale.setVersion(product.version());
 		product = itemService.updateProduct(merchantId, product.id(), onSale);
+		if (!product.skus().isEmpty()) {
+			SkuService.UpdateRequest skuUpdate = new SkuService.UpdateRequest();
+			skuUpdate.setStatus("ON_SALE"); skuUpdate.setVersion(product.skus().get(0).version());
+			skuService.update(merchantId, product.skus().get(0).id(), skuUpdate);
+		}
 		ShoppingService.CartItemView cartItem = shoppingService.add(userId,
 				new ShoppingService.AddRequest(product.id(), 2)).item();
 		long addressId = addressService.create(userId,
@@ -217,6 +227,11 @@ class OrderServiceContractTests extends ServiceContractTestSupport {
 	private UserService.UserView user(String account) {
 		return userService.register(new UserService.RegisterRequest(account, "ExamplePass123!",
 				"ExamplePass123!", "Alice", null));
+	}
+
+	private long insertImage() {
+		jdbcTemplate.update("INSERT INTO images(url,content_type,size) VALUES('/uploads/test.webp','image/webp',4)");
+		return jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
 	}
 
 	private MerchantService.MerchantView merchant(String account) {

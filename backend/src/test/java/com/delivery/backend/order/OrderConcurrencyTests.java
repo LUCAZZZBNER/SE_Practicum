@@ -13,11 +13,13 @@ import java.util.concurrent.Future;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import com.delivery.backend.common.ApiError;
 import com.delivery.backend.common.BusinessException;
 import com.delivery.backend.address.service.UserAddressService;
 import com.delivery.backend.item.service.ItemService;
+import com.delivery.backend.item.service.SkuService;
 import com.delivery.backend.merchant.service.MerchantService;
 import com.delivery.backend.order.service.OrderService;
 import com.delivery.backend.restaurant.service.RestaurantService;
@@ -41,6 +43,10 @@ class OrderConcurrencyTests {
 	private ShoppingService shoppingService;
 	@Autowired
 	private UserAddressService addressService;
+	@Autowired
+	private JdbcTemplate jdbcTemplate;
+	@Autowired
+	private SkuService skuService;
 
 	@Test
 	void concurrentRetriesWithTheSameKeyReturnTheSameOrder() throws Exception {
@@ -84,13 +90,18 @@ class OrderConcurrencyTests {
 		restaurantService.update(merchantId, shop.id(), open);
 		long categoryId = itemService.createCategory(merchantId, shop.id(),
 				new ItemService.CreateCategoryRequest("Meals", 0)).id();
+		long imageId = insertImage();
 		ItemService.ProductView product = itemService.createProduct(merchantId,
 				new ItemService.CreateProductRequest(shop.id(), categoryId, "Rice", null,
-						new BigDecimal("12.50"), 10));
+						new BigDecimal("12.50"), 10, imageId,
+						List.of(new SkuService.CreateRequest("默认规格", new BigDecimal("12.50"), 10))));
 		ItemService.UpdateProductRequest onSale = new ItemService.UpdateProductRequest();
 		onSale.setStatus("ON_SALE");
 		onSale.setVersion(product.version());
 		product = itemService.updateProduct(merchantId, product.id(), onSale);
+		SkuService.UpdateRequest skuUpdate = new SkuService.UpdateRequest();
+		skuUpdate.setStatus("ON_SALE"); skuUpdate.setVersion(product.skus().get(0).version());
+		skuService.update(merchantId, product.skus().get(0).id(), skuUpdate);
 		ShoppingService.CartItemView cartItem = shoppingService.add(userId,
 				new ShoppingService.AddRequest(product.id(), 2)).item();
 		long addressId = addressService.create(userId,
@@ -102,6 +113,11 @@ class OrderConcurrencyTests {
 
 	private ItemService.ProductView product(Fixture fixture) {
 		return itemService.getProduct(fixture.productId(), true, fixture.merchantId());
+	}
+
+	private long insertImage() {
+		jdbcTemplate.update("INSERT INTO images(url,content_type,size) VALUES('/uploads/test.webp','image/webp',4)");
+		return jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
 	}
 
 	private static OrderService.ListQuery query() {

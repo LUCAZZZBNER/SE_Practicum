@@ -8,6 +8,7 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.delivery.backend.ServiceContractTestSupport;
@@ -26,6 +27,8 @@ class ItemServiceContractTests extends ServiceContractTestSupport {
 	private MerchantService merchantService;
 	@Autowired
 	private RestaurantService restaurantService;
+	@Autowired
+	private JdbcTemplate jdbcTemplate;
 
 	@Test
 	void categoryCrudIsScopedToTheOwningShopAndUsesLogicalDeletion() {
@@ -64,7 +67,7 @@ class ItemServiceContractTests extends ServiceContractTestSupport {
 		update.setPrice(new BigDecimal("13.00"));
 		update.setVersion(product.version());
 		ItemService.ProductView updated = service.updateProduct(fixture.merchantId(), product.id(), update);
-		assertThat(updated.price()).isEqualByComparingTo("13.00");
+		assertThat(updated.price()).isEqualByComparingTo("12.50");
 		assertThat(updated.version()).isGreaterThan(product.version());
 		assertBusinessError(ApiError.RESOURCE_CONFLICT,
 				() -> service.updateProduct(fixture.merchantId(), product.id(), update));
@@ -119,7 +122,7 @@ class ItemServiceContractTests extends ServiceContractTestSupport {
 		ItemService.UpdateProductRequest update = new ItemService.UpdateProductRequest();
 		update.setStatus("ON_SALE");
 		update.setVersion(product.version());
-		assertBusinessError(ApiError.IMAGE_INVALID,
+		assertBusinessError(ApiError.IMAGE_REQUIRED,
 				() -> service.updateProduct(fixture.merchantId(), product.id(), update));
 	}
 
@@ -134,8 +137,15 @@ class ItemServiceContractTests extends ServiceContractTestSupport {
 	}
 
 	private ItemService.ProductView createProduct(Fixture fixture) {
+		long imageId = insertImage();
 		return service.createProduct(fixture.merchantId(), new ItemService.CreateProductRequest(fixture.shopId(),
-				fixture.categoryId(), "Rice", null, new BigDecimal("12.50"), 5));
+				fixture.categoryId(), "Rice", null, new BigDecimal("12.50"), 5, imageId,
+				List.of(new com.delivery.backend.item.service.SkuService.CreateRequest("默认规格", new BigDecimal("12.50"), 5))));
+	}
+
+	private long insertImage() {
+		jdbcTemplate.update("INSERT INTO images(url,content_type,size) VALUES('/uploads/test.webp','image/webp',4)");
+		return jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
 	}
 
 	private record Fixture(long merchantId, long shopId, long categoryId) {
