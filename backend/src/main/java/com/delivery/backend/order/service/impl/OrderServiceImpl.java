@@ -18,6 +18,7 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DuplicateKeyException;
 
 import com.delivery.backend.common.ApiError;
 import com.delivery.backend.common.BusinessException;
@@ -196,7 +197,9 @@ public class OrderServiceImpl implements OrderService {
 			RefundEntity refundEntity = new RefundEntity();
 			refundEntity.setOrderId(orderId); refundEntity.setRefundNumber("REFUND-" + orderId);
 			refundEntity.setAmount(order.getTotalAmount()); refundEntity.setStatus("REFUNDED"); refundEntity.setIdempotencyKey(key);
-			orderDao.insertRefund(refundEntity);
+			try { orderDao.insertRefund(refundEntity); } catch (DuplicateKeyException exception) {
+				throw new BusinessException(ApiError.IDEMPOTENCY_CONFLICT);
+			}
 		}
 		return requireMine(userId, orderId);
 	}
@@ -218,7 +221,9 @@ public class OrderServiceImpl implements OrderService {
 		PaymentEntity payment = new PaymentEntity();
 		payment.setOrderId(orderId); payment.setPaymentNumber("PAY-" + orderId);
 		payment.setAmount(order.getTotalAmount()); payment.setStatus("PAID"); payment.setIdempotencyKey(key);
-		orderDao.insertPayment(payment);
+		try { orderDao.insertPayment(payment); } catch (DuplicateKeyException exception) {
+			throw new BusinessException(ApiError.IDEMPOTENCY_CONFLICT);
+		}
 		return requireMine(userId, orderId);
 	}
 
