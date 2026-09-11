@@ -1,15 +1,25 @@
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { createShop, getStoreDetail, listStores, updateStoreStatus } from '../api/store'
+import {
+  createShop,
+  getStoreDetail,
+  listStores,
+  updateStoreAddress,
+  updateStoreStatus,
+} from '../api/store'
 
 const storeId = ref(null)
 const saving = ref(false)
+const addressSaving = ref(false)
 
 const store = reactive({
   name: '',
   description: '',
   status: 'CLOSED',
+  region: '',
+  detail: '',
+  phone: '',
 })
 
 const statusMap = {
@@ -34,8 +44,39 @@ async function loadStore() {
     store.name = data?.name || ''
     store.description = data?.description || ''
     store.status = data?.status || ''
+    store.region = data?.region || ''
+    store.detail = data?.detail || ''
+    store.phone = data?.phone || ''
   } catch (error) {
     ElMessage.error(error?.message || '店铺加载失败')
+  }
+}
+
+async function saveStoreAddress() {
+  if (!storeId.value || addressSaving.value) return
+
+  const payload = {
+    region: store.region.trim(),
+    detail: store.detail.trim(),
+    phone: store.phone.trim(),
+  }
+
+  if (!payload.region || !payload.detail || !payload.phone) {
+    ElMessage.error('请完整填写经营地址')
+    return
+  }
+
+  addressSaving.value = true
+  try {
+    await updateStoreAddress(storeId.value, payload)
+    store.region = payload.region
+    store.detail = payload.detail
+    store.phone = payload.phone
+    ElMessage.success('经营地址已保存')
+  } catch (error) {
+    ElMessage.error(error?.message || '经营地址保存失败')
+  } finally {
+    addressSaving.value = false
   }
 }
 
@@ -107,6 +148,30 @@ onMounted(loadStore)
       </el-form-item>
       <el-form-item label="店铺简介">
         <el-input v-model="store.description" type="textarea" />
+      </el-form-item>
+    </section>
+
+    <section class="manage-panel">
+      <div class="section-heading">
+        <h2>经营地址</h2>
+        <el-button
+          data-testid="save-store-address"
+          type="primary"
+          :loading="addressSaving"
+          :disabled="!storeId || addressSaving"
+          @click="saveStoreAddress"
+        >
+          保存地址
+        </el-button>
+      </div>
+      <el-form-item label="所在区域">
+        <el-input v-model="store.region" data-testid="store-region" maxlength="80" />
+      </el-form-item>
+      <el-form-item label="详细地址">
+        <el-input v-model="store.detail" data-testid="store-detail" maxlength="120" />
+      </el-form-item>
+      <el-form-item label="联系电话">
+        <el-input v-model="store.phone" data-testid="store-phone" maxlength="20" />
       </el-form-item>
     </section>
 
