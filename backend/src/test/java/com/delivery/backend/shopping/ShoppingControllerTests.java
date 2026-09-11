@@ -53,6 +53,16 @@ class ShoppingControllerTests {
 	}
 
 	@Test
+	void addForwardsSkuIdAndQuantitySentByProductDetailView() throws Exception {
+		when(service.add(any(Long.class), any()))
+				.thenReturn(new ShoppingService.AddResult(true, cartItem(31)));
+		mvc.perform(post("/api/v1/cart-items").requestAttr("currentPrincipal", userPrincipal(7)).contentType(JSON)
+				.content("{\"skuId\":1001,\"quantity\":2}"))
+				.andExpect(status().isCreated()).andExpect(successfulDataId(31));
+		verify(service).add(7, new ShoppingService.AddRequest(1001, 2));
+	}
+
+	@Test
 	void addReturnsOkWhenServiceMergesAnExistingCartItem() throws Exception {
 		when(service.add(any(Long.class), any()))
 				.thenReturn(new ShoppingService.AddResult(false, cartItem(31)));

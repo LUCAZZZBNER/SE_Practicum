@@ -14,6 +14,7 @@ import static com.delivery.backend.TestFixtures.product;
 import static com.delivery.backend.TestFixtures.productPage;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -37,16 +38,48 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import com.delivery.backend.item.controller.ItemController;
 import com.delivery.backend.item.service.ItemService;
+import com.delivery.backend.item.service.SkuService;
 
 class ItemControllerTests {
 
 	private ItemService service;
+	private SkuService skuService;
 	private MockMvc mvc;
 
 	@BeforeEach
 	void setUp() {
 		service = org.mockito.Mockito.mock(ItemService.class);
-		mvc = withApiErrors(new ItemController(service)).build();
+		skuService = org.mockito.Mockito.mock(SkuService.class);
+		mvc = withApiErrors(new ItemController(service, skuService)).build();
+	}
+
+	@Test
+	void createProductAcceptsTheSkuOnlyPayloadSentByMerchantProductsView() throws Exception {
+		when(service.createProduct(any(Long.class), any())).thenReturn(product(30));
+
+		mvc.perform(post("/api/v1/products").requestAttr("currentPrincipal", merchantPrincipal(2))
+				.contentType(JSON).content("""
+				{"shopId":10,"categoryId":21,"name":"Rice","description":"","imageId":7,
+				 "skus":[{"name":"Large","price":12.50,"stock":4}]}
+				"""))
+				.andExpect(status().isCreated()).andExpect(successfulDataId(30));
+
+		verify(service).createProduct(eq(2L), argThat(request -> request.shopId() == 10
+				&& request.categoryId() == 21 && request.skus().size() == 1
+				&& request.skus().get(0).name().equals("Large")));
+	}
+
+	@Test
+	void skuStatusToggleAcceptsOnlyStatusAndVersionFromMerchantProductsView() throws Exception {
+		when(skuService.update(any(Long.class), any(Long.class), any())).thenReturn(
+				new SkuService.SkuView(1001, 11, "Large", new BigDecimal("12.50"), 4,
+						"ON_SALE", 4, null, null));
+
+		mvc.perform(patch("/api/v1/skus/1001").requestAttr("currentPrincipal", merchantPrincipal(2))
+				.contentType(JSON).content("{\"status\":\"ON_SALE\",\"version\":3}"))
+				.andExpect(status().isOk()).andExpect(successfulDataId(1001));
+		verify(skuService).update(eq(2L), eq(1001L), argThat(request -> "ON_SALE".equals(request.status())
+				&& request.version() == 3L && request.name() == null && request.price() == null));
 	}
 
 	@Test
