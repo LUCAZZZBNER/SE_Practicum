@@ -41,6 +41,12 @@ export default [
         meta: { title: '订单详情' },
       },
       {
+        path: 'addresses',
+        name: 'CustomerAddresses',
+        component: () => import('../../views/CustomerAddressesView.vue'),
+        meta: { title: '收货地址' },
+      },
+      {
         path: 'profile',
         name: 'CustomerProfile',
         component: () => import('../../views/ProfileView.vue'),

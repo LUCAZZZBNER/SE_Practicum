@@ -1,5 +1,5 @@
 <script setup>
-import { Shop, ShoppingCart, Tickets, User } from '@element-plus/icons-vue'
+import { Location, Shop, ShoppingCart, Tickets, User } from '@element-plus/icons-vue'
 import AppHeader from '../components/layout/AppHeader.vue'
 import AppSidebar from '../components/layout/AppSidebar.vue'
 
@@ -7,6 +7,7 @@ const menuItems = [
   { path: '/customer/stores', label: '店铺浏览', shortLabel: '店铺', icon: Shop },
   { path: '/customer/cart', label: '购物车', shortLabel: '购物车', icon: ShoppingCart },
   { path: '/customer/orders', label: '我的订单', shortLabel: '订单', icon: Tickets },
+  { path: '/customer/addresses', label: '收货地址', shortLabel: '地址', icon: Location },
   { path: '/customer/profile', label: '个人信息', shortLabel: '我的', icon: User },
 ]
 
