@@ -2,6 +2,10 @@ package com.delivery.backend.image.controller;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.RequestAttribute;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestPart;
@@ -12,4 +16,4 @@ import com.delivery.backend.image.service.ImageService;
 import com.delivery.backend.security.CurrentPrincipal;
 import com.delivery.backend.security.RequireRole;
 import com.delivery.backend.security.Role;
-@RestController @RequestMapping("/api/v1/files/images") public class ImageController { private final ImageService service; public ImageController(ImageService service){this.service=service;} @PostMapping @RequireRole(Role.MERCHANT) public ResponseEntity<ApiResponse<ImageService.ImageView>> upload(@RequestAttribute("currentPrincipal") CurrentPrincipal p,@RequestPart("file") MultipartFile file){return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(service.upload(p.id(),file)));} }
+@RestController @RequestMapping("/api/v1/files/images") public class ImageController { private final ImageService service; public ImageController(ImageService service){this.service=service;} @PostMapping @RequireRole(Role.MERCHANT) public ResponseEntity<ApiResponse<ImageService.ImageView>> upload(@RequestAttribute("currentPrincipal") CurrentPrincipal p,@RequestPart("file") MultipartFile file){return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(service.upload(p.id(),file)));} @GetMapping("/{imageId}") public ResponseEntity<byte[]> content(@PathVariable long imageId){ImageService.Content content=service.content(imageId);return ResponseEntity.ok().contentType(MediaType.parseMediaType(content.contentType())).header(HttpHeaders.CACHE_CONTROL,"public, max-age=31536000, immutable").body(content.bytes());} }

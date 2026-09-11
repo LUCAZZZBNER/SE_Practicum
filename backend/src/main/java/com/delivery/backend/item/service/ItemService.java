@@ -99,7 +99,7 @@ public interface ItemService {
 	record CreateProductRequest(@Positive long shopId, @Positive long categoryId, @NotBlank String name, String description,
 			BigDecimal price, Integer stock, @Positive Long imageId,
 			@NotEmpty @Valid List<SkuService.CreateRequest> skus) {
-		public CreateProductRequest(long shopId,long categoryId,String name,String description,BigDecimal price,int stock){this(shopId,categoryId,name,description,price,stock,null,List.of());}
+		public CreateProductRequest(long shopId,long categoryId,String name,String description,BigDecimal price,int stock){this(shopId,categoryId,name,description,price,stock,null,List.of(new SkuService.CreateRequest("默认规格", price, stock)));}
 		public CreateProductRequest { skus=skus==null?List.of():List.copyOf(skus); }
 	}
 
@@ -267,13 +267,18 @@ public interface ItemService {
 	}
 	record ImageView(long id,String url,String contentType,long size,Instant createdAt) { public ImageView(long id,String url){this(id,url,null,0,null);} }
 
-	record ReservationRequest(long productId, long expectedVersion, int quantity) {
+	record ReservationRequest(long productId, long expectedVersion, int quantity, long skuId) {
+		public ReservationRequest(long productId, long expectedVersion, int quantity) { this(productId, expectedVersion, quantity, 0); }
 	}
 
 	record ProductSnapshot(long productId, long shopId, String name, BigDecimal unitPrice, int quantity,
-			long version) {
+			long version, long skuId, String skuName, String imageUrl) {
+		public ProductSnapshot(long productId, long shopId, String name, BigDecimal unitPrice, int quantity, long version) {
+			this(productId, shopId, name, unitPrice, quantity, version, 0, null, null);
+		}
 	}
 
-	record StockRestore(long productId, int quantity) {
+	record StockRestore(long productId, int quantity, long skuId) {
+		public StockRestore(long productId, int quantity) { this(productId, quantity, 0); }
 	}
 }

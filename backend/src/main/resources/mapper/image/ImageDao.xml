@@ -1,1 +1,11 @@
-<?xml version="1.0" encoding="UTF-8" ?><!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd"><mapper namespace="com.delivery.backend.image.dao.ImageDao"><resultMap id="image" type="com.delivery.backend.image.entity.ImageEntity"><id property="id" column="id"/><result property="url" column="url"/><result property="contentType" column="content_type"/><result property="size" column="size"/><result property="createdAt" column="created_at"/></resultMap><insert id="insert" useGeneratedKeys="true" keyProperty="id">INSERT INTO images(url,content_type,size) VALUES(#{url},#{contentType},#{size})</insert><select id="findById" resultMap="image">SELECT id,url,content_type,size,created_at FROM images WHERE id=#{id}</select></mapper>
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.delivery.backend.image.dao.ImageDao">
+ <resultMap id="image" type="com.delivery.backend.image.entity.ImageEntity">
+  <id property="id" column="id"/><result property="url" column="url"/><result property="contentType" column="content_type"/>
+  <result property="size" column="size"/><result property="content" column="content"/><result property="createdAt" column="created_at"/>
+ </resultMap>
+ <insert id="insert" useGeneratedKeys="true" keyProperty="id">INSERT INTO images(url,content_type,size,content) VALUES(#{url},#{contentType},#{size},#{content})</insert>
+ <update id="updateUrl">UPDATE images SET url=#{url} WHERE id=#{id}</update>
+ <select id="findById" resultMap="image">SELECT id,url,content_type,size,content,created_at FROM images WHERE id=#{id}</select>
+</mapper>

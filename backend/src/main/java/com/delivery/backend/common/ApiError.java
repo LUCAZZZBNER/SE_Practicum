@@ -15,15 +15,19 @@ public enum ApiError {
 	MERCHANT_ACCOUNT_EXISTS(HttpStatus.CONFLICT, 1201, "商家账号已存在"),
 	MERCHANT_SUSPENDED(HttpStatus.FORBIDDEN, 1202, "商家已暂停"),
 	SHOP_NOT_OPEN(HttpStatus.CONFLICT, 1301, "店铺未营业"),
+	SHOP_ADDRESS_REQUIRED(HttpStatus.CONFLICT, 1302, "店铺经营地址不完整"),
 	PRODUCT_OFF_SALE(HttpStatus.CONFLICT, 1401, "商品已下架"),
 	INSUFFICIENT_STOCK(HttpStatus.CONFLICT, 1402, "库存不足"),
+	SKU_OFF_SALE(HttpStatus.CONFLICT, 1403, "规格已下架"),
 	CART_EMPTY(HttpStatus.BAD_REQUEST, 1501, "购物车为空"),
 	MIXED_SHOPS(HttpStatus.BAD_REQUEST, 1502, "一次结算不能包含多个店铺"),
-	PRICE_CHANGED(HttpStatus.CONFLICT, 1601, "商品价格或版本已变化"),
-	ORDER_STATE_CONFLICT(HttpStatus.CONFLICT, 1602, "当前订单状态不允许该操作"),
-	IDEMPOTENCY_CONFLICT(HttpStatus.CONFLICT, 1603, "幂等键对应的请求不一致"),
-	SKU_VERSION_CONFLICT(HttpStatus.CONFLICT, 1604, "规格版本已变化"),
+	ADDRESS_INVALID(HttpStatus.CONFLICT, 1503, "收货地址不可用"),
+	PRICE_CHANGED(HttpStatus.CONFLICT, 1603, "商品价格或版本已变化"),
+	ORDER_STATE_CONFLICT(HttpStatus.CONFLICT, 1601, "当前订单状态不允许该操作"),
+	IDEMPOTENCY_CONFLICT(HttpStatus.CONFLICT, 1602, "幂等键对应的请求不一致"),
+	SKU_VERSION_CONFLICT(HttpStatus.CONFLICT, 1404, "规格版本已变化"),
 	IMAGE_INVALID(HttpStatus.BAD_REQUEST, 1405, "图片格式或大小不合法"),
+	IMAGE_REQUIRED(HttpStatus.CONFLICT, 1406, "商品缺少主图"),
 	INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, 9000, "服务器内部错误");
 
 	private final HttpStatus status;

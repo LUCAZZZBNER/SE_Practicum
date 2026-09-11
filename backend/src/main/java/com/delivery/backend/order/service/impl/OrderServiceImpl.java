@@ -110,7 +110,7 @@ public class OrderServiceImpl implements OrderService {
 
 		List<ItemService.ReservationRequest> reservations = checkoutItems.stream()
 				.map(item -> new ItemService.ReservationRequest(item.productId(),
-						versionsByCartItem.get(item.cartItemId()), item.quantity()))
+						versionsByCartItem.get(item.cartItemId()), item.quantity(), item.skuId()))
 				.sorted(Comparator.comparingLong(ItemService.ReservationRequest::productId))
 				.toList();
 		List<ItemService.ProductSnapshot> snapshots = itemService.reserveForOrder(reservations);
@@ -184,11 +184,13 @@ public class OrderServiceImpl implements OrderService {
 			throw new BusinessException(ApiError.ORDER_STATE_CONFLICT);
 		}
 		List<OrderItemEntity> lines = orderDao.listItems(orderId);
-		boolean restore = !PENDING_PAYMENT.equals(order.getStatus());
-		if (orderDao.cancelEligible(userId, orderId, normalizeReason(reason), restore) != 1) {
+		boolean restore = true;
+		boolean refund = !PENDING_PAYMENT.equals(order.getStatus());
+		if (orderDao.cancelEligible(userId, orderId, normalizeReason(reason), refund) != 1) {
 			throw new BusinessException(ApiError.ORDER_STATE_CONFLICT);
 		}
-		if (restore) itemService.restoreStock(lines.stream().map(line -> new ItemService.StockRestore(line.getProductId(), line.getQuantity())).toList());
+		if (restore) itemService.restoreStock(lines.stream().map(line -> new ItemService.StockRestore(line.getProductId(), line.getQuantity(),
+				line.getSkuId() == null ? 0 : line.getSkuId())).toList());
 		if (restore && key != null) {
 			RefundEntity refund = new RefundEntity();
 			refund.setOrderId(orderId); refund.setRefundNumber("REFUND-" + orderId);
@@ -387,13 +389,16 @@ public class OrderServiceImpl implements OrderService {
 		item.setProductName(snapshot.name());
 		item.setUnitPrice(snapshot.unitPrice());
 		item.setQuantity(snapshot.quantity());
+		item.setSkuId(snapshot.skuId() > 0 ? snapshot.skuId() : null);
+		item.setSkuName(snapshot.skuName());
+		item.setImageUrl(snapshot.imageUrl());
 		return item;
 	}
 
 	private static OrderView toOrderView(OrderEntity order, List<OrderItemEntity> items) {
 		List<OrderLineView> lines = items.stream().map(item -> new OrderLineView(
-				item.getProductId(), item.getProductName(), item.getUnitPrice(), item.getQuantity(),
-				item.getUnitPrice().multiply(BigDecimal.valueOf(item.getQuantity())))).toList();
+				item.getProductId(), item.getSkuId(), item.getProductName(), item.getSkuName(), item.getImageUrl(),
+				item.getUnitPrice(), item.getQuantity(), item.getUnitPrice().multiply(BigDecimal.valueOf(item.getQuantity())))).toList();
 		return new OrderView(order.getId(), order.getOrderNumber(), order.getUserId(), order.getShopId(),
 				order.getShopName(), lines, order.getTotalAmount(), order.getStatus(), order.getCreatedAt(),
 				order.getUpdatedAt(), order.getCancelledAt(), order.getPaymentStatus(), order.getRefundStatus(),

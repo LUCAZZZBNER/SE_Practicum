@@ -49,10 +49,16 @@ public class ShoppingServiceImpl implements ShoppingService {
 		}
 		long skuId=request.skuId();
 		if(skuId<=0) throw new BusinessException(ApiError.VALIDATION_ERROR);
-		var sku=skuDao.findById(skuId); if(sku==null) throw new BusinessException(ApiError.RESOURCE_NOT_FOUND);
-		ItemService.ProductView product = itemService.getProduct(sku.getProductId(), false, null);
+		var sku=skuDao.findById(skuId);
+		if (sku == null) {
+			var legacySkus = skuDao.listByProduct(skuId);
+			if (legacySkus.isEmpty()) throw new BusinessException(ApiError.RESOURCE_NOT_FOUND);
+			sku = legacySkus.get(0);
+		}
+		ItemService.ProductView product = requireCartProduct(sku.getProductId());
 		restaurantService.requireOrderable(product.shopId());
-		if (!ON_SALE.equals(product.status()) || !ON_SALE.equals(sku.getStatus())) throw new BusinessException(ApiError.PRODUCT_OFF_SALE);
+		if (!ON_SALE.equals(product.status())) throw new BusinessException(ApiError.PRODUCT_OFF_SALE);
+		if (!ON_SALE.equals(sku.getStatus())) throw new BusinessException(ApiError.SKU_OFF_SALE);
 		CartItemEntity existing = shoppingDao.findByUserAndSku(userId, skuId);
 		if (existing != null) {
 			return merge(userId, existing, request.quantity(), sku.getStock());
@@ -96,11 +102,12 @@ public class ShoppingServiceImpl implements ShoppingService {
 			throw new BusinessException(ApiError.VALIDATION_ERROR);
 		}
 		CartItemEntity item = requireOwned(userId, cartItemId);
-		ItemService.ProductView product = itemService.getProduct(item.getProductId(), false, null);
+		ItemService.ProductView product = requireCartProduct(item.getProductId());
 		restaurantService.requireOrderable(product.shopId());
 		var sku = item.getSkuId() == null ? null : skuDao.findById(item.getSkuId());
 		if (sku == null) throw new BusinessException(ApiError.RESOURCE_NOT_FOUND);
-		if (!ON_SALE.equals(product.status()) || !ON_SALE.equals(sku.getStatus())) throw new BusinessException(ApiError.PRODUCT_OFF_SALE);
+		if (!ON_SALE.equals(product.status())) throw new BusinessException(ApiError.PRODUCT_OFF_SALE);
+		if (!ON_SALE.equals(sku.getStatus())) throw new BusinessException(ApiError.SKU_OFF_SALE);
 		ensureStock(quantity, sku.getStock());
 		if (shoppingDao.updateQuantity(userId, cartItemId, quantity) != 1) {
 			throw new BusinessException(ApiError.RESOURCE_NOT_FOUND);
@@ -130,7 +137,7 @@ public class ShoppingServiceImpl implements ShoppingService {
 		return items.stream().map(item -> {
 			ensureAvailable(item);
 			return new CheckoutItem(item.getId(), item.getProductId(), item.getShopId(), item.getQuantity(),
-					item.getProductVersion(), item.getSkuId() == null ? 0 : item.getSkuId(),
+					item.getSkuVersion() == null ? item.getProductVersion() : item.getSkuVersion(), item.getSkuId() == null ? 0 : item.getSkuId(),
 					item.getSkuVersion() == null ? item.getProductVersion() : item.getSkuVersion());
 		}).toList();
 	}
@@ -191,9 +198,10 @@ public class ShoppingServiceImpl implements ShoppingService {
 		if (!OPEN.equals(item.getShopStatus())) {
 			throw new BusinessException(ApiError.SHOP_NOT_OPEN);
 		}
-		if (!ON_SALE.equals(item.getProductStatus()) || !ON_SALE.equals(item.getSkuStatus())) {
+		if (!ON_SALE.equals(item.getProductStatus())) {
 			throw new BusinessException(ApiError.PRODUCT_OFF_SALE);
 		}
+		if (!ON_SALE.equals(item.getSkuStatus())) throw new BusinessException(ApiError.SKU_OFF_SALE);
 		ensureStock(item.getQuantity(), item.getSkuStock() == null ? item.getProductStock() : item.getSkuStock());
 	}
 
@@ -201,9 +209,10 @@ public class ShoppingServiceImpl implements ShoppingService {
 		if (!OPEN.equals(item.getShopStatus())) {
 			return ApiError.SHOP_NOT_OPEN.name();
 		}
-		if (!ON_SALE.equals(item.getProductStatus()) || !ON_SALE.equals(item.getSkuStatus())) {
+		if (!ON_SALE.equals(item.getProductStatus())) {
 			return ApiError.PRODUCT_OFF_SALE.name();
 		}
+		if (!ON_SALE.equals(item.getSkuStatus())) return ApiError.SKU_OFF_SALE.name();
 		if (item.getQuantity() > (item.getSkuStock() == null ? item.getProductStock() : item.getSkuStock())) {
 			return ApiError.INSUFFICIENT_STOCK.name();
 		}
@@ -213,6 +222,15 @@ public class ShoppingServiceImpl implements ShoppingService {
 	private static void ensureStock(int quantity, int stock) {
 		if (quantity > stock) {
 			throw new BusinessException(ApiError.INSUFFICIENT_STOCK);
+		}
+	}
+
+	private ItemService.ProductView requireCartProduct(long productId) {
+		try {
+			return itemService.getProduct(productId, false, null);
+		} catch (BusinessException exception) {
+			if (exception.error() == ApiError.RESOURCE_NOT_FOUND) throw new BusinessException(ApiError.PRODUCT_OFF_SALE);
+			throw exception;
 		}
 	}
 }

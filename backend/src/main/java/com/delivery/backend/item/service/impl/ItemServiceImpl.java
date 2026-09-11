@@ -15,6 +15,7 @@ import com.delivery.backend.common.DeleteResult;
 import com.delivery.backend.common.PageResult;
 import com.delivery.backend.item.dao.ItemDao;
 import com.delivery.backend.item.dao.SkuDao;
+import com.delivery.backend.image.dao.ImageDao;
 import com.delivery.backend.item.entity.CategoryEntity;
 import com.delivery.backend.item.entity.ProductEntity;
 import com.delivery.backend.item.service.ItemService;
@@ -32,15 +33,20 @@ public class ItemServiceImpl implements ItemService {
 	private final ItemDao itemDao;
 	private final RestaurantService restaurantService;
 	private final SkuDao skuDao;
+	private final ImageDao imageDao;
 
 	public ItemServiceImpl(ItemDao itemDao, RestaurantService restaurantService) {
-		this(itemDao, restaurantService, null);
+		this(itemDao, restaurantService, null, null);
+	}
+	public ItemServiceImpl(ItemDao itemDao, RestaurantService restaurantService, SkuDao skuDao) {
+		this(itemDao, restaurantService, skuDao, null);
 	}
 	@Autowired
-	public ItemServiceImpl(ItemDao itemDao, RestaurantService restaurantService, SkuDao skuDao) {
+	public ItemServiceImpl(ItemDao itemDao, RestaurantService restaurantService, SkuDao skuDao, ImageDao imageDao) {
 		this.itemDao = itemDao;
 		this.restaurantService = restaurantService;
 		this.skuDao = skuDao;
+		this.imageDao = imageDao;
 	}
 
 	@Override
@@ -214,6 +220,11 @@ public class ItemServiceImpl implements ItemService {
 			throw new BusinessException(ApiError.VALIDATION_ERROR);
 		}
 		String status = request.isStatusSpecified() ? validateProductStatus(request.status()) : null;
+		Long imageId = request.isImageIdSpecified() ? request.imageId() : product.getImageId();
+		if (imageId != null && imageDao != null && imageDao.findById(imageId) == null) throw new BusinessException(ApiError.IMAGE_INVALID);
+		if (ON_SALE.equals(status) && (imageId == null || skuDao == null || skuDao.listByProduct(productId).isEmpty())) {
+			throw new BusinessException(ApiError.IMAGE_REQUIRED);
+		}
 		long expectedVersion = request.version() == null ? product.getVersion() : request.version();
 		int updated = itemDao.updateProduct(productId, expectedVersion,
 				request.isCategoryIdSpecified(), request.categoryId(),
@@ -250,7 +261,9 @@ public class ItemServiceImpl implements ItemService {
 			if (restoration.quantity() <= 0) {
 				throw new BusinessException(ApiError.VALIDATION_ERROR);
 			}
-			if (itemDao.restoreStock(restoration.productId(), restoration.quantity()) != 1) {
+			int restored = restoration.skuId() > 0 ? skuDao.restoreStock(restoration.skuId(), restoration.quantity())
+					: itemDao.restoreStock(restoration.productId(), restoration.quantity());
+			if (restored != 1) {
 				throw new BusinessException(ApiError.RESOURCE_NOT_FOUND);
 			}
 		}
@@ -261,6 +274,16 @@ public class ItemServiceImpl implements ItemService {
 			throw new BusinessException(ApiError.VALIDATION_ERROR);
 		}
 		ProductEntity product = requireProduct(request.productId());
+		if (request.skuId() > 0) {
+			var sku = skuDao.findById(request.skuId());
+			if (sku == null || sku.getProductId() != product.getId()) throw new BusinessException(ApiError.RESOURCE_NOT_FOUND);
+			if (!ON_SALE.equals(product.getStatus())) throw new BusinessException(ApiError.PRODUCT_OFF_SALE);
+			if (!ON_SALE.equals(sku.getStatus())) throw new BusinessException(ApiError.SKU_OFF_SALE);
+			if (sku.getVersion() != request.expectedVersion()) throw new BusinessException(ApiError.PRICE_CHANGED);
+			if (sku.getStock() < request.quantity()) throw new BusinessException(ApiError.INSUFFICIENT_STOCK);
+			if (skuDao.reserveStock(sku.getId(), request.expectedVersion(), request.quantity()) != 1) throw new BusinessException(ApiError.INSUFFICIENT_STOCK);
+			return new ProductSnapshot(product.getId(), product.getShopId(), product.getName(), sku.getPrice(), request.quantity(), sku.getVersion(), sku.getId(), sku.getName(), product.getImageUrl());
+		}
 		if (!ON_SALE.equals(product.getStatus())) {
 			throw new BusinessException(ApiError.PRODUCT_OFF_SALE);
 		}
@@ -281,7 +304,7 @@ public class ItemServiceImpl implements ItemService {
 			throw new BusinessException(ApiError.INSUFFICIENT_STOCK);
 		}
 		return new ProductSnapshot(product.getId(), product.getShopId(), product.getName(),
-				product.getPrice(), request.quantity(), product.getVersion());
+				product.getPrice(), request.quantity(), product.getVersion(), 0, null, product.getImageUrl());
 	}
 
 	private CategoryEntity requireCategory(long categoryId) {
@@ -308,6 +331,10 @@ public class ItemServiceImpl implements ItemService {
 	private ProductView toProductView(ProductEntity product) {
 		List<SkuService.SkuView> skus=skuDao==null?List.of():skuDao.listByProduct(product.getId()).stream().map(s->new SkuService.SkuView(s.getId(),s.getProductId(),s.getName(),s.getPrice(),s.getStock(),s.getStatus(),s.getVersion(),s.getCreatedAt(),s.getUpdatedAt())).toList();
 		ImageView image = product.getImageId() == null ? null : new ImageView(product.getImageId(), product.getImageUrl());
+		if (product.getImageId() != null && imageDao != null) {
+			var asset = imageDao.findById(product.getImageId());
+			if (asset != null) image = new ImageView(asset.getId(), asset.getUrl(), asset.getContentType(), asset.getSize(), asset.getCreatedAt());
+		}
 		BigDecimal minPrice = skus.stream().map(SkuService.SkuView::price).min(BigDecimal::compareTo).orElse(product.getPrice());
 		int stock = skus.stream().mapToInt(SkuService.SkuView::stock).sum();
 		return new ProductView(product.getId(), product.getShopId(), product.getCategoryId(),

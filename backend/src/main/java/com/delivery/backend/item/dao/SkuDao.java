@@ -13,4 +13,6 @@ public interface SkuDao {
 	int insert(SkuEntity sku);
 	int update(@Param("id") long id, @Param("version") long version, @Param("name") String name,
 		@Param("price") BigDecimal price, @Param("stock") Integer stock, @Param("status") String status);
+	int reserveStock(@Param("id") long id, @Param("version") long version, @Param("quantity") int quantity);
+	int restoreStock(@Param("id") long id, @Param("quantity") int quantity);
 }

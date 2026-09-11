@@ -6,4 +6,6 @@
  <select id="findById" resultMap="sku">SELECT id,product_id,name,price,stock,status,version,created_at,updated_at FROM product_skus WHERE id=#{id}</select>
  <select id="listByProduct" resultMap="sku">SELECT id,product_id,name,price,stock,status,version,created_at,updated_at FROM product_skus WHERE product_id=#{productId} ORDER BY id</select>
  <update id="update">UPDATE product_skus SET name=#{name},price=#{price},stock=#{stock},status=#{status},version=version+1 WHERE id=#{id} AND version=#{version}</update>
+ <update id="reserveStock">UPDATE product_skus SET stock=stock-#{quantity},version=version+1 WHERE id=#{id} AND version=#{version} AND status='ON_SALE' AND stock &gt;= #{quantity}</update>
+ <update id="restoreStock">UPDATE product_skus SET stock=stock+#{quantity},version=version+1 WHERE id=#{id}</update>
 </mapper>
