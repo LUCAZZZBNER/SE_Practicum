@@ -62,11 +62,13 @@ describe('CustomerLayout', () => {
       '/customer/stores',
       '/customer/cart',
       '/customer/orders',
+      '/customer/addresses',
       '/customer/profile',
     ])
     expect(mobileNavigation.text()).toContain('店铺')
     expect(mobileNavigation.text()).toContain('购物车')
     expect(mobileNavigation.text()).toContain('订单')
+    expect(mobileNavigation.text()).toContain('地址')
     expect(mobileNavigation.text()).toContain('我的')
   })
 })
