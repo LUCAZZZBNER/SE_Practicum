@@ -10,13 +10,18 @@ const mocks = vi.hoisted(() => ({
   getMerchantProfile: vi.fn(),
   listStores: vi.fn(),
   listProducts: vi.fn(),
-  updateProduct: vi.fn(),
   createProduct: vi.fn(),
+  updateProduct: vi.fn(),
+  createProductSku: vi.fn(),
+  updateProductSku: vi.fn(),
+  uploadProductImage: vi.fn(),
+  messageSuccess: vi.fn(),
   messageError: vi.fn(),
 }))
 
 vi.mock('element-plus', () => ({
   ElMessage: {
+    success: mocks.messageSuccess,
     error: mocks.messageError,
   },
 }))
@@ -28,36 +33,44 @@ vi.mock('../../api/category', () => ({
   updateCategory: mocks.updateCategory,
 }))
 
-vi.mock('../../api/merchant', () => ({
-  getMerchantProfile: mocks.getMerchantProfile,
-}))
-
-vi.mock('../../api/store', () => ({
-  listStores: mocks.listStores,
-}))
-
+vi.mock('../../api/merchant', () => ({ getMerchantProfile: mocks.getMerchantProfile }))
+vi.mock('../../api/store', () => ({ listStores: mocks.listStores }))
+vi.mock('../../api/image', () => ({ uploadProductImage: mocks.uploadProductImage }))
 vi.mock('../../api/product', () => ({
   listProducts: mocks.listProducts,
-  updateProduct: mocks.updateProduct,
   createProduct: mocks.createProduct,
+  updateProduct: mocks.updateProduct,
+  createProductSku: mocks.createProductSku,
+  updateProductSku: mocks.updateProductSku,
 }))
 
+const sku = {
+  id: 1001,
+  productId: 1,
+  name: '大份',
+  price: 18.8,
+  stock: 20,
+  status: 'ON_SALE',
+  version: 3,
+}
+
+const product = {
+  id: 1,
+  name: '招牌牛肉饭',
+  description: '招牌套餐',
+  categoryId: 21,
+  image: { id: 301, url: '/uploads/products/301.webp' },
+  minPrice: 18.8,
+  inStock: true,
+  status: 'ON_SALE',
+  skus: [sku],
+}
+
 function seedMerchantProducts({ products = [], categories = [{ id: 21, name: '主食', sortOrder: 1 }] } = {}) {
-  mocks.getMerchantProfile.mockResolvedValue({
-    id: 2,
-    account: 'merchant01',
-    name: '示例快餐店商家',
-    phone: '13900000000',
-    status: 'ACTIVE',
-  })
-  mocks.listStores.mockResolvedValue({
-    items: [{ id: 7 }],
-  })
+  mocks.getMerchantProfile.mockResolvedValue({ id: 2, status: 'ACTIVE' })
+  mocks.listStores.mockResolvedValue({ items: [{ id: 7 }] })
   mocks.listCategories.mockResolvedValue(categories)
-  mocks.listProducts.mockResolvedValue({
-    items: products,
-    total: products.length,
-  })
+  mocks.listProducts.mockResolvedValue({ items: products, total: products.length })
 }
 
 function mountView() {
@@ -89,62 +102,36 @@ function mountView() {
         },
         'el-button': {
           props: ['disabled', 'loading'],
+          emits: ['click'],
           template: '<button type="button" :disabled="disabled || loading" @click="$emit(\'click\')"><slot /></button>',
         },
+        'el-tag': { template: '<span><slot /></span>' },
       },
     },
   })
 }
 
 beforeEach(() => {
-  mocks.createCategory.mockReset()
-  mocks.listCategories.mockReset()
-  mocks.removeCategory.mockReset()
-  mocks.updateCategory.mockReset()
-  mocks.getMerchantProfile.mockReset()
-  mocks.listStores.mockReset()
-  mocks.listProducts.mockReset()
-  mocks.updateProduct.mockReset()
-  mocks.createProduct.mockReset()
-  mocks.messageError.mockReset()
+  Object.values(mocks).forEach((mock) => mock.mockReset())
 })
 
 describe('MerchantProductsView', () => {
-  it('loads categories as a direct array and renders product data', async () => {
-    seedMerchantProducts({
-      products: [
-        {
-          id: 1,
-          name: '招牌牛肉饭',
-          categoryId: 21,
-          price: 18.8,
-          stock: 20,
-          status: 'ON_SALE',
-          version: 3,
-        },
-      ],
-    })
+  it('loads and renders product images and SKU inventory', async () => {
+    seedMerchantProducts({ products: [product] })
 
     const wrapper = mountView()
     await flushPromises()
 
-    expect(mocks.getMerchantProfile).toHaveBeenCalledTimes(1)
-    expect(mocks.listStores).toHaveBeenCalledWith({ mine: true, page: 1, pageSize: 100 })
-    expect(mocks.listCategories).toHaveBeenCalledWith(7)
     expect(mocks.listProducts).toHaveBeenCalledWith(7, {
       page: 1,
       pageSize: 100,
       includeOffSale: true,
     })
-    expect(wrapper.text()).toContain('主食')
-    expect(wrapper.text()).toContain('招牌牛肉饭')
-    expect(wrapper.get('[data-testid="product-row-1"]')).toBeTruthy()
-    expect(wrapper.text()).toContain('¥18.80')
-    expect(wrapper.text()).toContain('库存：20 个')
+    expect(wrapper.get('[data-testid="product-image-1"]').attributes('src')).toBe('/uploads/products/301.webp')
+    expect(wrapper.get('[data-testid="sku-row-1001"]').text()).toContain('大份')
+    expect(wrapper.get('[data-testid="sku-row-1001"]').text()).toContain('¥18.80')
+    expect(wrapper.get('[data-testid="sku-row-1001"]').text()).toContain('库存：20 个')
     expect(wrapper.text()).toContain('在售')
-    expect(wrapper.text()).not.toContain('ON_SALE')
-    expect(wrapper.get('[data-testid="product-edit-1"]')).toBeTruthy()
-    expect(wrapper.get('[data-testid="product-toggle-1"]')).toBeTruthy()
   })
 
   it('submits category create, rename and delete actions', async () => {
@@ -152,13 +139,8 @@ describe('MerchantProductsView', () => {
     mocks.createCategory.mockResolvedValue({})
     mocks.updateCategory.mockResolvedValue({})
     mocks.removeCategory.mockResolvedValue({})
-
     const wrapper = mountView()
     await flushPromises()
-
-    expect(wrapper.text()).toContain('商品价格（元）')
-    expect(wrapper.text()).toContain('库存数量（个）')
-    expect(wrapper.get('[data-testid="add-product"]')).toBeTruthy()
 
     const inputs = wrapper.findAll('input')
     await inputs[0].setValue('饮品')
@@ -172,17 +154,39 @@ describe('MerchantProductsView', () => {
     expect(mocks.removeCategory).toHaveBeenCalledWith(21)
   })
 
-  it('submits create product with valid contract fields', async () => {
+  it('uploads a main image and stores its returned reference', async () => {
     seedMerchantProducts()
-    mocks.createProduct.mockResolvedValue({})
-
+    mocks.uploadProductImage.mockResolvedValue({ id: 301, url: '/uploads/products/301.webp' })
     const wrapper = mountView()
     await flushPromises()
 
-    const inputs = wrapper.findAll('input')
-    await inputs[2].setValue('牛肉饭')
-    await inputs[3].setValue('18.8')
-    await inputs[4].setValue('20')
+    const file = new File(['image'], 'meal.png', { type: 'image/png' })
+    const input = wrapper.get('[data-testid="product-image-input"]')
+    Object.defineProperty(input.element, 'files', { value: [file] })
+    await input.trigger('change')
+    await flushPromises()
+
+    const formData = mocks.uploadProductImage.mock.calls[0][0]
+    expect(formData.get('file')).toBe(file)
+    expect(wrapper.get('[data-testid="product-image-preview"]').attributes('src')).toBe('/uploads/products/301.webp')
+  })
+
+  it('creates a product with its image and initial SKU', async () => {
+    seedMerchantProducts()
+    mocks.uploadProductImage.mockResolvedValue({ id: 301, url: '/uploads/products/301.webp' })
+    mocks.createProduct.mockResolvedValue({})
+    const wrapper = mountView()
+    await flushPromises()
+
+    const imageInput = wrapper.get('[data-testid="product-image-input"]')
+    const file = new File(['image'], 'meal.png', { type: 'image/png' })
+    Object.defineProperty(imageInput.element, 'files', { value: [file] })
+    await imageInput.trigger('change')
+    await flushPromises()
+    await wrapper.get('[data-testid="product-name"]').setValue('牛肉饭')
+    await wrapper.get('[data-testid="initial-sku-name"]').setValue('默认规格')
+    await wrapper.get('[data-testid="initial-sku-price"]').setValue('18.8')
+    await wrapper.get('[data-testid="initial-sku-stock"]').setValue('20')
     await wrapper.get('[data-testid="add-product"]').trigger('click')
 
     expect(mocks.createProduct).toHaveBeenCalledWith({
@@ -190,174 +194,114 @@ describe('MerchantProductsView', () => {
       categoryId: 21,
       name: '牛肉饭',
       description: '',
-      price: 18.8,
-      stock: 20,
+      imageId: 301,
+      skus: [{ name: '默认规格', price: 18.8, stock: 20 }],
     })
   })
 
-  it('submits product description when creating a product', async () => {
+  it('rejects a product without a valid initial SKU', async () => {
     seedMerchantProducts()
-    mocks.createProduct.mockResolvedValue({})
-
     const wrapper = mountView()
     await flushPromises()
 
-    const descriptionInput = wrapper.find('textarea[placeholder="商品描述"]')
-    await descriptionInput.setValue('招牌套餐')
-    await wrapper.find('input[placeholder="商品名称"]').setValue('牛肉饭')
-    const numberInputs = wrapper.findAll('input[type="number"]')
-    await numberInputs[0].setValue('18.8')
-    await numberInputs[1].setValue('20')
-    await wrapper.get('[data-testid="add-product"]').trigger('click')
-
-    expect(mocks.createProduct).toHaveBeenCalledWith({
-      shopId: 7,
-      categoryId: 21,
-      name: '牛肉饭',
-      description: '招牌套餐',
-      price: 18.8,
-      stock: 20,
-    })
-  })
-
-  it('shows validation error instead of submitting invalid product payload', async () => {
-    seedMerchantProducts()
-
-    const wrapper = mountView()
-    await flushPromises()
-
+    await wrapper.get('[data-testid="product-name"]').setValue('牛肉饭')
     await wrapper.get('[data-testid="add-product"]').trigger('click')
 
     expect(mocks.createProduct).not.toHaveBeenCalled()
-    expect(mocks.messageError).toHaveBeenCalledWith('请填写有效商品信息')
+    expect(mocks.messageError).toHaveBeenCalledWith('请填写有效商品和规格信息')
   })
 
-  it('submits product edit with current version', async () => {
-    seedMerchantProducts({
-      products: [
-        {
-          id: 1,
-          name: '招牌牛肉饭',
-          categoryId: 21,
-          price: 18.8,
-          stock: 20,
-          status: 'ON_SALE',
-          version: 3,
-        },
-      ],
-    })
+  it('updates only product-level editable fields', async () => {
+    seedMerchantProducts({ products: [product] })
     mocks.updateProduct.mockResolvedValue({})
-
     const wrapper = mountView()
     await flushPromises()
 
     await wrapper.get('[data-testid="product-edit-1"]').trigger('click')
-    const inputs = wrapper.findAll('input')
-    await inputs[2].setValue('升级牛肉饭')
-    await inputs[3].setValue('20')
-    await inputs[4].setValue('18')
+    await wrapper.get('[data-testid="product-name"]').setValue('升级牛肉饭')
     await wrapper.get('[data-testid="save-product"]').trigger('click')
 
     expect(mocks.updateProduct).toHaveBeenCalledWith(1, {
       categoryId: 21,
       name: '升级牛肉饭',
-      description: '',
-      price: 20,
-      stock: 18,
-      version: 3,
+      description: '招牌套餐',
+      imageId: 301,
     })
   })
 
-  it('loads and submits edited product description with current version', async () => {
-    seedMerchantProducts({
-      products: [
-        {
-          id: 1,
-          name: '招牌牛肉饭',
-          description: '原商品描述',
-          categoryId: 21,
-          price: 18.8,
-          stock: 20,
-          status: 'ON_SALE',
-          version: 3,
-        },
-      ],
-    })
+  it('toggles product status without a product version', async () => {
+    seedMerchantProducts({ products: [product] })
     mocks.updateProduct.mockResolvedValue({})
-
     const wrapper = mountView()
     await flushPromises()
 
-    await wrapper.get('[data-testid="product-edit-1"]').trigger('click')
-    const descriptionInput = wrapper.find('textarea[placeholder="商品描述"]')
-    expect(descriptionInput.element.value).toBe('原商品描述')
-    await descriptionInput.setValue('升级后的描述')
-    await wrapper.get('[data-testid="save-product"]').trigger('click')
+    await wrapper.get('[data-testid="product-toggle-1"]').trigger('click')
+    await wrapper.findAll('.confirm-button')[0].trigger('click')
 
-    expect(mocks.updateProduct).toHaveBeenCalledWith(1, {
-      categoryId: 21,
-      name: '招牌牛肉饭',
-      description: '升级后的描述',
-      price: 18.8,
+    expect(mocks.updateProduct).toHaveBeenCalledWith(1, { status: 'OFF_SALE' })
+  })
+
+  it('blocks product on-sale when the main image is missing', async () => {
+    seedMerchantProducts({ products: [{ ...product, image: null, status: 'OFF_SALE' }] })
+    const wrapper = mountView()
+    await flushPromises()
+
+    await wrapper.get('[data-testid="product-toggle-1"]').trigger('click')
+    await wrapper.findAll('.confirm-button')[0].trigger('click')
+
+    expect(mocks.updateProduct).not.toHaveBeenCalled()
+    expect(mocks.messageError).toHaveBeenCalledWith('商品上架前必须上传主图')
+  })
+
+  it('creates another SKU for an existing product', async () => {
+    seedMerchantProducts({ products: [product] })
+    mocks.createProductSku.mockResolvedValue({})
+    const wrapper = mountView()
+    await flushPromises()
+
+    await wrapper.get('[data-testid="add-sku-1"]').trigger('click')
+    await wrapper.get('[data-testid="sku-name"]').setValue('小份')
+    await wrapper.get('[data-testid="sku-price"]').setValue('15.8')
+    await wrapper.get('[data-testid="sku-stock"]').setValue('12')
+    await wrapper.get('[data-testid="save-sku"]').trigger('click')
+
+    expect(mocks.createProductSku).toHaveBeenCalledWith(1, {
+      name: '小份',
+      price: 15.8,
+      stock: 12,
+    })
+  })
+
+  it('updates an existing SKU with its current version', async () => {
+    seedMerchantProducts({ products: [product] })
+    mocks.updateProductSku.mockResolvedValue({})
+    const wrapper = mountView()
+    await flushPromises()
+
+    await wrapper.get('[data-testid="sku-edit-1001"]').trigger('click')
+    await wrapper.get('[data-testid="sku-price"]').setValue('20')
+    await wrapper.get('[data-testid="save-sku"]').trigger('click')
+
+    expect(mocks.updateProductSku).toHaveBeenCalledWith(1001, {
+      name: '大份',
+      price: 20,
       stock: 20,
       version: 3,
     })
   })
 
-  it('submits off-shelf action for a product with version', async () => {
-    seedMerchantProducts({
-      products: [
-        {
-          id: 1,
-          name: '招牌牛肉饭',
-          categoryId: 21,
-          price: 18.8,
-          stock: 20,
-          status: 'ON_SALE',
-          version: 3,
-        },
-      ],
-    })
-    mocks.updateProduct.mockResolvedValue({})
-
+  it('toggles SKU status with optimistic-lock version', async () => {
+    seedMerchantProducts({ products: [product] })
+    mocks.updateProductSku.mockResolvedValue({})
     const wrapper = mountView()
     await flushPromises()
 
-    await wrapper.get('[data-testid="product-toggle-1"]').trigger('click')
-    await wrapper.find('.confirm-button').trigger('click')
+    await wrapper.get('[data-testid="sku-toggle-1001"]').trigger('click')
+    await wrapper.findAll('.confirm-button')[1].trigger('click')
 
-    expect(mocks.updateProduct).toHaveBeenCalledWith(1, {
+    expect(mocks.updateProductSku).toHaveBeenCalledWith(1001, {
       status: 'OFF_SALE',
       version: 3,
-    })
-  })
-
-  it('submits on-sale action for an off-sale product with version', async () => {
-    seedMerchantProducts({
-      products: [
-        {
-          id: 2,
-          name: '暂停售商品',
-          categoryId: 21,
-          price: 18.8,
-          stock: 20,
-          status: 'OFF_SALE',
-          version: 4,
-        },
-      ],
-    })
-    mocks.updateProduct.mockResolvedValue({})
-
-    const wrapper = mountView()
-    await flushPromises()
-
-    expect(wrapper.text()).toContain('上架')
-    await wrapper.get('[data-testid="product-toggle-2"]').trigger('click')
-    await wrapper.find('.confirm-button').trigger('click')
-
-    expect(mocks.updateProduct).toHaveBeenCalledWith(2, {
-      status: 'ON_SALE',
-      version: 4,
     })
   })
 })
