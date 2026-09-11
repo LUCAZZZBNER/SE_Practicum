@@ -121,22 +121,25 @@ class ItemControllerTests {
 	void createProductForwardsDecimalAndZeroStockBoundary() throws Exception {
 		when(service.createProduct(any(Long.class), any())).thenReturn(product(30));
 		mvc.perform(post("/api/v1/products").requestAttr("currentPrincipal", merchantPrincipal(2)).contentType(JSON).content("""
-				{"shopId":10,"categoryId":21,"name":"Rice","description":null,"price":0.01,"stock":0}
+				{"shopId":10,"categoryId":21,"name":"Rice","description":null,
+				 "skus":[{"name":"Default","price":0.01,"stock":0}]}
 				"""))
 				.andExpect(status().isCreated()).andExpect(successfulDataId(30));
-		verify(service).createProduct(2,
-				new ItemService.CreateProductRequest(10, 21, "Rice", null, new BigDecimal("0.01"), 0));
+		verify(service).createProduct(eq(2L),
+				argThat(request -> request.shopId() == 10 && request.categoryId() == 21
+						&& request.skus().size() == 1 && request.skus().get(0).stock() == 0));
 	}
 
 	@ParameterizedTest
 	@ValueSource(strings = {
 			"{}",
-			"{\"shopId\":0,\"categoryId\":21,\"name\":\"Rice\",\"price\":1,\"stock\":0}",
-			"{\"shopId\":10,\"categoryId\":0,\"name\":\"Rice\",\"price\":1,\"stock\":0}",
-			"{\"shopId\":10,\"categoryId\":21,\"name\":\"\",\"price\":1,\"stock\":0}",
-			"{\"shopId\":10,\"categoryId\":21,\"name\":\"Rice\",\"price\":0,\"stock\":0}",
-			"{\"shopId\":10,\"categoryId\":21,\"name\":\"Rice\",\"price\":1.001,\"stock\":0}",
-			"{\"shopId\":10,\"categoryId\":21,\"name\":\"Rice\",\"price\":1,\"stock\":-1}" })
+			"{\"shopId\":0,\"categoryId\":21,\"name\":\"Rice\",\"skus\":[{\"name\":\"Default\",\"price\":1,\"stock\":0}]}",
+			"{\"shopId\":10,\"categoryId\":0,\"name\":\"Rice\",\"skus\":[{\"name\":\"Default\",\"price\":1,\"stock\":0}]}",
+			"{\"shopId\":10,\"categoryId\":21,\"name\":\"\",\"skus\":[{\"name\":\"Default\",\"price\":1,\"stock\":0}]}",
+			"{\"shopId\":10,\"categoryId\":21,\"name\":\"Rice\",\"skus\":[]}",
+			"{\"shopId\":10,\"categoryId\":21,\"name\":\"Rice\",\"skus\":[{\"name\":\"\",\"price\":1,\"stock\":0}]}",
+			"{\"shopId\":10,\"categoryId\":21,\"name\":\"Rice\",\"skus\":[{\"name\":\"Default\",\"price\":0,\"stock\":0}]}",
+			"{\"shopId\":10,\"categoryId\":21,\"name\":\"Rice\",\"skus\":[{\"name\":\"Default\",\"price\":1,\"stock\":-1}]}" })
 	void createProductRejectsMissingInvalidIdsNamePriceAndStock(String body) throws Exception {
 		mvc.perform(post("/api/v1/products").requestAttr("currentPrincipal", merchantPrincipal(2))
 				.contentType(JSON).content(body))

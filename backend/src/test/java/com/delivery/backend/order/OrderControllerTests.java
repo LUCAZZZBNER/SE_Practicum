@@ -48,11 +48,11 @@ class OrderControllerTests {
 		mvc.perform(post("/api/v1/orders").requestAttr("currentPrincipal", userPrincipal(7))
 				.header("X-Idempotency-Key", "key-1")
 				.contentType(JSON).content("""
-				{"items":[{"cartItemId":31,"productVersion":3},{"cartItemId":32,"productVersion":7}]}
+				{"items":[{"cartItemId":31,"skuVersion":3},{"cartItemId":32,"skuVersion":7}],"addressId":51}
 				"""))
 				.andExpect(status().isCreated()).andExpect(successfulDataId(40));
 		verify(service).create(7, "key-1", new OrderService.CreateRequest(
-				List.of(new OrderService.ItemRequest(31, 3), new OrderService.ItemRequest(32, 7))));
+				List.of(new OrderService.ItemRequest(31, 3), new OrderService.ItemRequest(32, 7)), 51L, null));
 	}
 
 	@Test
@@ -93,7 +93,7 @@ class OrderControllerTests {
 
 	@Test
 	void createRejectsMissingPrincipalHeaderBlankHeaderOrItems() throws Exception {
-		String valid = "{\"items\":[{\"cartItemId\":31,\"productVersion\":3}]}";
+		String valid = "{\"items\":[{\"cartItemId\":31,\"skuVersion\":3}],\"addressId\":51}";
 		mvc.perform(post("/api/v1/orders").header("X-Idempotency-Key", "key-1").contentType(JSON).content(valid))
 				.andExpect(status().isUnauthorized()).andExpect(unauthenticated());
 		mvc.perform(post("/api/v1/orders").requestAttr("currentPrincipal", userPrincipal(7))
@@ -113,10 +113,10 @@ class OrderControllerTests {
 	@ParameterizedTest
 	@ValueSource(strings = {
 			"{\"items\":[null]}",
-			"{\"items\":[{\"cartItemId\":0,\"productVersion\":3}]}",
-			"{\"items\":[{\"cartItemId\":31,\"productVersion\":0}]}",
-			"{\"items\":[{\"cartItemId\":-1,\"productVersion\":3}]}",
-			"{\"items\":[{\"cartItemId\":31,\"productVersion\":-1}]}" })
+			"{\"items\":[{\"cartItemId\":0,\"skuVersion\":3}]}",
+			"{\"items\":[{\"cartItemId\":31,\"skuVersion\":0}]}",
+			"{\"items\":[{\"cartItemId\":-1,\"skuVersion\":3}]}",
+			"{\"items\":[{\"cartItemId\":31,\"skuVersion\":-1}]}" })
 	void createRejectsZeroAndNegativeItemInputs(String body) throws Exception {
 		mvc.perform(post("/api/v1/orders").requestAttr("currentPrincipal", userPrincipal(7))
 				.header("X-Idempotency-Key", "key-1")

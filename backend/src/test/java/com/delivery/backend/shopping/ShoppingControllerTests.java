@@ -47,9 +47,9 @@ class ShoppingControllerTests {
 		when(service.add(any(Long.class), any()))
 				.thenReturn(new ShoppingService.AddResult(true, cartItem(31)));
 		mvc.perform(post("/api/v1/cart-items").requestAttr("currentPrincipal", userPrincipal(7)).contentType(JSON)
-				.content("{\"productId\":30,\"quantity\":1}"))
+				.content("{\"skuId\":1001,\"quantity\":1}"))
 				.andExpect(status().isCreated()).andExpect(successfulDataId(31));
-		verify(service).add(7, new ShoppingService.AddRequest(30, 1));
+		verify(service).add(7, new ShoppingService.AddRequest(1001, 1));
 	}
 
 	@Test
@@ -67,14 +67,14 @@ class ShoppingControllerTests {
 		when(service.add(any(Long.class), any()))
 				.thenReturn(new ShoppingService.AddResult(false, cartItem(31)));
 		mvc.perform(post("/api/v1/cart-items").requestAttr("currentPrincipal", userPrincipal(7)).contentType(JSON)
-				.content("{\"productId\":30,\"quantity\":2}"))
+				.content("{\"skuId\":1001,\"quantity\":2}"))
 				.andExpect(status().isOk()).andExpect(successfulDataId(31));
-		verify(service).add(7, new ShoppingService.AddRequest(30, 2));
+		verify(service).add(7, new ShoppingService.AddRequest(1001, 2));
 	}
 
 	@ParameterizedTest
-	@ValueSource(strings = { "{}", "{\"productId\":0,\"quantity\":1}", "{\"productId\":30,\"quantity\":0}",
-			"{\"productId\":30,\"quantity\":-1}" })
+	@ValueSource(strings = { "{}", "{\"skuId\":0,\"quantity\":1}", "{\"skuId\":1001,\"quantity\":0}",
+			"{\"skuId\":1001,\"quantity\":-1}" })
 	void addRejectsMissingZeroAndNegativeInputs(String body) throws Exception {
 		mvc.perform(post("/api/v1/cart-items").requestAttr("currentPrincipal", userPrincipal(7))
 				.contentType(JSON).content(body))
@@ -115,12 +115,12 @@ class ShoppingControllerTests {
 				.thenReturn(new ShoppingService.AddResult(true, cartItem(31)));
 		when(service.changeQuantity(7, 31, Integer.MAX_VALUE)).thenReturn(cartItem(31));
 		mvc.perform(post("/api/v1/cart-items").requestAttr("currentPrincipal", userPrincipal(7)).contentType(JSON)
-				.content("{\"productId\":30,\"quantity\":2147483647}"))
+				.content("{\"skuId\":1001,\"quantity\":2147483647}"))
 				.andExpect(status().isCreated()).andExpect(successfulDataId(31));
 		mvc.perform(patch("/api/v1/cart-items/31").requestAttr("currentPrincipal", userPrincipal(7)).contentType(JSON)
 				.content("{\"quantity\":2147483647}"))
 				.andExpect(status().isOk()).andExpect(successfulDataId(31));
-		verify(service).add(7, new ShoppingService.AddRequest(30, Integer.MAX_VALUE));
+		verify(service).add(7, new ShoppingService.AddRequest(1001, Integer.MAX_VALUE));
 		verify(service).changeQuantity(7, 31, Integer.MAX_VALUE);
 	}
 
@@ -136,7 +136,7 @@ class ShoppingControllerTests {
 
 	@Test
 	void allCartEndpointsRejectMissingPrincipal() throws Exception {
-		mvc.perform(post("/api/v1/cart-items").contentType(JSON).content("{\"productId\":30,\"quantity\":1}"))
+		mvc.perform(post("/api/v1/cart-items").contentType(JSON).content("{\"skuId\":1001,\"quantity\":1}"))
 				.andExpect(status().isUnauthorized()).andExpect(unauthenticated());
 		mvc.perform(get("/api/v1/cart-items"))
 				.andExpect(status().isUnauthorized()).andExpect(unauthenticated());
