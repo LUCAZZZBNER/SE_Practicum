@@ -8,31 +8,33 @@ const mocks = vi.hoisted(() => ({
   messageError: vi.fn(),
 }))
 
-vi.mock('element-plus', () => ({
-  ElMessage: {
-    error: mocks.messageError,
-  },
-}))
+vi.mock('element-plus', () => ({ ElMessage: { error: mocks.messageError } }))
+vi.mock('../../api/order', () => ({ listMerchantOrders: mocks.listMerchantOrders }))
 
-vi.mock('../../api/order', () => ({
-  listMerchantOrders: mocks.listMerchantOrders,
-}))
+const orderSummary = {
+  id: 1001,
+  orderNumber: 'ORD202609110001',
+  shopId: 11,
+  shopName: '示例快餐店',
+  total: 48.6,
+  status: 'PREPARING',
+  paymentStatus: 'PAID',
+  refundStatus: 'NOT_REFUNDED',
+  createdAt: '2026-09-11T02:30:00Z',
+}
 
 function mountView() {
   return mount(MerchantOrdersView, {
     global: {
-      mocks: {
-        $router: {
-          push: mocks.routerPush,
-        },
-      },
+      mocks: { $router: { push: mocks.routerPush } },
       stubs: {
         EmptyState: {
           props: ['description'],
           template: '<div class="empty">{{ description }}</div>',
         },
         'el-button': {
-          template: '<button type="button" @click="$emit(\'click\')"><slot /></button>',
+          inheritAttrs: false,
+          template: '<button type="button" :data-testid="$attrs[\'data-testid\']" @click="$emit(\'click\')"><slot /></button>',
         },
         'el-tag': { template: '<span><slot /></span>' },
         'el-icon': { template: '<i><slot /></i>' },
@@ -42,82 +44,67 @@ function mountView() {
 }
 
 beforeEach(() => {
-  mocks.listMerchantOrders.mockReset()
-  mocks.routerPush.mockReset()
-  mocks.messageError.mockReset()
+  Object.values(mocks).forEach((mock) => mock.mockReset())
 })
 
 describe('MerchantOrdersView', () => {
-  it('loads merchant orders from the API and renders order rows', async () => {
+  it('loads merchant order summaries with default paging and sorting', async () => {
+    mocks.listMerchantOrders.mockResolvedValue({ items: [orderSummary], total: 1 })
+
+    const wrapper = mountView()
+    await flushPromises()
+
+    expect(mocks.listMerchantOrders).toHaveBeenCalledWith({
+      page: 1,
+      pageSize: 20,
+      sortBy: 'createdAt',
+      sortOrder: 'desc',
+    })
+    const card = wrapper.get('[data-testid="merchant-order-card-1001"]')
+    expect(card.text()).toContain('ORD202609110001')
+    expect(card.text()).toContain('示例快餐店')
+    expect(card.text()).toContain('¥48.60')
+    expect(card.text()).toContain('制作中')
+    expect(card.text()).toContain('已支付')
+    expect(card.text()).toContain('未退款')
+    expect(card.text()).not.toContain('PREPARING')
+  })
+
+  it('renders cancelled and refunded transaction states', async () => {
     mocks.listMerchantOrders.mockResolvedValue({
-      items: [
-        {
-          id: 1001,
-          orderNumber: 'MO202609060001',
-          shopName: '示例快餐店',
-          total: 48.6,
-          status: 'PREPARING',
-          createdAt: '2026-09-06T02:30:00Z',
-        },
-      ],
+      items: [{
+        ...orderSummary,
+        status: 'CANCELLED',
+        refundStatus: 'REFUNDED',
+      }],
       total: 1,
     })
 
     const wrapper = mountView()
     await flushPromises()
 
-    expect(mocks.listMerchantOrders).toHaveBeenCalledWith({ page: 1, pageSize: 10 })
-    expect(wrapper.get('[data-testid="merchant-order-card-1001"]')).toBeTruthy()
-    expect(wrapper.text()).toContain('MO202609060001')
-    expect(wrapper.text()).toContain('示例快餐店')
-    expect(wrapper.text()).toContain('¥48.60')
-    expect(wrapper.text()).toContain('制作中')
-    expect(wrapper.text()).not.toContain('PREPARING')
-    expect(wrapper.text()).toContain('2026/09/06 10:30')
-    expect(wrapper.get('[data-testid="view-merchant-order-1001"]').text()).toContain('查看详情')
+    expect(wrapper.text()).toContain('已取消')
+    expect(wrapper.text()).toContain('已退款')
   })
 
-  it('shows empty state when no merchant orders exist', async () => {
-    mocks.listMerchantOrders.mockResolvedValue({
-      items: [],
-      total: 0,
-    })
-
-    const wrapper = mountView()
-    await flushPromises()
-
-    expect(wrapper.text()).toContain('暂无订单')
-  })
-
-  it('navigates to merchant order detail when clicking view', async () => {
-    mocks.listMerchantOrders.mockResolvedValue({
-      items: [
-        {
-          id: 1001,
-          orderNumber: 'MO202609060001',
-          shopName: '示例快餐店',
-          total: 48.6,
-          status: 'PREPARING',
-          createdAt: '2026-09-06T02:30:00Z',
-        },
-      ],
-      total: 1,
-    })
-
+  it('navigates to merchant order detail', async () => {
+    mocks.listMerchantOrders.mockResolvedValue({ items: [orderSummary], total: 1 })
     const wrapper = mountView()
     await flushPromises()
 
     await wrapper.get('[data-testid="view-merchant-order-1001"]').trigger('click')
-
     expect(mocks.routerPush).toHaveBeenCalledWith('/merchant/orders/1001')
   })
 
-  it('shows an error when loading merchant orders fails', async () => {
-    mocks.listMerchantOrders.mockRejectedValue(new Error('订单加载失败'))
+  it('shows the empty state and API errors', async () => {
+    mocks.listMerchantOrders.mockResolvedValueOnce({ items: [], total: 0 })
+    const wrapper = mountView()
+    await flushPromises()
+    expect(wrapper.text()).toContain('暂无订单')
 
+    mocks.listMerchantOrders.mockRejectedValueOnce(new Error('订单加载失败'))
     mountView()
     await flushPromises()
-
     expect(mocks.messageError).toHaveBeenCalledWith('订单加载失败')
   })
 })
