@@ -12,6 +12,10 @@ public class OrderEntity {
 	private String idempotencyKey;
 	private String requestFingerprint;
 	private String cancelIdempotencyKey;
+	private String payIdempotencyKey;
+	private String prepareIdempotencyKey;
+	private String deliverIdempotencyKey;
+	private String receiptIdempotencyKey;
 	private Long shopId;
 	private String shopName;
 	private BigDecimal totalAmount;
@@ -67,6 +71,10 @@ public class OrderEntity {
 		this.requestFingerprint = requestFingerprint;
 	}
 	public String getCancelIdempotencyKey(){return cancelIdempotencyKey;} public void setCancelIdempotencyKey(String v){cancelIdempotencyKey=v;}
+	public String getPayIdempotencyKey(){return payIdempotencyKey;} public void setPayIdempotencyKey(String v){payIdempotencyKey=v;}
+	public String getPrepareIdempotencyKey(){return prepareIdempotencyKey;} public void setPrepareIdempotencyKey(String v){prepareIdempotencyKey=v;}
+	public String getDeliverIdempotencyKey(){return deliverIdempotencyKey;} public void setDeliverIdempotencyKey(String v){deliverIdempotencyKey=v;}
+	public String getReceiptIdempotencyKey(){return receiptIdempotencyKey;} public void setReceiptIdempotencyKey(String v){receiptIdempotencyKey=v;}
 
 	public Long getShopId() {
 		return shopId;

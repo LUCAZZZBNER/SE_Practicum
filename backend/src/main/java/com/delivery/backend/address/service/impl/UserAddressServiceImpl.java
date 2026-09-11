@@ -23,11 +23,12 @@ public class UserAddressServiceImpl implements UserAddressService {
 	public AddressView create(long userId, CreateRequest request) {
 		userService.requireActiveForUpdate(userId);
 		validate(request.recipient(), request.phone(), request.region(), request.detail());
-		if (Boolean.TRUE.equals(request.isDefault())) dao.clearDefaults(userId);
+		boolean firstAddress = dao.list(userId).isEmpty();
+		if (Boolean.TRUE.equals(request.isDefault()) || firstAddress) dao.clearDefaults(userId);
 		UserAddressEntity entity = new UserAddressEntity();
 		entity.setUserId(userId); entity.setRecipient(request.recipient().trim()); entity.setPhone(request.phone().trim());
 		entity.setRegion(request.region().trim()); entity.setDetail(request.detail().trim());
-		entity.setDefaultAddress(Boolean.TRUE.equals(request.isDefault()));
+		entity.setDefaultAddress(Boolean.TRUE.equals(request.isDefault()) || firstAddress);
 		dao.insert(entity);
 		return toView(owned(userId, entity.getId()));
 	}

@@ -11,6 +11,10 @@
         <result property="idempotencyKey" column="idempotency_key"/>
         <result property="requestFingerprint" column="request_fingerprint"/>
         <result property="cancelIdempotencyKey" column="cancel_idempotency_key"/>
+        <result property="payIdempotencyKey" column="pay_idempotency_key"/>
+        <result property="prepareIdempotencyKey" column="prepare_idempotency_key"/>
+        <result property="deliverIdempotencyKey" column="deliver_idempotency_key"/>
+        <result property="receiptIdempotencyKey" column="receipt_idempotency_key"/>
         <result property="shopId" column="shop_id"/>
         <result property="shopName" column="shop_name"/>
         <result property="totalAmount" column="total_amount"/>
@@ -35,7 +39,8 @@
         o.id, o.order_no, o.user_id, o.idempotency_key, o.request_fingerprint,
         o.shop_id, o.shop_name, o.total_amount, o.status, o.created_at,
         o.updated_at, o.cancelled_at
-        , o.payment_status, o.refund_status, o.remark, o.cancel_reason, o.completed_at, o.user_address_snapshot, o.shop_address_snapshot, o.cancel_idempotency_key
+        , o.payment_status, o.refund_status, o.remark, o.cancel_reason, o.completed_at, o.user_address_snapshot, o.shop_address_snapshot, o.cancel_idempotency_key,
+        o.pay_idempotency_key, o.prepare_idempotency_key, o.deliver_idempotency_key, o.receipt_idempotency_key
     </sql>
 
     <sql id="orderSort">
@@ -169,6 +174,10 @@
             payment_status = CASE WHEN #{status} = 'PAID' THEN 'PAID' ELSE payment_status END,
             completed_at = CASE WHEN #{status} = 'COMPLETED' THEN CURRENT_TIMESTAMP(3) ELSE completed_at END
         WHERE id = #{orderId} AND status = #{fromStatus}
+    </update>
+
+    <update id="updateActionKey">
+        UPDATE orders SET ${column} = #{key}, updated_at = CURRENT_TIMESTAMP(3) WHERE id = #{orderId}
     </update>
 
     <update id="cancelEligible">

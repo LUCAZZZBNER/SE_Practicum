@@ -53,6 +53,7 @@ public interface OrderDao {
 
 	int transitionStatus(@Param("orderId") long orderId, @Param("status") String status,
 			@Param("fromStatus") String fromStatus);
+	int updateActionKey(@Param("orderId") long orderId, @Param("column") String column, @Param("key") String key);
 
 	int cancelEligible(@Param("userId") long userId, @Param("orderId") long orderId, @Param("reason") String reason,
 			@Param("refund") boolean refund, @Param("idempotencyKey") String idempotencyKey);

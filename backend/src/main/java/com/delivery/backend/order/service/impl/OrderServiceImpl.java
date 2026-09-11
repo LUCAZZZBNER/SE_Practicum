@@ -85,7 +85,7 @@ public class OrderServiceImpl implements OrderService {
 			throw new BusinessException(ApiError.VALIDATION_ERROR);
 		}
 		UserAddressService.AddressView address = addressService.requireOwned(userId, request.addressId());
-		String fingerprint = fingerprint(requestedItems);
+		String fingerprint = fingerprint(request);
 
 		OrderEntity existing = orderDao.findByUserAndIdempotency(userId, key);
 		if (existing != null) {
@@ -210,6 +210,7 @@ public class OrderServiceImpl implements OrderService {
 		userService.requireActive(userId);
 		String key = normalizeIdempotencyKey(idempotencyKey);
 		OrderEntity order = findMine(userId, orderId);
+		if (key.equals(order.getPayIdempotencyKey())) return requireMine(userId, orderId);
 		PaymentEntity prior = orderDao.findPayment(orderId);
 		if (prior != null) {
 			if (key.equals(prior.getIdempotencyKey())) return requireMine(userId, orderId);
@@ -224,6 +225,7 @@ public class OrderServiceImpl implements OrderService {
 		try { orderDao.insertPayment(payment); } catch (DuplicateKeyException exception) {
 			throw new BusinessException(ApiError.IDEMPOTENCY_CONFLICT);
 		}
+		orderDao.updateActionKey(orderId, "pay_idempotency_key", key);
 		return requireMine(userId, orderId);
 	}
 
@@ -231,10 +233,14 @@ public class OrderServiceImpl implements OrderService {
 	@Transactional
 	public OrderView confirmReceipt(long userId, long orderId, String idempotencyKey) {
 		userService.requireActive(userId);
-		findMine(userId, orderId);
+		String key = normalizeIdempotencyKey(idempotencyKey);
+		OrderEntity current = findMine(userId, orderId);
+		if (key.equals(current.getReceiptIdempotencyKey())) return requireMine(userId, orderId);
+		if ("COMPLETED".equals(current.getStatus())) throw new BusinessException(ApiError.ORDER_STATE_CONFLICT);
 		if (orderDao.transitionStatus(orderId, "COMPLETED", "DELIVERING") != 1) {
 			throw new BusinessException(ApiError.ORDER_STATE_CONFLICT);
 		}
+		orderDao.updateActionKey(orderId, "receipt_idempotency_key", key);
 		return requireMine(userId, orderId);
 	}
 
@@ -242,10 +248,14 @@ public class OrderServiceImpl implements OrderService {
 	@Transactional
 	public OrderView prepare(long merchantId, long orderId, String idempotencyKey) {
 		merchantService.getCurrent(merchantId);
+		String key = normalizeIdempotencyKey(idempotencyKey);
 		OrderEntity order = orderDao.findMerchantOrder(merchantId, orderId);
+		if (order != null && key.equals(order.getPrepareIdempotencyKey())) return toOrderView(order, orderDao.listItems(orderId));
+		if (order != null && "PREPARING".equals(order.getStatus())) throw new BusinessException(ApiError.ORDER_STATE_CONFLICT);
 		if (order == null || orderDao.transitionStatus(orderId, "PREPARING", "PAID") != 1) {
 			throw new BusinessException(ApiError.ORDER_STATE_CONFLICT);
 		}
+		orderDao.updateActionKey(orderId, "prepare_idempotency_key", key);
 		return toOrderView(orderDao.findMerchantOrder(merchantId, orderId), orderDao.listItems(orderId));
 	}
 
@@ -253,10 +263,14 @@ public class OrderServiceImpl implements OrderService {
 	@Transactional
 	public OrderView deliver(long merchantId, long orderId, String idempotencyKey) {
 		merchantService.getCurrent(merchantId);
+		String key = normalizeIdempotencyKey(idempotencyKey);
 		OrderEntity order = orderDao.findMerchantOrder(merchantId, orderId);
+		if (order != null && key.equals(order.getDeliverIdempotencyKey())) return toOrderView(order, orderDao.listItems(orderId));
+		if (order != null && "DELIVERING".equals(order.getStatus())) throw new BusinessException(ApiError.ORDER_STATE_CONFLICT);
 		if (order == null || orderDao.transitionStatus(orderId, "DELIVERING", "PREPARING") != 1) {
 			throw new BusinessException(ApiError.ORDER_STATE_CONFLICT);
 		}
+		orderDao.updateActionKey(orderId, "deliver_idempotency_key", key);
 		return toOrderView(orderDao.findMerchantOrder(merchantId, orderId), orderDao.listItems(orderId));
 	}
 
@@ -372,13 +386,15 @@ public class OrderServiceImpl implements OrderService {
 	}
 	private static String escape(String value) { return value == null ? "" : value.replace("\\", "\\\\").replace("\"", "\\\""); }
 
-	private static String fingerprint(List<ItemRequest> items) {
+	private static String fingerprint(CreateRequest request) {
+		List<ItemRequest> items = request.items();
 		List<ItemRequest> sorted = new ArrayList<>(items);
 		sorted.sort(Comparator.comparingLong(ItemRequest::cartItemId));
 		StringBuilder canonical = new StringBuilder();
 		for (ItemRequest item : sorted) {
 			canonical.append(item.cartItemId()).append(':').append(item.productVersion()).append(';');
 		}
+		canonical.append("address=").append(request.addressId()).append(";remark=").append(request.remark()).append(';');
 		try {
 			byte[] digest = MessageDigest.getInstance("SHA-256")
 					.digest(canonical.toString().getBytes(StandardCharsets.UTF_8));
