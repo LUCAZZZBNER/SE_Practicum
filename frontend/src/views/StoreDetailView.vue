@@ -1,20 +1,15 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { ArrowLeft, ShoppingCart } from '@element-plus/icons-vue'
+import { ArrowLeft, ArrowRight } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import { addCartItem } from '../api/cart'
 import { listCategories } from '../api/category'
-import { getStoreDetail } from '../api/store'
 import { listProducts } from '../api/product'
+import { getStoreDetail } from '../api/store'
 
 const route = useRoute()
-const store = reactive({
-  name: '',
-  description: '',
-  status: '',
-})
 const shopId = Number(route.params.id)
+const store = reactive({ name: '', description: '', status: '' })
 const categories = ref([])
 const products = ref([])
 
@@ -24,19 +19,10 @@ const storeStatusMap = {
   CLOSED: '已关闭',
 }
 
-const productStatusMap = {
-  ON_SALE: '在售',
-  OFF_SALE: '已下架',
-}
-
-const productsByCategory = computed(() => {
-  const grouped = categories.value.map((category) => ({
-    ...category,
-    products: products.value.filter((item) => item.categoryId === category.id),
-  }))
-
-  return grouped
-})
+const productsByCategory = computed(() => categories.value.map((category) => ({
+  ...category,
+  products: products.value.filter((item) => item.categoryId === category.id),
+})))
 
 async function loadStoreDetail() {
   try {
@@ -49,23 +35,10 @@ async function loadStoreDetail() {
       listCategories(shopId),
       listProducts(shopId, { page: 1, pageSize: 100 }),
     ])
-
     categories.value = categoryData || []
     products.value = productData?.items || []
   } catch (error) {
     ElMessage.error(error?.message || '店铺详情加载失败')
-  }
-}
-
-async function addToCart(product) {
-  try {
-    await addCartItem({
-      productId: product.id,
-      quantity: 1,
-    })
-    ElMessage.success('已加入购物车')
-  } catch (error) {
-    ElMessage.error(error?.message || '加入购物车失败')
   }
 }
 
@@ -75,10 +48,6 @@ function formatPrice(price) {
 
 function formatStoreStatus(status) {
   return storeStatusMap[status] || '状态未知'
-}
-
-function formatProductStatus(status) {
-  return productStatusMap[status] || '状态未知'
 }
 
 onMounted(loadStoreDetail)
@@ -100,24 +69,46 @@ onMounted(loadStoreDetail)
     <el-tabs>
       <el-tab-pane v-for="category in productsByCategory" :key="category.id" :label="category.name">
         <div class="product-list">
-          <div v-for="row in category.products" :key="row.id" class="product-row">
-            <div>商品：{{ row.name }}</div>
-            <div v-if="row.description" class="product-description">{{ row.description }}</div>
-            <div>价格：{{ formatPrice(row.price) }}</div>
-            <div>库存：{{ row.stock }}</div>
-            <div>状态：{{ formatProductStatus(row.status) }}</div>
-            <el-button size="small" @click="$router.push(`/customer/products/${row.id}`)">详情</el-button>
-            <el-button
-              :data-testid="`add-product-${row.id}`"
-              size="small"
-              type="primary"
-              :disabled="row.stock <= 0 || row.status === 'OFF_SALE'"
-              @click="addToCart(row)"
+          <article
+            v-for="row in category.products"
+            :key="row.id"
+            :data-testid="`product-row-${row.id}`"
+            class="product-row"
+          >
+            <img
+              v-if="row.image?.url"
+              :data-testid="`product-image-${row.id}`"
+              :src="row.image.url"
+              :alt="row.name"
+              class="product-image"
             >
-              <el-icon><ShoppingCart /></el-icon>
-              加入购物车
+            <div
+              v-else
+              :data-testid="`product-image-placeholder-${row.id}`"
+              class="product-image product-placeholder"
+            >
+              暂无图片
+            </div>
+
+            <div class="product-copy">
+              <h3>{{ row.name }}</h3>
+              <p>{{ row.description || '暂无描述' }}</p>
+              <div class="product-meta">
+                <strong>{{ formatPrice(row.minPrice) }} 起</strong>
+                <span :class="{ soldOut: !row.inStock }">{{ row.inStock ? '有货' : '已售罄' }}</span>
+              </div>
+            </div>
+
+            <el-button
+              :data-testid="`select-product-${row.id}`"
+              type="primary"
+              plain
+              @click="$router.push(`/customer/products/${row.id}`)"
+            >
+              选择规格
+              <el-icon><ArrowRight /></el-icon>
             </el-button>
-          </div>
+          </article>
         </div>
       </el-tab-pane>
     </el-tabs>
@@ -126,5 +117,40 @@ onMounted(loadStoreDetail)
 
 <style scoped>
 .back-button { justify-self: start; padding-left: 0; }
-.product-description { color: #6c7772; }
+.product-list { display: grid; gap: 10px; }
+.product-row {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 0;
+  border-bottom: 1px solid #edf0ee;
+}
+.product-image {
+  width: 96px;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border: 1px solid #e1e6e3;
+  border-radius: 6px;
+}
+.product-placeholder {
+  display: grid;
+  place-items: center;
+  color: #8a948f;
+  background: #f6f7f6;
+  font-size: 12px;
+}
+.product-copy { min-width: 0; }
+.product-copy h3 { margin: 0; color: #202925; font-size: 17px; }
+.product-copy p { margin: 7px 0; color: #6c7772; font-size: 14px; }
+.product-meta { display: flex; align-items: center; gap: 14px; }
+.product-meta strong { color: #c8473d; }
+.product-meta span { color: #318258; font-size: 13px; }
+.product-meta .soldOut { color: #8a948f; }
+
+@media (max-width: 640px) {
+  .product-row { grid-template-columns: 76px minmax(0, 1fr); }
+  .product-image { width: 76px; }
+  .product-row > button { grid-column: 1 / -1; justify-self: stretch; }
+}
 </style>
