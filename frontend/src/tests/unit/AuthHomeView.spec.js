@@ -139,6 +139,30 @@ describe('AuthHomeView', () => {
     expect(mocks.routerPush).toHaveBeenCalledWith('/merchant/store')
   })
 
+  it('returns the customer to the protected destination requested by the guard', async () => {
+    mocks.routeQuery.redirect = '/customer/orders/10001'
+    mocks.loginCustomer.mockResolvedValue({ accessToken: 'customer-token', roles: ['USER'] })
+    const wrapper = mountView()
+
+    await wrapper.get('input[placeholder="请输入用户账号"]').setValue('alice01')
+    await wrapper.get('input[placeholder="请输入密码"]').setValue('ExamplePass123!')
+    await wrapper.get('[data-testid="login-submit"]').trigger('click')
+    await flushPromises()
+
+    expect(mocks.routerPush).toHaveBeenCalledWith('/customer/orders/10001')
+  })
+
+  it('does not allow a login redirect to cross role boundaries', async () => {
+    mocks.routeQuery.redirect = '/merchant/orders/10001'
+    mocks.loginCustomer.mockResolvedValue({ accessToken: 'customer-token', roles: ['USER'] })
+    const wrapper = mountView()
+
+    await wrapper.get('[data-testid="login-submit"]').trigger('click')
+    await flushPromises()
+
+    expect(mocks.routerPush).toHaveBeenCalledWith('/customer/stores')
+  })
+
   it('keeps customer and merchant registration routes independent', async () => {
     const wrapper = mountView()
 
