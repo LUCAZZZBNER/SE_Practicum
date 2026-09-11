@@ -138,6 +138,31 @@ class OrderServiceContractTests extends ServiceContractTestSupport {
 	}
 
 	@Test
+	void checkoutRejectsAnAddressThatDoesNotBelongToTheUser() {
+		Fixture fixture = fixture("order-address-ownership");
+		OrderService.CreateRequest request = new OrderService.CreateRequest(
+				List.of(new OrderService.ItemRequest(fixture.cartItemId(), fixture.productVersion())),
+				999999L, "少放辣椒");
+
+		assertBusinessError(ApiError.RESOURCE_NOT_FOUND,
+				() -> service.create(fixture.userId(), "address-key", request));
+		assertThat(shoppingService.getCart(fixture.userId()).items())
+				.extracting(ShoppingService.CartItemView::id).contains(fixture.cartItemId());
+	}
+
+	@Test
+	void checkoutRejectsRemarksLongerThanTwoHundredCharacters() {
+		Fixture fixture = fixture("order-remark-length");
+		String remark = "x".repeat(201);
+		OrderService.CreateRequest request = new OrderService.CreateRequest(
+				List.of(new OrderService.ItemRequest(fixture.cartItemId(), fixture.productVersion())),
+				null, remark);
+
+		assertBusinessError(ApiError.VALIDATION_ERROR,
+				() -> service.create(fixture.userId(), "remark-key", request));
+	}
+
+	@Test
 	void paymentFulfillmentAndReceiptFollowTheDocumentedStateMachine() {
 		Fixture fixture = fixture("order-state-machine");
 		OrderService.OrderView created = service.create(fixture.userId(), "state-key", request(fixture));
