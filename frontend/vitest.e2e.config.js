@@ -5,14 +5,10 @@ export default defineConfig({
   plugins: [vue()],
   test: {
     environment: 'jsdom',
-    globals: true,
+    environmentOptions: {
+      jsdom: { url: 'http://127.0.0.1:8080/' },
+    },
     setupFiles: ['./src/tests/setup.js'],
-    exclude: [
-      '**/node_modules/**',
-      '**/dist/**',
-      '**/coverage/**',
-      '**/.{git,cache,output,temp}/**',
-      'src/tests/e2e/**',
-    ],
+    include: ['./src/tests/e2e/**/*.spec.js'],
   },
 })
