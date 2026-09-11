@@ -17,6 +17,7 @@
         <result property="createdAt" column="created_at"/>
         <result property="updatedAt" column="updated_at"/>
         <result property="cancelledAt" column="cancelled_at"/>
+        <result property="paymentStatus" column="payment_status"/><result property="refundStatus" column="refund_status"/><result property="remark" column="remark"/><result property="cancelReason" column="cancel_reason"/><result property="completedAt" column="completed_at"/><result property="userAddressSnapshot" column="user_address_snapshot"/><result property="shopAddressSnapshot" column="shop_address_snapshot"/>
     </resultMap>
 
     <resultMap id="orderItemResultMap" type="com.delivery.backend.order.entity.OrderItemEntity">
@@ -26,12 +27,14 @@
         <result property="productName" column="product_name"/>
         <result property="unitPrice" column="unit_price"/>
         <result property="quantity" column="quantity"/>
+        <result property="skuId" column="sku_id"/><result property="skuName" column="sku_name"/><result property="imageUrl" column="image_url"/>
     </resultMap>
 
     <sql id="orderColumns">
         o.id, o.order_no, o.user_id, o.idempotency_key, o.request_fingerprint,
         o.shop_id, o.shop_name, o.total_amount, o.status, o.created_at,
         o.updated_at, o.cancelled_at
+        , o.payment_status, o.refund_status, o.remark, o.cancel_reason, o.completed_at, o.user_address_snapshot, o.shop_address_snapshot
     </sql>
 
     <sql id="orderSort">
@@ -93,7 +96,7 @@
     </insert>
 
     <select id="listItems" resultMap="orderItemResultMap">
-        SELECT id, order_id, product_id, product_name, unit_price, quantity
+        SELECT id, order_id, product_id, product_name, unit_price, quantity, sku_id, sku_name, image_url
         FROM order_items
         WHERE order_id = #{orderId}
         ORDER BY id ASC

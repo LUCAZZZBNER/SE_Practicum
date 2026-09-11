@@ -11,6 +11,9 @@ public class OrderItemEntity {
 	private String productName;
 	private BigDecimal unitPrice;
 	private Integer quantity;
+	private Long skuId;
+	private String skuName;
+	private String imageUrl;
 
 	public Long getId() {
 		return id;
@@ -59,4 +62,7 @@ public class OrderItemEntity {
 	public void setQuantity(Integer quantity) {
 		this.quantity = quantity;
 	}
+	public Long getSkuId(){return skuId;} public void setSkuId(Long v){skuId=v;}
+	public String getSkuName(){return skuName;} public void setSkuName(String v){skuName=v;}
+	public String getImageUrl(){return imageUrl;} public void setImageUrl(String v){imageUrl=v;}
 }

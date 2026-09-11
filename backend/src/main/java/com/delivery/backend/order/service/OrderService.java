@@ -23,6 +23,10 @@ public interface OrderService {
 
 	OrderView cancel(long userId, long orderId);
 
+	default OrderView cancel(long userId, long orderId, String idempotencyKey, String reason) {
+		return cancel(userId, orderId);
+	}
+
 	OrderView pay(long userId, long orderId, String idempotencyKey);
 
 	OrderView confirmReceipt(long userId, long orderId, String idempotencyKey);

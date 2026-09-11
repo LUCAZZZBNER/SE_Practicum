@@ -74,7 +74,8 @@ public class OrderController {
 			@PathVariable @Positive long orderId,
 			@RequestHeader(value = "X-Idempotency-Key", required = false) String idempotencyKey,
 			@RequestBody(required = false) CancelRequest request) {
-		return ApiResponse.success(orderService.cancel(principal.id(), orderId));
+		return ApiResponse.success(orderService.cancel(principal.id(), orderId, idempotencyKey,
+				request == null ? null : request.reason()));
 	}
 
 	@PostMapping("/orders/{orderId}/pay")
