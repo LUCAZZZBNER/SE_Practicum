@@ -69,6 +69,7 @@ class ShoppingConcurrencyTests {
 				new RestaurantService.CreateRequest("Shop " + suffix, null));
 		RestaurantService.UpdateRequest open = new RestaurantService.UpdateRequest();
 		open.setStatus("OPEN");
+		restaurantService.updateAddress(merchantId, shop.id(), new RestaurantService.AddressRequest("杭州", "学院路", "05711234567"));
 		restaurantService.update(merchantId, shop.id(), open);
 		long categoryId = itemService.createCategory(merchantId, shop.id(),
 				new ItemService.CreateCategoryRequest("Meals", 0)).id();

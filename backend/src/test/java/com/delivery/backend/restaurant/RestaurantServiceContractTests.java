@@ -80,6 +80,8 @@ class RestaurantServiceContractTests extends ServiceContractTestSupport {
 
 		RestaurantService.UpdateRequest open = new RestaurantService.UpdateRequest();
 		open.setStatus("OPEN");
+		assertBusinessError(ApiError.SHOP_ADDRESS_REQUIRED, () -> service.update(merchantId, shop.id(), open));
+		service.updateAddress(merchantId, shop.id(), new RestaurantService.AddressRequest("杭州", "学院路", "05711234567"));
 		service.update(merchantId, shop.id(), open);
 		assertThat(service.requireOrderable(shop.id()).status()).isEqualTo("OPEN");
 	}
