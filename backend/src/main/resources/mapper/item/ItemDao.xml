@@ -44,6 +44,7 @@
         WHERE shop_id = #{shopId}
         <if test="!includeOffSale">
             AND status = 'ON_SALE'
+            AND EXISTS (SELECT 1 FROM product_skus ps WHERE ps.product_id = products.id AND ps.status = 'ON_SALE' AND ps.stock > 0)
         </if>
         <if test="categoryId != null">
             AND category_id = #{categoryId}

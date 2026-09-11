@@ -177,7 +177,7 @@ public class ItemServiceImpl implements ItemService {
 		String keyword = normalizeSearch(query.keyword());
 		long offset = (long) (page - 1) * pageSize;
 		List<ProductView> items = itemDao.listProducts(shopId, query.categoryId(), keyword, includeOffSale,
-				sortBy, sortOrder, pageSize, offset).stream().map(this::toProductView).toList();
+				sortBy, sortOrder, pageSize, offset).stream().map(product -> toProductView(product, includeOffSale)).toList();
 		long total = itemDao.countProducts(shopId, query.categoryId(), keyword, includeOffSale);
 		int totalPages = total == 0 ? 0 : (int) ((total + pageSize - 1) / pageSize);
 		return new PageResult<>(items, page, pageSize, total, totalPages);
@@ -195,7 +195,11 @@ public class ItemServiceImpl implements ItemService {
 		} else if (!ON_SALE.equals(product.getStatus())) {
 			throw new BusinessException(ApiError.RESOURCE_NOT_FOUND);
 		}
-		return toProductView(product);
+		ProductView view = toProductView(product, includeOffSale);
+		if (!includeOffSale && view.skus().stream().noneMatch(sku -> ON_SALE.equals(sku.status()) && sku.stock() > 0)) {
+			throw new BusinessException(ApiError.RESOURCE_NOT_FOUND);
+		}
+		return view;
 	}
 
 	@Override
@@ -328,8 +332,10 @@ public class ItemServiceImpl implements ItemService {
 				category.getSortOrder(), category.getCreatedAt(), category.getUpdatedAt());
 	}
 
-	private ProductView toProductView(ProductEntity product) {
-		List<SkuService.SkuView> skus=skuDao==null?List.of():skuDao.listByProduct(product.getId()).stream().map(s->new SkuService.SkuView(s.getId(),s.getProductId(),s.getName(),s.getPrice(),s.getStock(),s.getStatus(),s.getVersion(),s.getCreatedAt(),s.getUpdatedAt())).toList();
+	private ProductView toProductView(ProductEntity product) { return toProductView(product, true); }
+
+	private ProductView toProductView(ProductEntity product, boolean includeOffSale) {
+		List<SkuService.SkuView> skus=skuDao==null?List.of():skuDao.listByProduct(product.getId()).stream().filter(s -> includeOffSale || ON_SALE.equals(s.getStatus())).map(s->new SkuService.SkuView(s.getId(),s.getProductId(),s.getName(),s.getPrice(),s.getStock(),s.getStatus(),s.getVersion(),s.getCreatedAt(),s.getUpdatedAt())).toList();
 		ImageView image = product.getImageId() == null ? null : new ImageView(product.getImageId(), product.getImageUrl());
 		if (product.getImageId() != null && imageDao != null) {
 			var asset = imageDao.findById(product.getImageId());

@@ -97,6 +97,11 @@ public class RestaurantServiceImpl implements RestaurantService {
 			}
 		}
 		String status = request.isStatusSpecified() ? validateRequiredStatus(request.status()) : null;
+		if (OPEN.equals(status) && (shop.getAddressRegion() == null || shop.getAddressRegion().isBlank()
+				|| shop.getAddressDetail() == null || shop.getAddressDetail().isBlank()
+				|| shop.getAddressPhone() == null || shop.getAddressPhone().isBlank())) {
+			throw new BusinessException(ApiError.SHOP_ADDRESS_REQUIRED);
+		}
 		try {
 			restaurantDao.update(shopId, request.isNameSpecified(), name,
 					request.isDescriptionSpecified(), request.description(),
@@ -125,6 +130,9 @@ public class RestaurantServiceImpl implements RestaurantService {
 		ShopEntity shop = requireById(shopId);
 		if (!OPEN.equals(shop.getStatus())) {
 			throw new BusinessException(ApiError.SHOP_NOT_OPEN);
+		}
+		if (shop.getAddressRegion() == null || shop.getAddressDetail() == null || shop.getAddressPhone() == null) {
+			throw new BusinessException(ApiError.SHOP_ADDRESS_REQUIRED);
 		}
 		return toSnapshot(shop);
 	}
