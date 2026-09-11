@@ -117,6 +117,15 @@ class RestaurantControllerTests {
 	}
 
 	@Test
+	void updateAddressForwardsMerchantShopAndAddressFields() throws Exception {
+		when(service.updateAddress(any(Long.class), any(Long.class), any())).thenReturn(shop(10));
+		mvc.perform(patch("/api/v1/shops/10/address").requestAttr("currentPrincipal", merchantPrincipal(2))
+				.contentType(JSON).content("{\"region\":\"杭州\",\"detail\":\"学院路\",\"phone\":\"05710000000\"}"))
+				.andExpect(status().isOk()).andExpect(successfulDataId(10));
+		verify(service).updateAddress(eq(2L), eq(10L), any());
+	}
+
+	@Test
 	void updateAcceptsExplicitNullAsAProvidedNullableDescription() throws Exception {
 		when(service.update(any(Long.class), any(Long.class), any())).thenReturn(shop(10));
 		mvc.perform(patch("/api/v1/shops/10").requestAttr("currentPrincipal", merchantPrincipal(2)).contentType(JSON)
