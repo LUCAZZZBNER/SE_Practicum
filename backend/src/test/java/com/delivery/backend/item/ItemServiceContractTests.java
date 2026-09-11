@@ -110,6 +110,19 @@ class ItemServiceContractTests extends ServiceContractTestSupport {
 		assertThat(service.getProduct(product.id(), true, fixture.merchantId()).stock()).isEqualTo(5);
 	}
 
+	@Test
+	void productCannotBePutOnSaleWithoutAnImageAndSku() {
+		Fixture fixture = fixture("item-sale-validation");
+		ItemService.ProductView product = service.createProduct(fixture.merchantId(),
+				new ItemService.CreateProductRequest(fixture.shopId(), fixture.categoryId(), "Rice", null,
+						new BigDecimal("12.50"), 5));
+		ItemService.UpdateProductRequest update = new ItemService.UpdateProductRequest();
+		update.setStatus("ON_SALE");
+		update.setVersion(product.version());
+		assertBusinessError(ApiError.IMAGE_INVALID,
+				() -> service.updateProduct(fixture.merchantId(), product.id(), update));
+	}
+
 	private Fixture fixture(String account) {
 		long merchantId = merchantService.register(new MerchantService.RegisterRequest(account, "ExamplePass123!",
 				"ExamplePass123!", "Store", "13900000000")).id();
