@@ -137,6 +137,18 @@ class OrderServiceContractTests extends ServiceContractTestSupport {
 				() -> service.create(fixture.userId(), "null-items-key", new OrderService.CreateRequest(null)));
 	}
 
+	@Test
+	void paymentFulfillmentAndReceiptFollowTheDocumentedStateMachine() {
+		Fixture fixture = fixture("order-state-machine");
+		OrderService.OrderView created = service.create(fixture.userId(), "state-key", request(fixture));
+		assertThat(service.pay(fixture.userId(), created.id(), "pay-key").status()).isEqualTo("PAID");
+		assertThat(service.prepare(fixture.merchantId(), created.id(), "prepare-key").status()).isEqualTo("PREPARING");
+		assertThat(service.deliver(fixture.merchantId(), created.id(), "deliver-key").status()).isEqualTo("DELIVERING");
+		assertThat(service.confirmReceipt(fixture.userId(), created.id(), "receipt-key").status()).isEqualTo("COMPLETED");
+		assertBusinessError(ApiError.ORDER_STATE_CONFLICT,
+				() -> service.confirmReceipt(fixture.userId(), created.id(), "receipt-again"));
+	}
+
 	private Fixture fixture(String name) {
 		long userId = user(name + "-user").id();
 		long merchantId = merchant(name + "-merchant").id();
