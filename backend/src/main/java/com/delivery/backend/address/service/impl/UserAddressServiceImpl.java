@@ -21,7 +21,7 @@ public class UserAddressServiceImpl implements UserAddressService {
 
 	@Override @Transactional
 	public AddressView create(long userId, CreateRequest request) {
-		userService.requireActive(userId);
+		userService.requireActiveForUpdate(userId);
 		validate(request.recipient(), request.phone(), request.region(), request.detail());
 		if (Boolean.TRUE.equals(request.isDefault())) dao.clearDefaults(userId);
 		UserAddressEntity entity = new UserAddressEntity();
@@ -29,7 +29,7 @@ public class UserAddressServiceImpl implements UserAddressService {
 		entity.setRegion(request.region().trim()); entity.setDetail(request.detail().trim());
 		entity.setDefaultAddress(Boolean.TRUE.equals(request.isDefault()));
 		dao.insert(entity);
-		return toView(entity);
+		return toView(owned(userId, entity.getId()));
 	}
 
 	@Override @Transactional(readOnly = true)
@@ -37,9 +37,9 @@ public class UserAddressServiceImpl implements UserAddressService {
 
 	@Override @Transactional
 	public AddressView update(long userId, long addressId, UpdateRequest request) {
-		userService.requireActive(userId); UserAddressEntity existing = owned(userId, addressId);
+		userService.requireActiveForUpdate(userId); owned(userId, addressId);
 		if (!request.isUpdateSpecified()) throw new BusinessException(ApiError.VALIDATION_ERROR);
-		if (request.phoneSpecified() && request.phone() != null && !request.phone().matches("1[0-9]{10}")) throw new BusinessException(ApiError.VALIDATION_ERROR);
+		if (request.phoneSpecified() && (request.phone() == null || !request.phone().matches("1[0-9]{10}"))) throw new BusinessException(ApiError.VALIDATION_ERROR);
 		if (request.recipientSpecified() && (request.recipient() == null || request.recipient().isBlank())) throw new BusinessException(ApiError.VALIDATION_ERROR);
 		if (request.regionSpecified() && (request.region() == null || request.region().isBlank())) throw new BusinessException(ApiError.VALIDATION_ERROR);
 		if (request.detailSpecified() && (request.detail() == null || request.detail().isBlank())) throw new BusinessException(ApiError.VALIDATION_ERROR);

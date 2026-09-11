@@ -39,7 +39,10 @@ public interface UserAddressService {
 		public String detail() { return detail; }
 		public void setDetail(String value) { detail = value; detailSpecified = true; markUpdateSpecified(); }
 		public Boolean isDefault() { return isDefault; }
+		@com.fasterxml.jackson.annotation.JsonProperty("isDefault")
 		public void setDefault(Boolean value) { isDefault = value; defaultSpecified = true; markUpdateSpecified(); }
+		@Override @com.fasterxml.jackson.annotation.JsonIgnore @jakarta.validation.constraints.AssertTrue
+		public boolean isUpdateSpecified() { return super.isUpdateSpecified(); }
 		public boolean recipientSpecified() { return recipientSpecified; }
 		public boolean phoneSpecified() { return phoneSpecified; }
 		public boolean regionSpecified() { return regionSpecified; }

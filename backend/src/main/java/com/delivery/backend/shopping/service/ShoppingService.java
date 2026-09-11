@@ -45,6 +45,7 @@ public interface ShoppingService {
 		}
 	}
 
-	record CheckoutItem(long cartItemId, long productId, long shopId, int quantity, long confirmedVersion) {
+	record CheckoutItem(long cartItemId, long productId, long shopId, int quantity, long confirmedVersion, long skuId, long skuVersion) {
+		public CheckoutItem(long cartItemId,long productId,long shopId,int quantity,long confirmedVersion){this(cartItemId,productId,shopId,quantity,confirmedVersion,0,confirmedVersion);}
 	}
 }

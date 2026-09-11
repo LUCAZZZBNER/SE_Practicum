@@ -10,6 +10,6 @@
   <select id="findOwned" resultMap="address">SELECT id,user_id,recipient,phone,region,detail,is_default,created_at,updated_at,deleted_at FROM user_addresses WHERE user_id=#{userId} AND id=#{id} AND deleted_at IS NULL</select>
   <insert id="insert" useGeneratedKeys="true" keyProperty="id">INSERT INTO user_addresses(user_id,recipient,phone,region,detail,is_default) VALUES(#{userId},#{recipient},#{phone},#{region},#{detail},#{defaultAddress})</insert>
   <update id="clearDefaults">UPDATE user_addresses SET is_default=FALSE WHERE user_id=#{userId} AND deleted_at IS NULL</update>
-  <update id="update"><set><if test="recipientSpecified">recipient=#{recipient},</if><if test="phoneSpecified">phone=#{phone},</if><if test="regionSpecified">region=#{region},</if><if test="detailSpecified">detail=#{detail},</if><if test="defaultSpecified">is_default=#{defaultAddress},</if></set> WHERE id=#{id} AND user_id=#{userId} AND deleted_at IS NULL</update>
+  <update id="update">UPDATE user_addresses <set><if test="recipientSpecified">recipient=#{recipient},</if><if test="phoneSpecified">phone=#{phone},</if><if test="regionSpecified">region=#{region},</if><if test="detailSpecified">detail=#{detail},</if><if test="defaultSpecified">is_default=#{defaultAddress},</if></set> WHERE id=#{id} AND user_id=#{userId} AND deleted_at IS NULL</update>
   <update id="softDelete">UPDATE user_addresses SET deleted_at=CURRENT_TIMESTAMP(3) WHERE id=#{id} AND user_id=#{userId} AND deleted_at IS NULL</update>
 </mapper>

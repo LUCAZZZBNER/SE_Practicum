@@ -52,15 +52,17 @@ public class ShoppingServiceImpl implements ShoppingService {
 		var sku=skuDao.findById(skuId); if(sku==null) throw new BusinessException(ApiError.RESOURCE_NOT_FOUND);
 		ItemService.ProductView product = itemService.getProduct(sku.getProductId(), false, null);
 		restaurantService.requireOrderable(product.shopId());
+		if (!ON_SALE.equals(product.status()) || !ON_SALE.equals(sku.getStatus())) throw new BusinessException(ApiError.PRODUCT_OFF_SALE);
 		CartItemEntity existing = shoppingDao.findByUserAndSku(userId, skuId);
 		if (existing != null) {
-			return merge(userId, existing, request.quantity(), product.stock());
+			return merge(userId, existing, request.quantity(), sku.getStock());
 		}
-		ensureStock(request.quantity(), product.stock());
+		ensureStock(request.quantity(), sku.getStock());
 
 		CartItemEntity item = new CartItemEntity();
 		item.setUserId(userId);
 		item.setProductId(product.id());
+		item.setSkuId(skuId);
 		item.setQuantity(request.quantity());
 		try {
 			shoppingDao.insert(item);
@@ -69,9 +71,8 @@ public class ShoppingServiceImpl implements ShoppingService {
 			if (concurrent == null) {
 				throw exception;
 			}
-			return merge(userId, concurrent, request.quantity(), product.stock());
+			return merge(userId, concurrent, request.quantity(), sku.getStock());
 		}
-		item.setSkuId(skuId);
 		return new AddResult(true, toView(requireOwned(userId, item.getId())));
 	}
 
@@ -97,7 +98,10 @@ public class ShoppingServiceImpl implements ShoppingService {
 		CartItemEntity item = requireOwned(userId, cartItemId);
 		ItemService.ProductView product = itemService.getProduct(item.getProductId(), false, null);
 		restaurantService.requireOrderable(product.shopId());
-		ensureStock(quantity, product.stock());
+		var sku = item.getSkuId() == null ? null : skuDao.findById(item.getSkuId());
+		if (sku == null) throw new BusinessException(ApiError.RESOURCE_NOT_FOUND);
+		if (!ON_SALE.equals(product.status()) || !ON_SALE.equals(sku.getStatus())) throw new BusinessException(ApiError.PRODUCT_OFF_SALE);
+		ensureStock(quantity, sku.getStock());
 		if (shoppingDao.updateQuantity(userId, cartItemId, quantity) != 1) {
 			throw new BusinessException(ApiError.RESOURCE_NOT_FOUND);
 		}
@@ -125,8 +129,9 @@ public class ShoppingServiceImpl implements ShoppingService {
 		}
 		return items.stream().map(item -> {
 			ensureAvailable(item);
-			return new CheckoutItem(item.getId(), item.getProductId(), item.getShopId(),
-					item.getQuantity(), item.getProductVersion());
+			return new CheckoutItem(item.getId(), item.getProductId(), item.getShopId(), item.getQuantity(),
+					item.getProductVersion(), item.getSkuId() == null ? 0 : item.getSkuId(),
+					item.getSkuVersion() == null ? item.getProductVersion() : item.getSkuVersion());
 		}).toList();
 	}
 
@@ -186,20 +191,20 @@ public class ShoppingServiceImpl implements ShoppingService {
 		if (!OPEN.equals(item.getShopStatus())) {
 			throw new BusinessException(ApiError.SHOP_NOT_OPEN);
 		}
-		if (!ON_SALE.equals(item.getProductStatus())) {
+		if (!ON_SALE.equals(item.getProductStatus()) || !ON_SALE.equals(item.getSkuStatus())) {
 			throw new BusinessException(ApiError.PRODUCT_OFF_SALE);
 		}
-		ensureStock(item.getQuantity(), item.getProductStock());
+		ensureStock(item.getQuantity(), item.getSkuStock() == null ? item.getProductStock() : item.getSkuStock());
 	}
 
 	private static String unavailableReason(CartItemEntity item) {
 		if (!OPEN.equals(item.getShopStatus())) {
 			return ApiError.SHOP_NOT_OPEN.name();
 		}
-		if (!ON_SALE.equals(item.getProductStatus())) {
+		if (!ON_SALE.equals(item.getProductStatus()) || !ON_SALE.equals(item.getSkuStatus())) {
 			return ApiError.PRODUCT_OFF_SALE.name();
 		}
-		if (item.getQuantity() > item.getProductStock()) {
+		if (item.getQuantity() > (item.getSkuStock() == null ? item.getProductStock() : item.getSkuStock())) {
 			return ApiError.INSUFFICIENT_STOCK.name();
 		}
 		return null;
