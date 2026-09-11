@@ -133,6 +133,9 @@ public class ItemServiceImpl implements ItemService {
 		}
 		List<SkuService.CreateRequest> skus=request.skus();
 		if (skus.isEmpty()) throw new BusinessException(ApiError.VALIDATION_ERROR);
+		if (request.imageId() != null && imageDao != null && imageDao.findById(request.imageId()) == null) {
+			throw new BusinessException(ApiError.IMAGE_INVALID);
+		}
 		BigDecimal price=request.price(); int stock=request.stock()==null?0:request.stock();
 		if(price==null){price=skus.stream().map(SkuService.CreateRequest::price).min(BigDecimal::compareTo).orElseThrow();}
 		if(request.stock()==null) stock=skus.stream().mapToInt(SkuService.CreateRequest::stock).sum();
