@@ -430,7 +430,8 @@ public class OrderServiceImpl implements OrderService {
 
 	private static OrderSummaryView toSummaryView(OrderEntity order) {
 		return new OrderSummaryView(order.getId(), order.getOrderNumber(), order.getShopId(),
-				order.getShopName(), order.getTotalAmount(), order.getStatus(), order.getCreatedAt());
+				order.getShopName(), order.getTotalAmount(), order.getStatus(), order.getPaymentStatus(),
+				order.getRefundStatus(), order.getCreatedAt());
 	}
 
 	private static <T> PageResult<T> page(List<T> items, int page, int pageSize, long total) {

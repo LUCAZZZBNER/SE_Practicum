@@ -91,7 +91,11 @@ public interface OrderService {
 
 
 	record OrderSummaryView(long id, String orderNumber, long shopId, String shopName, BigDecimal total,
-			String status, Instant createdAt) {
+			String status, String paymentStatus, String refundStatus, Instant createdAt) {
+		public OrderSummaryView(long id, String orderNumber, long shopId, String shopName, BigDecimal total,
+				String status, Instant createdAt) {
+			this(id, orderNumber, shopId, shopName, total, status, "UNPAID", "NOT_REFUNDED", createdAt);
+		}
 	}
 
 	record RefundView(long orderId, String refundNumber, BigDecimal amount, String status) {}
