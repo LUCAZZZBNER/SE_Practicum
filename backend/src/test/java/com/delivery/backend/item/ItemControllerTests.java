@@ -218,6 +218,15 @@ class ItemControllerTests {
 	}
 
 	@Test
+	void updateProductForwardsTheFrontendImageReference() throws Exception {
+		when(service.updateProduct(any(Long.class), any(Long.class), any())).thenReturn(product(30));
+		mvc.perform(patch("/api/v1/products/30").requestAttr("currentPrincipal", merchantPrincipal(2))
+				.contentType(JSON).content("{\"imageId\":301}"))
+				.andExpect(status().isOk()).andExpect(successfulDataId(30));
+		verify(service).updateProduct(eq(2L), eq(30L), argThat(request -> request.imageId() == 301L));
+	}
+
+	@Test
 	void updateProductAcceptsExplicitNullAsAProvidedNullableDescription() throws Exception {
 		when(service.updateProduct(any(Long.class), any(Long.class), any())).thenReturn(product(30));
 		mvc.perform(patch("/api/v1/products/30").requestAttr("currentPrincipal", merchantPrincipal(2)).contentType(JSON)
