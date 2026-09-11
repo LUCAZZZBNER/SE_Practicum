@@ -92,6 +92,14 @@ class OrderControllerTests {
 	}
 
 	@Test
+	void refundLookupForwardsUserOwnershipAndOrderId() throws Exception {
+		when(service.getRefund(7, 40)).thenReturn(new OrderService.RefundView(40, "REFUND-40", new java.math.BigDecimal("12.50"), "REFUNDED"));
+		mvc.perform(get("/api/v1/orders/40/refund").requestAttr("currentPrincipal", userPrincipal(7)))
+				.andExpect(status().isOk()).andExpect(successfulDataId(40));
+		verify(service).getRefund(7, 40);
+	}
+
+	@Test
 	void createRejectsMissingPrincipalHeaderBlankHeaderOrItems() throws Exception {
 		String valid = "{\"items\":[{\"cartItemId\":31,\"skuVersion\":3}],\"addressId\":51}";
 		mvc.perform(post("/api/v1/orders").header("X-Idempotency-Key", "key-1").contentType(JSON).content(valid))
