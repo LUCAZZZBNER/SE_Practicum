@@ -193,6 +193,28 @@ class OrderServiceContractTests extends ServiceContractTestSupport {
 		assertThat(retry.paymentStatus()).isEqualTo("PAID");
 	}
 
+	@Test
+	void fulfillmentActionsReplayTheSameIdempotencyKey() {
+		Fixture fixture = fixture("order-action-retries");
+		OrderService.OrderView created = service.create(fixture.userId(), "create-key", request(fixture));
+		service.pay(fixture.userId(), created.id(), "pay-key");
+		service.prepare(fixture.merchantId(), created.id(), "prepare-key");
+		assertThat(service.prepare(fixture.merchantId(), created.id(), "prepare-key").status()).isEqualTo("PREPARING");
+		service.deliver(fixture.merchantId(), created.id(), "deliver-key");
+		assertThat(service.deliver(fixture.merchantId(), created.id(), "deliver-key").status()).isEqualTo("DELIVERING");
+		service.confirmReceipt(fixture.userId(), created.id(), "receipt-key");
+		assertThat(service.confirmReceipt(fixture.userId(), created.id(), "receipt-key").status()).isEqualTo("COMPLETED");
+	}
+
+	@Test
+	void checkoutIdempotencyIncludesTheAddressAndRemark() {
+		Fixture fixture = fixture("order-fingerprint");
+		service.create(fixture.userId(), "fingerprint-key", request(fixture));
+		assertBusinessError(ApiError.IDEMPOTENCY_CONFLICT,
+				() -> service.create(fixture.userId(), "fingerprint-key", new OrderService.CreateRequest(
+						request(fixture).items(), fixture.addressId(), "another remark")));
+	}
+
 	private Fixture fixture(String name) {
 		long userId = user(name + "-user").id();
 		long merchantId = merchant(name + "-merchant").id();
