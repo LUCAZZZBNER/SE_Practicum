@@ -11,6 +11,7 @@ public class OrderEntity {
 	private Long userId;
 	private String idempotencyKey;
 	private String requestFingerprint;
+	private String cancelIdempotencyKey;
 	private Long shopId;
 	private String shopName;
 	private BigDecimal totalAmount;
@@ -65,6 +66,7 @@ public class OrderEntity {
 	public void setRequestFingerprint(String requestFingerprint) {
 		this.requestFingerprint = requestFingerprint;
 	}
+	public String getCancelIdempotencyKey(){return cancelIdempotencyKey;} public void setCancelIdempotencyKey(String v){cancelIdempotencyKey=v;}
 
 	public Long getShopId() {
 		return shopId;

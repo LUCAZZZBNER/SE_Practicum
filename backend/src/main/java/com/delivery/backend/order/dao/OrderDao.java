@@ -55,7 +55,7 @@ public interface OrderDao {
 			@Param("fromStatus") String fromStatus);
 
 	int cancelEligible(@Param("userId") long userId, @Param("orderId") long orderId, @Param("reason") String reason,
-			@Param("refund") boolean refund);
+			@Param("refund") boolean refund, @Param("idempotencyKey") String idempotencyKey);
 
 	PaymentEntity findPayment(@Param("orderId") long orderId);
 	PaymentEntity findPaymentByKey(@Param("idempotencyKey") String idempotencyKey);

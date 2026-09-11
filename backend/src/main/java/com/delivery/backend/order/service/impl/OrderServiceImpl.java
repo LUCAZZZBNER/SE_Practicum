@@ -177,6 +177,7 @@ public class OrderServiceImpl implements OrderService {
 		String key = idempotencyKey == null ? null : normalizeIdempotencyKey(idempotencyKey);
 		OrderEntity order = findMine(userId, orderId);
 		if (key != null) {
+			if (key.equals(order.getCancelIdempotencyKey())) return requireMine(userId, orderId);
 			RefundEntity prior = orderDao.findRefundByKey(key);
 			if (prior != null && prior.getOrderId().equals(orderId)) return requireMine(userId, orderId);
 		}
@@ -186,16 +187,16 @@ public class OrderServiceImpl implements OrderService {
 		List<OrderItemEntity> lines = orderDao.listItems(orderId);
 		boolean restore = true;
 		boolean refund = !PENDING_PAYMENT.equals(order.getStatus());
-		if (orderDao.cancelEligible(userId, orderId, normalizeReason(reason), refund) != 1) {
+		if (orderDao.cancelEligible(userId, orderId, normalizeReason(reason), refund, key) != 1) {
 			throw new BusinessException(ApiError.ORDER_STATE_CONFLICT);
 		}
 		if (restore) itemService.restoreStock(lines.stream().map(line -> new ItemService.StockRestore(line.getProductId(), line.getQuantity(),
 				line.getSkuId() == null ? 0 : line.getSkuId())).toList());
 		if (restore && key != null) {
-			RefundEntity refund = new RefundEntity();
-			refund.setOrderId(orderId); refund.setRefundNumber("REFUND-" + orderId);
-			refund.setAmount(order.getTotalAmount()); refund.setStatus("REFUNDED"); refund.setIdempotencyKey(key);
-			orderDao.insertRefund(refund);
+			RefundEntity refundEntity = new RefundEntity();
+			refundEntity.setOrderId(orderId); refundEntity.setRefundNumber("REFUND-" + orderId);
+			refundEntity.setAmount(order.getTotalAmount()); refundEntity.setStatus("REFUNDED"); refundEntity.setIdempotencyKey(key);
+			orderDao.insertRefund(refundEntity);
 		}
 		return requireMine(userId, orderId);
 	}
