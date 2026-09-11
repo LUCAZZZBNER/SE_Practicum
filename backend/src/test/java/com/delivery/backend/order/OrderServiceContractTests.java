@@ -177,6 +177,19 @@ class OrderServiceContractTests extends ServiceContractTestSupport {
 				() -> service.confirmReceipt(fixture.userId(), created.id(), "receipt-again"));
 	}
 
+	@Test
+	void repeatedPaymentWithTheSameIdempotencyKeyReturnsTheOriginalResult() {
+		Fixture fixture = fixture("order-payment-idempotency");
+		OrderService.OrderView created = service.create(fixture.userId(), "payment-order-key", request(fixture));
+
+		OrderService.OrderView first = service.pay(fixture.userId(), created.id(), "payment-key");
+		OrderService.OrderView retry = service.pay(fixture.userId(), created.id(), "payment-key");
+
+		assertThat(retry.id()).isEqualTo(first.id());
+		assertThat(retry.status()).isEqualTo("PAID");
+		assertThat(retry.paymentStatus()).isEqualTo("PAID");
+	}
+
 	private Fixture fixture(String name) {
 		long userId = user(name + "-user").id();
 		long merchantId = merchant(name + "-merchant").id();
