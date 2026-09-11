@@ -37,6 +37,13 @@ function selectRole(role) {
   activeRole.value = role
 }
 
+function getLoginDestination(config) {
+  const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : ''
+  const allowedPrefix = config.role === 'MERCHANT' ? '/merchant/' : '/customer/'
+
+  return redirect.startsWith(allowedPrefix) ? redirect : config.homePath
+}
+
 async function submitLogin() {
   if (submitting.value) return
 
@@ -49,7 +56,7 @@ async function submitLogin() {
     localStorage.setItem('access_token', data.accessToken)
     localStorage.setItem('user_role', data.roles?.[0] || config.role)
     ElMessage.success('登录成功')
-    router.push(config.homePath)
+    router.push(getLoginDestination(config))
   } catch (error) {
     ElMessage.error(error?.message || '登录失败')
   } finally {

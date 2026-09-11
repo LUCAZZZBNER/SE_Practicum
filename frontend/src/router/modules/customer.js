@@ -3,6 +3,7 @@ export default [
     path: '/customer',
     component: () => import('../../layouts/CustomerLayout.vue'),
     redirect: '/customer/stores',
+    meta: { requiresAuth: true, role: 'USER' },
     children: [
       {
         path: 'stores',
