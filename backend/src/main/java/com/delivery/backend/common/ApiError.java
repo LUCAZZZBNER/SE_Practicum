@@ -22,6 +22,7 @@ public enum ApiError {
 	PRICE_CHANGED(HttpStatus.CONFLICT, 1601, "商品价格或版本已变化"),
 	ORDER_STATE_CONFLICT(HttpStatus.CONFLICT, 1602, "当前订单状态不允许该操作"),
 	IDEMPOTENCY_CONFLICT(HttpStatus.CONFLICT, 1603, "幂等键对应的请求不一致"),
+	SKU_VERSION_CONFLICT(HttpStatus.CONFLICT, 1604, "规格版本已变化"),
 	INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, 9000, "服务器内部错误");
 
 	private final HttpStatus status;

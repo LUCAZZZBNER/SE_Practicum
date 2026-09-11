@@ -9,6 +9,7 @@ public class CartItemEntity {
 	private Long id;
 	private Long userId;
 	private Long productId;
+	private Long skuId;
 	private Integer quantity;
 	private Instant createdAt;
 	private Instant updatedAt;
@@ -19,6 +20,15 @@ public class CartItemEntity {
 	private String productStatus;
 	private Long productVersion;
 	private String shopStatus;
+	private String productImageUrl;
+	private String skuName; private BigDecimal skuPrice; private Integer skuStock; private String skuStatus; private Long skuVersion;
+	public Long getSkuId(){return skuId;} public void setSkuId(Long v){skuId=v;}
+	public String getProductImageUrl(){return productImageUrl;} public void setProductImageUrl(String v){productImageUrl=v;}
+	public String getSkuName(){return skuName;} public void setSkuName(String v){skuName=v;}
+	public BigDecimal getSkuPrice(){return skuPrice;} public void setSkuPrice(BigDecimal v){skuPrice=v;}
+	public Integer getSkuStock(){return skuStock;} public void setSkuStock(Integer v){skuStock=v;}
+	public String getSkuStatus(){return skuStatus;} public void setSkuStatus(String v){skuStatus=v;}
+	public Long getSkuVersion(){return skuVersion;} public void setSkuVersion(Long v){skuVersion=v;}
 
 	public Long getId() {
 		return id;

@@ -7,9 +7,11 @@ import java.util.List;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import jakarta.validation.constraints.AssertTrue;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Positive;
@@ -95,8 +97,10 @@ public interface ItemService {
 	}
 
 	record CreateProductRequest(@Positive long shopId, @Positive long categoryId, @NotBlank String name, String description,
-			@NotNull @DecimalMin("0.01") @Digits(integer = 1000, fraction = 2) BigDecimal price,
-			@PositiveOrZero int stock) {
+			BigDecimal price, Integer stock, @Positive Long imageId,
+			@NotEmpty @Valid List<SkuService.CreateRequest> skus) {
+		public CreateProductRequest(long shopId,long categoryId,String name,String description,BigDecimal price,int stock){this(shopId,categoryId,name,description,price,stock,null,List.of());}
+		public CreateProductRequest { skus=skus==null?List.of():List.copyOf(skus); }
 	}
 
 	final class UpdateProductRequest extends PatchRequest {
@@ -246,8 +250,11 @@ public interface ItemService {
 	}
 
 	record ProductView(long id, long shopId, long categoryId, String name, String description, BigDecimal price,
-			int stock, String status, long version, Instant createdAt, Instant updatedAt) {
+			int stock, String status, long version, Instant createdAt, Instant updatedAt, ImageView image, List<SkuService.SkuView> skus) {
+		public ProductView(long id,long shopId,long categoryId,String name,String description,BigDecimal price,int stock,String status,long version,Instant createdAt,Instant updatedAt){this(id,shopId,categoryId,name,description,price,stock,status,version,createdAt,updatedAt,null,List.of());}
+		public ProductView { skus=skus==null?List.of():List.copyOf(skus); }
 	}
+	record ImageView(long id,String url) {}
 
 	record ReservationRequest(long productId, long expectedVersion, int quantity) {
 	}

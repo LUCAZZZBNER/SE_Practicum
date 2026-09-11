@@ -12,6 +12,7 @@ import com.delivery.backend.common.ApiError;
 import com.delivery.backend.common.BusinessException;
 import com.delivery.backend.common.DeleteResult;
 import com.delivery.backend.item.service.ItemService;
+import com.delivery.backend.item.dao.SkuDao;
 import com.delivery.backend.restaurant.service.RestaurantService;
 import com.delivery.backend.shopping.dao.ShoppingDao;
 import com.delivery.backend.shopping.entity.CartItemEntity;
@@ -28,13 +29,15 @@ public class ShoppingServiceImpl implements ShoppingService {
 	private final UserService userService;
 	private final ItemService itemService;
 	private final RestaurantService restaurantService;
+	private final SkuDao skuDao;
 
 	public ShoppingServiceImpl(ShoppingDao shoppingDao, UserService userService,
-			ItemService itemService, RestaurantService restaurantService) {
+			ItemService itemService, RestaurantService restaurantService, SkuDao skuDao) {
 		this.shoppingDao = shoppingDao;
 		this.userService = userService;
 		this.itemService = itemService;
 		this.restaurantService = restaurantService;
+		this.skuDao = skuDao;
 	}
 
 	@Override
@@ -44,9 +47,12 @@ public class ShoppingServiceImpl implements ShoppingService {
 		if (request.quantity() <= 0) {
 			throw new BusinessException(ApiError.VALIDATION_ERROR);
 		}
-		ItemService.ProductView product = itemService.getProduct(request.productId(), false, null);
+		long skuId=request.skuId();
+		if(skuId<=0) throw new BusinessException(ApiError.VALIDATION_ERROR);
+		var sku=skuDao.findById(skuId); if(sku==null) throw new BusinessException(ApiError.RESOURCE_NOT_FOUND);
+		ItemService.ProductView product = itemService.getProduct(sku.getProductId(), false, null);
 		restaurantService.requireOrderable(product.shopId());
-		CartItemEntity existing = shoppingDao.findByUserAndProduct(userId, request.productId());
+		CartItemEntity existing = shoppingDao.findByUserAndSku(userId, skuId);
 		if (existing != null) {
 			return merge(userId, existing, request.quantity(), product.stock());
 		}
@@ -54,17 +60,18 @@ public class ShoppingServiceImpl implements ShoppingService {
 
 		CartItemEntity item = new CartItemEntity();
 		item.setUserId(userId);
-		item.setProductId(request.productId());
+		item.setProductId(product.id());
 		item.setQuantity(request.quantity());
 		try {
 			shoppingDao.insert(item);
 		} catch (DuplicateKeyException exception) {
-			CartItemEntity concurrent = shoppingDao.findByUserAndProduct(userId, request.productId());
+			CartItemEntity concurrent = shoppingDao.findByUserAndSku(userId, skuId);
 			if (concurrent == null) {
 				throw exception;
 			}
 			return merge(userId, concurrent, request.quantity(), product.stock());
 		}
+		item.setSkuId(skuId);
 		return new AddResult(true, toView(requireOwned(userId, item.getId())));
 	}
 
@@ -166,11 +173,13 @@ public class ShoppingServiceImpl implements ShoppingService {
 	private static CartItemView toView(CartItemEntity item) {
 		CartProductView product = new CartProductView(item.getProductId(), item.getShopId(),
 				item.getProductName(), item.getProductPrice(), item.getProductStock(),
-				item.getProductStatus(), item.getProductVersion());
-		BigDecimal subtotal = item.getProductPrice().multiply(BigDecimal.valueOf(item.getQuantity()));
+				item.getProductStatus(), item.getProductVersion(), item.getProductImageUrl());
+		BigDecimal unit=item.getSkuPrice()==null?item.getProductPrice():item.getSkuPrice();
+		BigDecimal subtotal = unit.multiply(BigDecimal.valueOf(item.getQuantity()));
 		String unavailableReason = unavailableReason(item);
+		CartSkuView sku=item.getSkuId()==null?null:new CartSkuView(item.getSkuId(),item.getSkuName(),unit,item.getSkuStock(),item.getSkuStatus(),item.getSkuVersion());
 		return new CartItemView(item.getId(), product, item.getQuantity(), subtotal,
-				unavailableReason == null, unavailableReason, item.getCreatedAt(), item.getUpdatedAt());
+				unavailableReason == null, unavailableReason, item.getCreatedAt(), item.getUpdatedAt(),sku);
 	}
 
 	private static void ensureAvailable(CartItemEntity item) {

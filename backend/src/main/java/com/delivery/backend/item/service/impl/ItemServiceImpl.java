@@ -7,15 +7,18 @@ import java.util.List;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import com.delivery.backend.common.ApiError;
 import com.delivery.backend.common.BusinessException;
 import com.delivery.backend.common.DeleteResult;
 import com.delivery.backend.common.PageResult;
 import com.delivery.backend.item.dao.ItemDao;
+import com.delivery.backend.item.dao.SkuDao;
 import com.delivery.backend.item.entity.CategoryEntity;
 import com.delivery.backend.item.entity.ProductEntity;
 import com.delivery.backend.item.service.ItemService;
+import com.delivery.backend.item.service.SkuService;
 import com.delivery.backend.restaurant.service.RestaurantService;
 
 /** Category, product, optimistic-update, and atomic-stock behavior. */
@@ -28,10 +31,16 @@ public class ItemServiceImpl implements ItemService {
 	private static final String OFF_SALE = "OFF_SALE";
 	private final ItemDao itemDao;
 	private final RestaurantService restaurantService;
+	private final SkuDao skuDao;
 
 	public ItemServiceImpl(ItemDao itemDao, RestaurantService restaurantService) {
+		this(itemDao, restaurantService, null);
+	}
+	@Autowired
+	public ItemServiceImpl(ItemDao itemDao, RestaurantService restaurantService, SkuDao skuDao) {
 		this.itemDao = itemDao;
 		this.restaurantService = restaurantService;
+		this.skuDao = skuDao;
 	}
 
 	@Override
@@ -116,21 +125,24 @@ public class ItemServiceImpl implements ItemService {
 		if (category.getShopId() != request.shopId()) {
 			throw new BusinessException(ApiError.RESOURCE_CONFLICT);
 		}
-		validatePrice(request.price());
-		if (request.stock() < 0) {
-			throw new BusinessException(ApiError.VALIDATION_ERROR);
-		}
+		List<SkuService.CreateRequest> skus=request.skus();
+		if (skus.isEmpty()) throw new BusinessException(ApiError.VALIDATION_ERROR);
+		BigDecimal price=request.price(); int stock=request.stock()==null?0:request.stock();
+		if(price==null){price=skus.stream().map(SkuService.CreateRequest::price).min(BigDecimal::compareTo).orElseThrow();}
+		if(request.stock()==null) stock=skus.stream().mapToInt(SkuService.CreateRequest::stock).sum();
+		validatePrice(price); if(stock<0) throw new BusinessException(ApiError.VALIDATION_ERROR);
 
 		ProductEntity product = new ProductEntity();
 		product.setShopId(request.shopId());
 		product.setCategoryId(request.categoryId());
 		product.setName(normalizeRequired(request.name()));
 		product.setDescription(request.description());
-		product.setPrice(request.price());
-		product.setStock(request.stock());
+		product.setPrice(price);
+		product.setStock(stock);
 		product.setStatus(OFF_SALE);
 		product.setVersion(1L);
 		itemDao.insertProduct(product);
+		if(skuDao!=null) for(SkuService.CreateRequest requestSku:skus){var sku=new com.delivery.backend.item.entity.SkuEntity();sku.setProductId(product.getId());sku.setName(requestSku.name().trim());sku.setPrice(requestSku.price());sku.setStock(requestSku.stock());sku.setStatus(OFF_SALE);sku.setVersion(1L);skuDao.insert(sku);}
 		return toProductView(requireProduct(product.getId()));
 	}
 
@@ -158,7 +170,7 @@ public class ItemServiceImpl implements ItemService {
 		String keyword = normalizeSearch(query.keyword());
 		long offset = (long) (page - 1) * pageSize;
 		List<ProductView> items = itemDao.listProducts(shopId, query.categoryId(), keyword, includeOffSale,
-				sortBy, sortOrder, pageSize, offset).stream().map(ItemServiceImpl::toProductView).toList();
+				sortBy, sortOrder, pageSize, offset).stream().map(this::toProductView).toList();
 		long total = itemDao.countProducts(shopId, query.categoryId(), keyword, includeOffSale);
 		int totalPages = total == 0 ? 0 : (int) ((total + pageSize - 1) / pageSize);
 		return new PageResult<>(items, page, pageSize, total, totalPages);
@@ -291,10 +303,11 @@ public class ItemServiceImpl implements ItemService {
 				category.getSortOrder(), category.getCreatedAt(), category.getUpdatedAt());
 	}
 
-	private static ProductView toProductView(ProductEntity product) {
+	private ProductView toProductView(ProductEntity product) {
+		List<SkuService.SkuView> skus=skuDao==null?List.of():skuDao.listByProduct(product.getId()).stream().map(s->new SkuService.SkuView(s.getId(),s.getProductId(),s.getName(),s.getPrice(),s.getStock(),s.getStatus(),s.getVersion(),s.getCreatedAt(),s.getUpdatedAt())).toList();
 		return new ProductView(product.getId(), product.getShopId(), product.getCategoryId(),
 				product.getName(), product.getDescription(), product.getPrice(), product.getStock(),
-				product.getStatus(), product.getVersion(), product.getCreatedAt(), product.getUpdatedAt());
+				product.getStatus(), product.getVersion(), product.getCreatedAt(), product.getUpdatedAt(),null,skus);
 	}
 
 	private static int defaultPage(Integer page) {

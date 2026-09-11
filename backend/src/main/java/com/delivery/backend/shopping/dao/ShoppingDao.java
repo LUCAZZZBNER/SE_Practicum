@@ -13,6 +13,7 @@ public interface ShoppingDao {
 
 	CartItemEntity findByUserAndProduct(@Param("userId") long userId,
 			@Param("productId") long productId);
+	CartItemEntity findByUserAndSku(@Param("userId") long userId,@Param("skuId") long skuId);
 
 	CartItemEntity findOwnedById(@Param("userId") long userId,
 			@Param("id") long id);

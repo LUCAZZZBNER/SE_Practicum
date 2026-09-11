@@ -156,6 +156,50 @@ public class OrderServiceImpl implements OrderService {
 	}
 
 	@Override
+	@Transactional
+	public OrderView pay(long userId, long orderId, String idempotencyKey) {
+		userService.requireActive(userId);
+		findMine(userId, orderId);
+		if (orderDao.transitionStatus(orderId, "PAID", PENDING_PAYMENT) != 1) {
+			throw new BusinessException(ApiError.ORDER_STATE_CONFLICT);
+		}
+		return requireMine(userId, orderId);
+	}
+
+	@Override
+	@Transactional
+	public OrderView confirmReceipt(long userId, long orderId, String idempotencyKey) {
+		userService.requireActive(userId);
+		findMine(userId, orderId);
+		if (orderDao.transitionStatus(orderId, "COMPLETED", "DELIVERING") != 1) {
+			throw new BusinessException(ApiError.ORDER_STATE_CONFLICT);
+		}
+		return requireMine(userId, orderId);
+	}
+
+	@Override
+	@Transactional
+	public OrderView prepare(long merchantId, long orderId, String idempotencyKey) {
+		merchantService.getCurrent(merchantId);
+		OrderEntity order = orderDao.findMerchantOrder(merchantId, orderId);
+		if (order == null || orderDao.transitionStatus(orderId, "PREPARING", "PAID") != 1) {
+			throw new BusinessException(ApiError.ORDER_STATE_CONFLICT);
+		}
+		return toOrderView(orderDao.findMerchantOrder(merchantId, orderId), orderDao.listItems(orderId));
+	}
+
+	@Override
+	@Transactional
+	public OrderView deliver(long merchantId, long orderId, String idempotencyKey) {
+		merchantService.getCurrent(merchantId);
+		OrderEntity order = orderDao.findMerchantOrder(merchantId, orderId);
+		if (order == null || orderDao.transitionStatus(orderId, "DELIVERING", "PREPARING") != 1) {
+			throw new BusinessException(ApiError.ORDER_STATE_CONFLICT);
+		}
+		return toOrderView(orderDao.findMerchantOrder(merchantId, orderId), orderDao.listItems(orderId));
+	}
+
+	@Override
 	@Transactional(readOnly = true)
 	public PageResult<OrderSummaryView> listMerchantOrders(long merchantId, MerchantListQuery query) {
 		merchantService.getCurrent(merchantId);

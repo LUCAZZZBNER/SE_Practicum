@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
@@ -25,6 +26,7 @@ import com.delivery.backend.common.ApiResponse;
 import com.delivery.backend.common.DeleteResult;
 import com.delivery.backend.common.PageResult;
 import com.delivery.backend.item.service.ItemService;
+import com.delivery.backend.item.service.SkuService;
 import com.delivery.backend.security.CurrentPrincipal;
 import com.delivery.backend.security.PublicEndpoint;
 import com.delivery.backend.security.RequireRole;
@@ -35,10 +37,20 @@ import com.delivery.backend.security.Role;
 public class ItemController {
 
 	private final ItemService itemService;
+	private final SkuService skuService;
 
 	public ItemController(ItemService itemService) {
-		this.itemService = itemService;
+		this(itemService,null);
 	}
+	@Autowired
+	public ItemController(ItemService itemService,SkuService skuService){this.itemService=itemService;this.skuService=skuService;}
+
+	@PostMapping("/products/{productId}/skus") @RequireRole(Role.MERCHANT)
+	public ResponseEntity<ApiResponse<SkuService.SkuView>> createSku(@RequestAttribute("currentPrincipal") CurrentPrincipal p,@PathVariable @Positive long productId,@Valid @RequestBody SkuService.CreateRequest request){return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(skuService.create(p.id(),productId,request)));}
+	@PatchMapping("/skus/{skuId}") @RequireRole(Role.MERCHANT)
+	public ApiResponse<SkuService.SkuView> updateSku(@RequestAttribute("currentPrincipal") CurrentPrincipal p,@PathVariable @Positive long skuId,@Valid @RequestBody SkuService.UpdateRequest request){return ApiResponse.success(skuService.update(p.id(),skuId,request));}
+	@GetMapping("/products/{productId}/skus") @PublicEndpoint(optionalAuthentication=true)
+	public ApiResponse<List<SkuService.SkuView>> listSkus(@PathVariable @Positive long productId,@RequestParam(defaultValue="false") boolean includeOffSale,@RequestAttribute(name="currentPrincipal",required=false) CurrentPrincipal p){Long merchant=p!=null&&p.role()==Role.MERCHANT?p.id():null;return ApiResponse.success(skuService.list(productId,includeOffSale,merchant));}
 
 	@PostMapping("/shops/{shopId}/categories")
 	@RequireRole(Role.MERCHANT)

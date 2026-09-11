@@ -48,4 +48,7 @@ public interface OrderDao {
 			@Param("status") String status);
 
 	int cancelPending(@Param("userId") long userId, @Param("orderId") long orderId);
+
+	int transitionStatus(@Param("orderId") long orderId, @Param("status") String status,
+			@Param("fromStatus") String fromStatus);
 }

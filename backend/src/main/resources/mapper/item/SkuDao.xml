@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.delivery.backend.item.dao.SkuDao">
+ <resultMap id="sku" type="com.delivery.backend.item.entity.SkuEntity"><id property="id" column="id"/><result property="productId" column="product_id"/><result property="name" column="name"/><result property="price" column="price"/><result property="stock" column="stock"/><result property="status" column="status"/><result property="version" column="version"/><result property="createdAt" column="created_at"/><result property="updatedAt" column="updated_at"/></resultMap>
+ <insert id="insert" useGeneratedKeys="true" keyProperty="id">INSERT INTO product_skus(product_id,name,price,stock,status,version) VALUES(#{productId},#{name},#{price},#{stock},#{status},#{version})</insert>
+ <select id="findById" resultMap="sku">SELECT id,product_id,name,price,stock,status,version,created_at,updated_at FROM product_skus WHERE id=#{id}</select>
+ <select id="listByProduct" resultMap="sku">SELECT id,product_id,name,price,stock,status,version,created_at,updated_at FROM product_skus WHERE product_id=#{productId} ORDER BY id</select>
+ <update id="update">UPDATE product_skus SET name=#{name},price=#{price},stock=#{stock},status=#{status},version=version+1 WHERE id=#{id} AND version=#{version}</update>
+</mapper>

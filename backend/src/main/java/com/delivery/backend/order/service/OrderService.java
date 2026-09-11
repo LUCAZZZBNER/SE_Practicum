@@ -23,17 +23,33 @@ public interface OrderService {
 
 	OrderView cancel(long userId, long orderId);
 
+	OrderView pay(long userId, long orderId, String idempotencyKey);
+
+	OrderView confirmReceipt(long userId, long orderId, String idempotencyKey);
+
+	OrderView prepare(long merchantId, long orderId, String idempotencyKey);
+
+	OrderView deliver(long merchantId, long orderId, String idempotencyKey);
+
 	PageResult<OrderSummaryView> listMerchantOrders(long merchantId, MerchantListQuery query);
 
 	OrderView getMerchantOrder(long merchantId, long orderId);
 
-	record CreateRequest(@NotEmpty List<@NotNull @Valid ItemRequest> items) {
+	record CreateRequest(@NotEmpty List<@NotNull @Valid ItemRequest> items, @Positive Long addressId, String remark) {
+		public CreateRequest(List<ItemRequest> items) {
+			this(items, null, null);
+		}
+
 		public CreateRequest {
 			items = items == null ? null : List.copyOf(items);
+			remark = remark == null ? null : remark.trim();
 		}
 	}
 
-	record ItemRequest(@Positive long cartItemId, @Positive long productVersion) {
+	record ItemRequest(@Positive long cartItemId, @Positive long skuVersion) {
+		public long productVersion() {
+			return skuVersion;
+		}
 	}
 
 	record ListQuery(String status, Integer page, Integer pageSize, String sortBy, String sortOrder) {
@@ -43,8 +59,12 @@ public interface OrderService {
 		String sortOrder) {
 	}
 
-	record OrderLineView(long productId, String productName, BigDecimal unitPrice, int quantity,
-			BigDecimal subtotal) {
+	record OrderLineView(long productId, Long skuId, String productName, String skuName, String imageUrl,
+			BigDecimal unitPrice, int quantity, BigDecimal subtotal) {
+		public OrderLineView(long productId, String productName, BigDecimal unitPrice, int quantity,
+				BigDecimal subtotal) {
+			this(productId, null, productName, null, null, unitPrice, quantity, subtotal);
+		}
 	}
 
 	record OrderView(long id, String orderNumber, long userId, long shopId, String shopName,

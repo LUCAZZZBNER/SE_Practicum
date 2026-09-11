@@ -23,18 +23,20 @@ public interface ShoppingService {
 
 	void removeAfterCheckout(long userId, List<Long> cartItemIds);
 
-	record AddRequest(@Positive long productId, @Positive int quantity) {
-	}
+	record AddRequest(@Positive long skuId, @Positive int quantity) {}
 
 	record AddResult(boolean created, CartItemView item) {
 	}
 
 	record CartProductView(long id, long shopId, String name, BigDecimal price, int stock, String status,
-			long version) {
+			long version, String imageUrl) {
+		public CartProductView(long id,long shopId,String name,BigDecimal price,int stock,String status,long version){this(id,shopId,name,price,stock,status,version,null);}
 	}
+	record CartSkuView(long id,String name,BigDecimal price,int stock,String status,long version) {}
 
 	record CartItemView(long id, CartProductView product, int quantity, BigDecimal subtotal, boolean available,
-			String unavailableReason, Instant createdAt, Instant updatedAt) {
+				String unavailableReason, Instant createdAt, Instant updatedAt, CartSkuView sku) {
+		public CartItemView(long id,CartProductView product,int quantity,BigDecimal subtotal,boolean available,String unavailableReason,Instant createdAt,Instant updatedAt){this(id,product,quantity,subtotal,available,unavailableReason,createdAt,updatedAt,null);}
 	}
 
 	record CartView(List<CartItemView> items, BigDecimal total) {

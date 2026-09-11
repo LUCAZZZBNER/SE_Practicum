@@ -156,4 +156,10 @@
           AND status = 'PENDING_PAYMENT'
     </update>
 
+    <update id="transitionStatus">
+        UPDATE orders
+        SET status = #{status}, updated_at = CURRENT_TIMESTAMP(3)
+        WHERE id = #{orderId} AND status = #{fromStatus}
+    </update>
+
 </mapper>

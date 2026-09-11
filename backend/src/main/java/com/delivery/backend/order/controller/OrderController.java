@@ -71,8 +71,28 @@ public class OrderController {
 	@RequireRole(Role.USER)
 	public ApiResponse<OrderService.OrderView> cancel(
 			@RequestAttribute("currentPrincipal") CurrentPrincipal principal,
-			@PathVariable @Positive long orderId) {
+			@PathVariable @Positive long orderId,
+			@RequestHeader(value = "X-Idempotency-Key", required = false) String idempotencyKey,
+			@RequestBody(required = false) CancelRequest request) {
 		return ApiResponse.success(orderService.cancel(principal.id(), orderId));
+	}
+
+	@PostMapping("/orders/{orderId}/pay")
+	@RequireRole(Role.USER)
+	public ApiResponse<OrderService.OrderView> pay(
+			@RequestAttribute("currentPrincipal") CurrentPrincipal principal,
+			@PathVariable @Positive long orderId,
+			@RequestHeader("X-Idempotency-Key") @NotBlank String idempotencyKey) {
+		return ApiResponse.success(orderService.pay(principal.id(), orderId, idempotencyKey));
+	}
+
+	@PostMapping("/orders/{orderId}/confirm-receipt")
+	@RequireRole(Role.USER)
+	public ApiResponse<OrderService.OrderView> confirmReceipt(
+			@RequestAttribute("currentPrincipal") CurrentPrincipal principal,
+			@PathVariable @Positive long orderId,
+			@RequestHeader("X-Idempotency-Key") @NotBlank String idempotencyKey) {
+		return ApiResponse.success(orderService.confirmReceipt(principal.id(), orderId, idempotencyKey));
 	}
 
 	@GetMapping("/merchant/orders")
@@ -95,5 +115,26 @@ public class OrderController {
 			@RequestAttribute("currentPrincipal") CurrentPrincipal principal,
 			@PathVariable @Positive long orderId) {
 		return ApiResponse.success(orderService.getMerchantOrder(principal.id(), orderId));
+	}
+
+	@PostMapping("/merchant/orders/{orderId}/prepare")
+	@RequireRole(Role.MERCHANT)
+	public ApiResponse<OrderService.OrderView> prepare(
+			@RequestAttribute("currentPrincipal") CurrentPrincipal principal,
+			@PathVariable @Positive long orderId,
+			@RequestHeader("X-Idempotency-Key") @NotBlank String idempotencyKey) {
+		return ApiResponse.success(orderService.prepare(principal.id(), orderId, idempotencyKey));
+	}
+
+	@PostMapping("/merchant/orders/{orderId}/deliver")
+	@RequireRole(Role.MERCHANT)
+	public ApiResponse<OrderService.OrderView> deliver(
+			@RequestAttribute("currentPrincipal") CurrentPrincipal principal,
+			@PathVariable @Positive long orderId,
+			@RequestHeader("X-Idempotency-Key") @NotBlank String idempotencyKey) {
+		return ApiResponse.success(orderService.deliver(principal.id(), orderId, idempotencyKey));
+	}
+
+	record CancelRequest(String reason) {
 	}
 }
