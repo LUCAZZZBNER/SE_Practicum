@@ -196,6 +196,8 @@ public class OrderServiceImpl implements OrderService {
 		if (restore && key != null) {
 			RefundEntity refundEntity = new RefundEntity();
 			refundEntity.setOrderId(orderId); refundEntity.setRefundNumber("REFUND-" + orderId);
+			PaymentEntity payment = orderDao.findPayment(orderId);
+			refundEntity.setPaymentId(payment == null ? null : payment.getId());
 			refundEntity.setAmount(order.getTotalAmount()); refundEntity.setStatus("REFUNDED"); refundEntity.setIdempotencyKey(key);
 			try { orderDao.insertRefund(refundEntity); } catch (DuplicateKeyException exception) {
 				throw new BusinessException(ApiError.IDEMPOTENCY_CONFLICT);
@@ -282,7 +284,7 @@ public class OrderServiceImpl implements OrderService {
 		if (!"REFUNDED".equals(order.getRefundStatus())) throw new BusinessException(ApiError.RESOURCE_NOT_FOUND);
 		RefundEntity refund = orderDao.findRefund(orderId);
 		if (refund == null) throw new BusinessException(ApiError.RESOURCE_NOT_FOUND);
-		return new RefundView(orderId, refund.getRefundNumber(), refund.getAmount(), refund.getStatus());
+		return new RefundView(orderId, refund.getRefundNumber(), refund.getAmount(), refund.getStatus(), refund.getPaymentId());
 	}
 
 	@Override

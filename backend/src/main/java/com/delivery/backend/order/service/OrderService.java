@@ -98,7 +98,11 @@ public interface OrderService {
 		}
 	}
 
-	record RefundView(long orderId, String refundNumber, BigDecimal amount, String status) {}
+	record RefundView(long orderId, String refundNumber, BigDecimal amount, String status, Long paymentId) {
+		public RefundView(long orderId, String refundNumber, BigDecimal amount, String status) {
+			this(orderId, refundNumber, amount, status, null);
+		}
+	}
 
 	record PriceChangeData(List<ShoppingService.CartItemView> currentItems) {
 		public PriceChangeData {

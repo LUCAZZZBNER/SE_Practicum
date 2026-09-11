@@ -189,7 +189,7 @@
     </update>
 
     <resultMap id="paymentResultMap" type="com.delivery.backend.order.entity.PaymentEntity">
-        <id property="id" column="id"/><result property="orderId" column="order_id"/>
+        <id property="id" column="id"/><result property="orderId" column="order_id"/><result property="paymentId" column="payment_id"/>
         <result property="paymentNumber" column="payment_number"/><result property="amount" column="amount"/>
         <result property="status" column="status"/><result property="idempotencyKey" column="idempotency_key"/>
         <result property="paidAt" column="paid_at"/><result property="createdAt" column="created_at"/>
@@ -209,8 +209,8 @@
     <select id="findRefund" resultMap="refundResultMap">SELECT * FROM refunds WHERE order_id=#{orderId}</select>
     <select id="findRefundByKey" resultMap="refundResultMap">SELECT * FROM refunds WHERE idempotency_key=#{idempotencyKey}</select>
     <insert id="insertRefund" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO refunds(order_id,refund_number,amount,status,idempotency_key,completed_at)
-        VALUES(#{orderId},#{refundNumber},#{amount},#{status},#{idempotencyKey},CURRENT_TIMESTAMP(3))
+        INSERT INTO refunds(order_id,payment_id,refund_number,amount,status,idempotency_key,completed_at)
+        VALUES(#{orderId},#{paymentId},#{refundNumber},#{amount},#{status},#{idempotencyKey},CURRENT_TIMESTAMP(3))
     </insert>
 
 </mapper>

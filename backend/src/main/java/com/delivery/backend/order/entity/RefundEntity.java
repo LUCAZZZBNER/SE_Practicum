@@ -6,6 +6,7 @@ import java.time.Instant;
 public class RefundEntity {
 	private Long id;
 	private Long orderId;
+	private Long paymentId;
 	private String refundNumber;
 	private BigDecimal amount;
 	private String status;
@@ -14,6 +15,7 @@ public class RefundEntity {
 	private Instant createdAt;
 	public Long getId(){return id;} public void setId(Long v){id=v;}
 	public Long getOrderId(){return orderId;} public void setOrderId(Long v){orderId=v;}
+	public Long getPaymentId(){return paymentId;} public void setPaymentId(Long v){paymentId=v;}
 	public String getRefundNumber(){return refundNumber;} public void setRefundNumber(String v){refundNumber=v;}
 	public BigDecimal getAmount(){return amount;} public void setAmount(BigDecimal v){amount=v;}
 	public String getStatus(){return status;} public void setStatus(String v){status=v;}
