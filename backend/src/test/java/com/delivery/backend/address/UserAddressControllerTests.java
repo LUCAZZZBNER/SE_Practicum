@@ -80,4 +80,13 @@ class UserAddressControllerTests {
 		return new UserAddressService.AddressView(id, 7, "张三", "13800000000", "杭州", "学院路",
 				true, Instant.parse("2026-09-11T00:00:00Z"), Instant.parse("2026-09-11T00:00:00Z"));
 	}
+
+	@Test
+	void defaultAddressPatchUsesTheFrontendFieldName() throws Exception {
+		when(service.update(eq(7L), eq(51L), any())).thenReturn(address(51));
+		mvc.perform(patch("/api/v1/user-addresses/51").requestAttr("currentPrincipal", userPrincipal(7))
+				.contentType(JSON).content("{\"isDefault\":true}"))
+				.andExpect(status().isOk()).andExpect(successfulDataId(51));
+		verify(service).update(eq(7L), eq(51L), org.mockito.ArgumentMatchers.argThat(request -> Boolean.TRUE.equals(request.isDefault())));
+	}
 }

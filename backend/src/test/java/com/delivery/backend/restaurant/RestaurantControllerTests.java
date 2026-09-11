@@ -127,6 +127,16 @@ class RestaurantControllerTests {
 	}
 
 	@Test
+	void shopAddressUsesTheFieldsReadByTheFrontend() throws Exception {
+		when(service.get(10)).thenReturn(new RestaurantService.ShopView(10, 2, "Shop", null, "CLOSED", "杭州", "学院路", "05710000000", null, null));
+		mvc.perform(get("/api/v1/shops/10"))
+				.andExpect(status().isOk())
+				.andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.data.region").value("杭州"))
+				.andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.data.detail").value("学院路"))
+				.andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.data.phone").value("05710000000"));
+	}
+
+	@Test
 	void updateAcceptsExplicitNullAsAProvidedNullableDescription() throws Exception {
 		when(service.update(any(Long.class), any(Long.class), any())).thenReturn(shop(10));
 		mvc.perform(patch("/api/v1/shops/10").requestAttr("currentPrincipal", merchantPrincipal(2)).contentType(JSON)
