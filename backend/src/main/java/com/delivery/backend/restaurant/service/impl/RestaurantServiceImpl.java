@@ -168,7 +168,8 @@ public class RestaurantServiceImpl implements RestaurantService {
 	}
 
 	private static ShopSnapshot toSnapshot(ShopEntity shop) {
-		return new ShopSnapshot(shop.getId(), shop.getMerchantId(), shop.getName(), shop.getStatus());
+		return new ShopSnapshot(shop.getId(), shop.getMerchantId(), shop.getName(), shop.getStatus(),
+				shop.getAddressRegion(), shop.getAddressDetail(), shop.getAddressPhone());
 	}
 
 	private static int defaultPage(Integer page) {

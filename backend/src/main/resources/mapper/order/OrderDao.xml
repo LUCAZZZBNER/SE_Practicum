@@ -80,18 +80,21 @@
             useGeneratedKeys="true" keyProperty="id">
         INSERT INTO orders (
             order_no, user_id, idempotency_key, request_fingerprint,
-            shop_id, shop_name, total_amount, status
+            shop_id, shop_name, total_amount, status, payment_status, refund_status,
+            remark, user_address_snapshot, shop_address_snapshot
         ) VALUES (
             #{orderNumber}, #{userId}, #{idempotencyKey}, #{requestFingerprint},
-            #{shopId}, #{shopName}, #{totalAmount}, #{status}
+            #{shopId}, #{shopName}, #{totalAmount}, #{status}, #{paymentStatus}, #{refundStatus},
+            #{remark}, #{userAddressSnapshot}, #{shopAddressSnapshot}
         )
     </insert>
 
     <insert id="insertItems">
-        INSERT INTO order_items (order_id, product_id, product_name, unit_price, quantity)
+        INSERT INTO order_items (order_id, product_id, product_name, unit_price, quantity, sku_id, sku_name, image_url)
         VALUES
         <foreach collection="items" item="item" separator=",">
-            (#{item.orderId}, #{item.productId}, #{item.productName}, #{item.unitPrice}, #{item.quantity})
+            (#{item.orderId}, #{item.productId}, #{item.productName}, #{item.unitPrice}, #{item.quantity},
+             #{item.skuId}, #{item.skuName}, #{item.imageUrl})
         </foreach>
     </insert>
 

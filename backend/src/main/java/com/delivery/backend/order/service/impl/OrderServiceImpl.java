@@ -14,12 +14,17 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import com.delivery.backend.common.ApiError;
 import com.delivery.backend.common.BusinessException;
 import com.delivery.backend.common.PageResult;
+import com.delivery.backend.address.service.UserAddressService;
 import com.delivery.backend.item.service.ItemService;
 import com.delivery.backend.merchant.service.MerchantService;
 import com.delivery.backend.order.dao.OrderDao;
@@ -46,15 +51,26 @@ public class OrderServiceImpl implements OrderService {
 	private final RestaurantService restaurantService;
 	private final ShoppingService shoppingService;
 	private final ItemService itemService;
+	private final UserAddressService addressService;
+	private final ObjectMapper objectMapper;
 
 	public OrderServiceImpl(OrderDao orderDao, UserService userService, MerchantService merchantService,
 			RestaurantService restaurantService, ShoppingService shoppingService, ItemService itemService) {
+		this(orderDao, userService, merchantService, restaurantService, shoppingService, itemService, null, new ObjectMapper());
+	}
+
+	@Autowired
+	public OrderServiceImpl(OrderDao orderDao, UserService userService, MerchantService merchantService,
+			RestaurantService restaurantService, ShoppingService shoppingService, ItemService itemService,
+			UserAddressService addressService, ObjectMapper objectMapper) {
 		this.orderDao = orderDao;
 		this.userService = userService;
 		this.merchantService = merchantService;
 		this.restaurantService = restaurantService;
 		this.shoppingService = shoppingService;
 		this.itemService = itemService;
+		this.addressService = addressService;
+		this.objectMapper = objectMapper;
 	}
 
 	@Override
@@ -63,6 +79,13 @@ public class OrderServiceImpl implements OrderService {
 		userService.requireActiveForUpdate(userId);
 		String key = normalizeIdempotencyKey(idempotencyKey);
 		List<ItemRequest> requestedItems = validateItems(request);
+		if (request.addressId() == null || request.addressId() <= 0 || addressService == null) {
+			throw new BusinessException(ApiError.VALIDATION_ERROR);
+		}
+		if (request.remark() != null && request.remark().length() > 200) {
+			throw new BusinessException(ApiError.VALIDATION_ERROR);
+		}
+		UserAddressService.AddressView address = addressService.requireOwned(userId, request.addressId());
 		String fingerprint = fingerprint(requestedItems);
 
 		OrderEntity existing = orderDao.findByUserAndIdempotency(userId, key);
@@ -106,6 +129,11 @@ public class OrderServiceImpl implements OrderService {
 		order.setShopName(shop.name());
 		order.setTotalAmount(total);
 		order.setStatus(PENDING_PAYMENT);
+		order.setPaymentStatus("UNPAID");
+		order.setRefundStatus("NOT_REFUNDED");
+		order.setRemark(normalizeReason(request.remark()));
+		order.setUserAddressSnapshot(writeSnapshot(new OrderService.AddressSnapshot(address.recipient(), address.phone(), address.region(), address.detail())));
+		order.setShopAddressSnapshot(writeSnapshot(new OrderService.ShopAddressSnapshot(shop.region(), shop.detail(), shop.phone())));
 		orderDao.insertOrder(order);
 
 		List<OrderItemEntity> lines = snapshots.stream().map(snapshot -> toEntity(order.getId(), snapshot)).toList();
@@ -296,6 +324,23 @@ public class OrderServiceImpl implements OrderService {
 		return normalized;
 	}
 
+	private String writeSnapshot(Object value) {
+		try {
+			return objectMapper.writeValueAsString(value);
+		} catch (JsonProcessingException exception) {
+			throw new IllegalStateException("Unable to serialize order snapshot", exception);
+		}
+	}
+
+	private <T> T readSnapshot(String value, Class<T> type) {
+		if (value == null || value.isBlank()) return null;
+		try {
+			return objectMapper.readValue(value, type);
+		} catch (JsonProcessingException exception) {
+			return null;
+		}
+	}
+
 	private static String fingerprint(List<ItemRequest> items) {
 		List<ItemRequest> sorted = new ArrayList<>(items);
 		sorted.sort(Comparator.comparingLong(ItemRequest::cartItemId));
@@ -328,7 +373,10 @@ public class OrderServiceImpl implements OrderService {
 				item.getUnitPrice().multiply(BigDecimal.valueOf(item.getQuantity())))).toList();
 		return new OrderView(order.getId(), order.getOrderNumber(), order.getUserId(), order.getShopId(),
 				order.getShopName(), lines, order.getTotalAmount(), order.getStatus(), order.getCreatedAt(),
-				order.getUpdatedAt(), order.getCancelledAt());
+				order.getUpdatedAt(), order.getCancelledAt(), order.getPaymentStatus(), order.getRefundStatus(),
+				order.getRemark(), order.getCancelReason(), order.getCompletedAt(),
+				readSnapshot(order.getUserAddressSnapshot(), OrderService.AddressSnapshot.class),
+				readSnapshot(order.getShopAddressSnapshot(), OrderService.ShopAddressSnapshot.class));
 	}
 
 	private static OrderSummaryView toSummaryView(OrderEntity order) {

@@ -108,6 +108,9 @@ public interface RestaurantService {
 		public ShopView(long id,long merchantId,String name,String description,String status,Instant createdAt,Instant updatedAt){this(id,merchantId,name,description,status,null,null,null,createdAt,updatedAt);}
 	}
 
-	record ShopSnapshot(long id, long merchantId, String name, String status) {
+	record ShopSnapshot(long id, long merchantId, String name, String status, String region, String detail, String phone) {
+		public ShopSnapshot(long id, long merchantId, String name, String status) {
+			this(id, merchantId, name, status, null, null, null);
+		}
 	}
 }

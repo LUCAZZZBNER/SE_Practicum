@@ -75,11 +75,21 @@ public interface OrderService {
 
 	record OrderView(long id, String orderNumber, long userId, long shopId, String shopName,
 			List<OrderLineView> lines, BigDecimal total, String status, Instant createdAt, Instant updatedAt,
-			Instant cancelledAt) {
+			Instant cancelledAt, String paymentStatus, String refundStatus, String remark, String cancelReason,
+			Instant completedAt, AddressSnapshot userAddressSnapshot, ShopAddressSnapshot shopAddressSnapshot) {
+		public OrderView(long id, String orderNumber, long userId, long shopId, String shopName,
+				List<OrderLineView> lines, BigDecimal total, String status, Instant createdAt, Instant updatedAt,
+				Instant cancelledAt) {
+			this(id, orderNumber, userId, shopId, shopName, lines, total, status, createdAt, updatedAt,
+					cancelledAt, "UNPAID", "NOT_REFUNDED", null, null, null, null, null);
+		}
 		public OrderView {
 			lines = List.copyOf(lines);
 		}
 	}
+
+	record AddressSnapshot(String recipient, String phone, String region, String detail) {}
+	record ShopAddressSnapshot(String region, String detail, String phone) {}
 
 	record OrderSummaryView(long id, String orderNumber, long shopId, String shopName, BigDecimal total,
 			String status, Instant createdAt) {
