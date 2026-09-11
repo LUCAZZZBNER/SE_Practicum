@@ -43,9 +43,9 @@ class ShoppingServiceContractTests extends ServiceContractTestSupport {
 	void addingTheSameProductCreatesOnceThenMergesQuantity() {
 		Fixture fixture = fixture("cart-merge");
 		ShoppingService.AddResult created = service.add(fixture.userId(),
-				new ShoppingService.AddRequest(fixture.productId(), 1));
+				new ShoppingService.AddRequest(fixture.skuId(), 1));
 		ShoppingService.AddResult merged = service.add(fixture.userId(),
-				new ShoppingService.AddRequest(fixture.productId(), 2));
+				new ShoppingService.AddRequest(fixture.skuId(), 2));
 
 		assertThat(created.created()).isTrue();
 		assertThat(merged.created()).isFalse();
@@ -56,7 +56,7 @@ class ShoppingServiceContractTests extends ServiceContractTestSupport {
 	@Test
 	void cartUsesLatestProductDataAndCalculatesDisplayTotal() {
 		Fixture fixture = fixture("cart-total");
-		service.add(fixture.userId(), new ShoppingService.AddRequest(fixture.productId(), 2));
+		service.add(fixture.userId(), new ShoppingService.AddRequest(fixture.skuId(), 2));
 
 		ShoppingService.CartView cart = service.getCart(fixture.userId());
 		assertThat(cart.items()).singleElement().satisfies(item -> {
@@ -72,7 +72,7 @@ class ShoppingServiceContractTests extends ServiceContractTestSupport {
 		Fixture fixture = fixture("cart-owner");
 		long otherUserId = user("cart-other").id();
 		ShoppingService.CartItemView item = service.add(fixture.userId(),
-				new ShoppingService.AddRequest(fixture.productId(), 1)).item();
+				new ShoppingService.AddRequest(fixture.skuId(), 1)).item();
 
 		assertThat(service.changeQuantity(fixture.userId(), item.id(), 2).quantity()).isEqualTo(2);
 		assertBusinessError(ApiError.RESOURCE_NOT_FOUND,
@@ -85,7 +85,7 @@ class ShoppingServiceContractTests extends ServiceContractTestSupport {
 	void checkoutLoadingReturnsOnlySelectedOwnedItemsAndSuccessfulRemovalIsSelective() {
 		Fixture fixture = fixture("cart-checkout");
 		ShoppingService.CartItemView selected = service.add(fixture.userId(),
-				new ShoppingService.AddRequest(fixture.productId(), 1)).item();
+				new ShoppingService.AddRequest(fixture.skuId(), 1)).item();
 		List<ShoppingService.CheckoutItem> checkout = service.loadForCheckout(fixture.userId(),
 				List.of(selected.id()));
 		assertThat(checkout).singleElement().satisfies(item -> {
@@ -122,7 +122,7 @@ class ShoppingServiceContractTests extends ServiceContractTestSupport {
 		SkuService.UpdateRequest skuUpdate = new SkuService.UpdateRequest();
 		skuUpdate.setStatus("ON_SALE"); skuUpdate.setVersion(product.skus().get(0).version());
 		skuService.update(merchantId, product.skus().get(0).id(), skuUpdate);
-		return new Fixture(userId, product.id());
+		return new Fixture(userId, product.id(), product.skus().get(0).id());
 	}
 
 	private UserService.UserView user(String account) {
@@ -135,6 +135,6 @@ class ShoppingServiceContractTests extends ServiceContractTestSupport {
 		return jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
 	}
 
-	private record Fixture(long userId, long productId) {
+	private record Fixture(long userId, long productId, long skuId) {
 	}
 }

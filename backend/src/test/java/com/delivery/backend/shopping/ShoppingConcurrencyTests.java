@@ -42,7 +42,7 @@ class ShoppingConcurrencyTests {
 	@Test
 	void concurrentAddsIncrementInsteadOfOverwritingQuantity() throws Exception {
 		Fixture fixture = fixture();
-		shoppingService.add(fixture.userId(), new ShoppingService.AddRequest(fixture.productId(), 1));
+		shoppingService.add(fixture.userId(), new ShoppingService.AddRequest(fixture.skuId(), 1));
 		CountDownLatch start = new CountDownLatch(1);
 		ExecutorService executor = Executors.newFixedThreadPool(2);
 		try {
@@ -85,19 +85,19 @@ class ShoppingConcurrencyTests {
 		SkuService.UpdateRequest skuUpdate = new SkuService.UpdateRequest();
 		skuUpdate.setStatus("ON_SALE"); skuUpdate.setVersion(product.skus().get(0).version());
 		skuService.update(merchantId, product.skus().get(0).id(), skuUpdate);
-		return new Fixture(userId, product.id());
+		return new Fixture(userId, product.id(), product.skus().get(0).id());
 	}
 
 	private void addAfter(CountDownLatch start, Fixture fixture) {
 		try {
 			start.await();
-			shoppingService.add(fixture.userId(), new ShoppingService.AddRequest(fixture.productId(), 1));
+			shoppingService.add(fixture.userId(), new ShoppingService.AddRequest(fixture.skuId(), 1));
 		} catch (InterruptedException exception) {
 			Thread.currentThread().interrupt();
 			throw new IllegalStateException(exception);
 		}
 	}
 
-	private record Fixture(long userId, long productId) {
+	private record Fixture(long userId, long productId, long skuId) {
 	}
 }

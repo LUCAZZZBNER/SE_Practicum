@@ -218,7 +218,7 @@ class OrderServiceContractTests extends ServiceContractTestSupport {
 			skuService.update(merchantId, product.skus().get(0).id(), skuUpdate);
 		}
 		ShoppingService.CartItemView cartItem = shoppingService.add(userId,
-				new ShoppingService.AddRequest(product.id(), 2)).item();
+				new ShoppingService.AddRequest(product.skus().get(0).id(), 2)).item();
 		long addressId = addressService.create(userId,
 				new UserAddressService.CreateRequest("张三", "13800000000", "杭州", "学院路", true)).id();
 		return new Fixture(userId, merchantId, shop.id(), product.id(), product.version(), cartItem.id(), addressId);

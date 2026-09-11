@@ -103,7 +103,7 @@ class OrderConcurrencyTests {
 		skuUpdate.setStatus("ON_SALE"); skuUpdate.setVersion(product.skus().get(0).version());
 		skuService.update(merchantId, product.skus().get(0).id(), skuUpdate);
 		ShoppingService.CartItemView cartItem = shoppingService.add(userId,
-				new ShoppingService.AddRequest(product.id(), 2)).item();
+				new ShoppingService.AddRequest(product.skus().get(0).id(), 2)).item();
 		long addressId = addressService.create(userId,
 				new UserAddressService.CreateRequest("张三", "13800000000", "杭州", "学院路", true)).id();
 		OrderService.CreateRequest request = new OrderService.CreateRequest(
