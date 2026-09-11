@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   listStores: vi.fn(),
   getStoreDetail: vi.fn(),
   createShop: vi.fn(),
+  updateStoreAddress: vi.fn(),
   updateStoreStatus: vi.fn(),
   messageSuccess: vi.fn(),
   messageError: vi.fn(),
@@ -22,6 +23,7 @@ vi.mock('../../api/store', () => ({
   listStores: mocks.listStores,
   getStoreDetail: mocks.getStoreDetail,
   createShop: mocks.createShop,
+  updateStoreAddress: mocks.updateStoreAddress,
   updateStoreStatus: mocks.updateStoreStatus,
 }))
 
@@ -64,6 +66,7 @@ beforeEach(() => {
   mocks.listStores.mockReset()
   mocks.getStoreDetail.mockReset()
   mocks.createShop.mockReset()
+  mocks.updateStoreAddress.mockReset()
   mocks.updateStoreStatus.mockReset()
   mocks.messageSuccess.mockReset()
   mocks.messageError.mockReset()
@@ -171,5 +174,97 @@ describe('MerchantStoreView', () => {
     await flushPromises()
 
     expect(mocks.messageError).toHaveBeenCalledWith('保存失败')
+  })
+
+  it('loads the complete operating address into dedicated fields', async () => {
+    mocks.listStores.mockResolvedValue({ items: [{ id: 7 }] })
+    mocks.getStoreDetail.mockResolvedValue({
+      id: 7,
+      name: '示例快餐店',
+      description: '欢迎下单',
+      status: 'OPEN',
+      region: '浙江省杭州市西湖区',
+      detail: '学院路 2 号',
+      phone: '05710000000',
+    })
+
+    const wrapper = mountView()
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="store-region"]').element.value).toBe('浙江省杭州市西湖区')
+    expect(wrapper.get('[data-testid="store-detail"]').element.value).toBe('学院路 2 号')
+    expect(wrapper.get('[data-testid="store-phone"]').element.value).toBe('05710000000')
+    expect(wrapper.text()).toContain('经营地址')
+  })
+
+  it('saves a complete operating address through the dedicated endpoint', async () => {
+    mocks.listStores.mockResolvedValue({ items: [{ id: 7 }] })
+    mocks.getStoreDetail.mockResolvedValue({
+      id: 7,
+      name: '示例快餐店',
+      description: '欢迎下单',
+      status: 'CLOSED',
+      region: '',
+      detail: '',
+      phone: '',
+    })
+    mocks.updateStoreAddress.mockResolvedValue({})
+
+    const wrapper = mountView()
+    await flushPromises()
+
+    await wrapper.get('[data-testid="store-region"]').setValue('浙江省杭州市西湖区')
+    await wrapper.get('[data-testid="store-detail"]').setValue('学院路 2 号')
+    await wrapper.get('[data-testid="store-phone"]').setValue('05710000000')
+    await wrapper.get('[data-testid="save-store-address"]').trigger('click')
+    await flushPromises()
+
+    expect(mocks.updateStoreAddress).toHaveBeenCalledWith(7, {
+      region: '浙江省杭州市西湖区',
+      detail: '学院路 2 号',
+      phone: '05710000000',
+    })
+    expect(mocks.messageSuccess).toHaveBeenCalledWith('经营地址已保存')
+  })
+
+  it('rejects an incomplete operating address before submitting', async () => {
+    mocks.listStores.mockResolvedValue({ items: [{ id: 7 }] })
+    mocks.getStoreDetail.mockResolvedValue({
+      id: 7,
+      name: '示例快餐店',
+      description: '欢迎下单',
+      status: 'CLOSED',
+      region: '',
+      detail: '',
+      phone: '',
+    })
+
+    const wrapper = mountView()
+    await flushPromises()
+    await wrapper.get('[data-testid="save-store-address"]').trigger('click')
+
+    expect(mocks.updateStoreAddress).not.toHaveBeenCalled()
+    expect(mocks.messageError).toHaveBeenCalledWith('请完整填写经营地址')
+  })
+
+  it('shows the backend message when saving the operating address fails', async () => {
+    mocks.listStores.mockResolvedValue({ items: [{ id: 7 }] })
+    mocks.getStoreDetail.mockResolvedValue({
+      id: 7,
+      name: '示例快餐店',
+      description: '欢迎下单',
+      status: 'CLOSED',
+      region: '浙江省杭州市西湖区',
+      detail: '学院路 2 号',
+      phone: '05710000000',
+    })
+    mocks.updateStoreAddress.mockRejectedValue(new Error('经营地址保存失败'))
+
+    const wrapper = mountView()
+    await flushPromises()
+    await wrapper.get('[data-testid="save-store-address"]').trigger('click')
+    await flushPromises()
+
+    expect(mocks.messageError).toHaveBeenCalledWith('经营地址保存失败')
   })
 })
