@@ -151,7 +151,8 @@ class ItemControllerTests {
 	void productListForwardsAbsentAndFullySpecifiedQueries() throws Exception {
 		when(service.listProducts(any(Long.class), any())).thenReturn(productPage());
 		mvc.perform(get("/api/v1/shops/10/products"))
-				.andExpect(status().isOk()).andExpect(successfulPage(1, 10, 1));
+				.andExpect(status().isOk()).andExpect(successfulPage(1, 10, 1))
+				.andExpect(jsonPath("$.data.items[0].inStock").value(true));
 		verify(service).listProducts(10, new ItemService.ProductQuery(null, null, null, null, null, null, null, null));
 
 		mvc.perform(get("/api/v1/shops/10/products").requestAttr("currentPrincipal", merchantPrincipal(2))

@@ -215,6 +215,24 @@ class OrderServiceContractTests extends ServiceContractTestSupport {
 						request(fixture).items(), fixture.addressId(), "another remark")));
 	}
 
+	@Test
+	void orderDetailReturnsAddressSnapshotsAfterMysqlJsonRoundTrip() {
+		Fixture fixture = fixture("order-address-snapshots");
+
+		OrderService.OrderView created = service.create(
+				fixture.userId(), "address-snapshot-key", request(fixture));
+
+		assertThat(created.userAddressSnapshot())
+				.containsEntry("recipient", "张三")
+				.containsEntry("phone", "13800000000")
+				.containsEntry("region", "杭州")
+				.containsEntry("detail", "学院路");
+		assertThat(created.shopAddressSnapshot())
+				.containsEntry("region", "杭州")
+				.containsEntry("detail", "学院路")
+				.containsEntry("phone", "05711234567");
+	}
+
 	private Fixture fixture(String name) {
 		long userId = user(name + "-user").id();
 		long merchantId = merchant(name + "-merchant").id();

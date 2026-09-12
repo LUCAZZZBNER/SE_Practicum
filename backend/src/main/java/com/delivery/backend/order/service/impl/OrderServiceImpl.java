@@ -137,9 +137,10 @@ public class OrderServiceImpl implements OrderService {
 		order.setPaymentStatus("UNPAID");
 		order.setRefundStatus("NOT_REFUNDED");
 		order.setRemark(normalizedRemark);
-		order.setUserAddressSnapshot(writeSnapshot("recipient", address.recipient(), "phone", address.phone(),
+		order.setUserAddressSnapshot(OrderAddressSnapshotCodec.write("recipient", address.recipient(), "phone", address.phone(),
 				"region", address.region(), "detail", address.detail()));
-		order.setShopAddressSnapshot(writeSnapshot("region", shop.region(), "detail", shop.detail(), "phone", shop.phone()));
+		order.setShopAddressSnapshot(OrderAddressSnapshotCodec.write(
+				"region", shop.region(), "detail", shop.detail(), "phone", shop.phone()));
 		orderDao.insertOrder(order);
 
 		List<OrderItemEntity> lines = snapshots.stream().map(snapshot -> toEntity(order.getId(), snapshot)).toList();
@@ -448,24 +449,6 @@ public class OrderServiceImpl implements OrderService {
 		return normalized;
 	}
 
-	private static String writeSnapshot(String... values) {
-		StringBuilder json = new StringBuilder("{");
-		for (int i = 0; i < values.length; i += 2) {
-			if (i > 0) json.append(',');
-			json.append('"').append(values[i]).append("\":\"").append(escape(values[i + 1])).append('"');
-		}
-		return json.append('}').toString();
-	}
-
-	private static Map<String, String> readSnapshot(String value) {
-		if (value == null || value.isBlank()) return null;
-		Map<String, String> result = new java.util.LinkedHashMap<>();
-		java.util.regex.Matcher matcher = java.util.regex.Pattern.compile("\\\"([^\\\"]+)\\\":\\\"([^\\\"]*)\\\"").matcher(value);
-		while (matcher.find()) result.put(matcher.group(1), matcher.group(2));
-		return result;
-	}
-	private static String escape(String value) { return value == null ? "" : value.replace("\\", "\\\\").replace("\"", "\\\""); }
-
 	private static String fingerprint(List<ItemRequest> items, long addressId, String normalizedRemark) {
 		List<ItemRequest> sorted = new ArrayList<>(items);
 		sorted.sort(Comparator.comparingLong(ItemRequest::cartItemId));
@@ -514,7 +497,8 @@ public class OrderServiceImpl implements OrderService {
 				order.getShopName(), lines, order.getTotalAmount(), order.getStatus(), order.getCreatedAt(),
 				order.getUpdatedAt(), order.getCancelledAt(), order.getPaymentStatus(), order.getRefundStatus(),
 				order.getRemark(), order.getCancelReason(), order.getCompletedAt(),
-				readSnapshot(order.getUserAddressSnapshot()), readSnapshot(order.getShopAddressSnapshot()));
+				OrderAddressSnapshotCodec.read(order.getUserAddressSnapshot()),
+				OrderAddressSnapshotCodec.read(order.getShopAddressSnapshot()));
 	}
 
 	private static OrderSummaryView toSummaryView(OrderEntity order) {

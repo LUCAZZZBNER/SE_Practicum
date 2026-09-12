@@ -5,6 +5,7 @@ import java.time.Instant;
 import java.util.List;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.Valid;
@@ -262,6 +263,7 @@ public interface ItemService {
 			int stock, String status, long version, Instant createdAt, Instant updatedAt, ImageView image, List<SkuService.SkuView> skus) {
 		public ProductView(long id,long shopId,long categoryId,String name,String description,BigDecimal price,int stock,String status,long version,Instant createdAt,Instant updatedAt){this(id,shopId,categoryId,name,description,price,stock,status,version,createdAt,updatedAt,null,List.of());}
 		public ProductView { skus=skus==null?List.of():List.copyOf(skus); }
+		@JsonProperty("inStock")
 		public boolean inStock(){return stock > 0;}
 		public BigDecimal price(){return minPrice;}
 	}
