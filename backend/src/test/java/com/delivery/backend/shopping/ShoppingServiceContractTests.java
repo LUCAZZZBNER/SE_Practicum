@@ -111,7 +111,7 @@ class ShoppingServiceContractTests extends ServiceContractTestSupport {
 		restaurantService.update(merchantId, shop.id(), open);
 		long categoryId = itemService.createCategory(merchantId, shop.id(),
 				new ItemService.CreateCategoryRequest("Meals", 0)).id();
-		long imageId = insertImage();
+		long imageId = insertImage(merchantId);
 		ItemService.ProductView product = itemService.createProduct(merchantId,
 				new ItemService.CreateProductRequest(shop.id(), categoryId, "Rice", null,
 						new BigDecimal("12.50"), 5, imageId,
@@ -131,8 +131,8 @@ class ShoppingServiceContractTests extends ServiceContractTestSupport {
 				"ExamplePass123!", "Alice", null));
 	}
 
-	private long insertImage() {
-		jdbcTemplate.update("INSERT INTO images(url,content_type,size) VALUES('/uploads/test.webp','image/webp',4)");
+	private long insertImage(long merchantId) {
+		jdbcTemplate.update("INSERT INTO images(merchant_id,url,content_type,size) VALUES(?, '/uploads/test.webp','image/webp',4)", merchantId);
 		return jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
 	}
 

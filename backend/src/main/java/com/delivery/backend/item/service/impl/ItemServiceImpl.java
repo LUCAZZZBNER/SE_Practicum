@@ -15,7 +15,7 @@ import com.delivery.backend.common.DeleteResult;
 import com.delivery.backend.common.PageResult;
 import com.delivery.backend.item.dao.ItemDao;
 import com.delivery.backend.item.dao.SkuDao;
-import com.delivery.backend.image.dao.ImageDao;
+import com.delivery.backend.image.service.ImageService;
 import com.delivery.backend.item.entity.CategoryEntity;
 import com.delivery.backend.item.entity.ProductEntity;
 import com.delivery.backend.item.service.ItemService;
@@ -33,7 +33,7 @@ public class ItemServiceImpl implements ItemService {
 	private final ItemDao itemDao;
 	private final RestaurantService restaurantService;
 	private final SkuDao skuDao;
-	private final ImageDao imageDao;
+	private final ImageService imageService;
 
 	public ItemServiceImpl(ItemDao itemDao, RestaurantService restaurantService) {
 		this(itemDao, restaurantService, null, null);
@@ -42,11 +42,11 @@ public class ItemServiceImpl implements ItemService {
 		this(itemDao, restaurantService, skuDao, null);
 	}
 	@Autowired
-	public ItemServiceImpl(ItemDao itemDao, RestaurantService restaurantService, SkuDao skuDao, ImageDao imageDao) {
+	public ItemServiceImpl(ItemDao itemDao, RestaurantService restaurantService, SkuDao skuDao, ImageService imageService) {
 		this.itemDao = itemDao;
 		this.restaurantService = restaurantService;
 		this.skuDao = skuDao;
-		this.imageDao = imageDao;
+		this.imageService = imageService;
 	}
 
 	@Override
@@ -133,8 +133,8 @@ public class ItemServiceImpl implements ItemService {
 		}
 		List<SkuService.CreateRequest> skus=request.skus();
 		if (skus.isEmpty()) throw new BusinessException(ApiError.VALIDATION_ERROR);
-		if (request.imageId() != null && imageDao != null && imageDao.findById(request.imageId()) == null) {
-			throw new BusinessException(ApiError.IMAGE_INVALID);
+		if (request.imageId() != null && imageService != null) {
+			imageService.requireOwned(merchantId, request.imageId());
 		}
 		BigDecimal price=request.price(); int stock=request.stock()==null?0:request.stock();
 		if(price==null){price=skus.stream().map(SkuService.CreateRequest::price).min(BigDecimal::compareTo).orElseThrow();}
@@ -228,7 +228,7 @@ public class ItemServiceImpl implements ItemService {
 		}
 		String status = request.isStatusSpecified() ? validateProductStatus(request.status()) : null;
 		Long imageId = request.isImageIdSpecified() ? request.imageId() : product.getImageId();
-		if (imageId != null && imageDao != null && imageDao.findById(imageId) == null) throw new BusinessException(ApiError.IMAGE_INVALID);
+		if (imageId != null && imageService != null) imageService.requireOwned(merchantId, imageId);
 		if (ON_SALE.equals(status) && (imageId == null || skuDao == null || skuDao.listByProduct(productId).isEmpty())) {
 			throw new BusinessException(ApiError.IMAGE_REQUIRED);
 		}
@@ -340,9 +340,9 @@ public class ItemServiceImpl implements ItemService {
 	private ProductView toProductView(ProductEntity product, boolean includeOffSale) {
 		List<SkuService.SkuView> skus=skuDao==null?List.of():skuDao.listByProduct(product.getId()).stream().filter(s -> includeOffSale || ON_SALE.equals(s.getStatus())).map(s->new SkuService.SkuView(s.getId(),s.getProductId(),s.getName(),s.getPrice(),s.getStock(),s.getStatus(),s.getVersion(),s.getCreatedAt(),s.getUpdatedAt())).toList();
 		ImageView image = product.getImageId() == null ? null : new ImageView(product.getImageId(), product.getImageUrl());
-		if (product.getImageId() != null && imageDao != null) {
-			var asset = imageDao.findById(product.getImageId());
-			if (asset != null) image = new ImageView(asset.getId(), asset.getUrl(), asset.getContentType(), asset.getSize(), asset.getCreatedAt());
+		if (product.getImageId() != null && imageService != null) {
+			var asset = imageService.require(product.getImageId());
+			image = new ImageView(asset.id(), asset.url(), asset.contentType(), asset.size(), asset.createdAt());
 		}
 		BigDecimal minPrice = skus.stream().map(SkuService.SkuView::price).min(BigDecimal::compareTo).orElse(product.getPrice());
 		int stock = skus.stream().mapToInt(SkuService.SkuView::stock).sum();

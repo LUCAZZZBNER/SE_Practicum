@@ -612,10 +612,10 @@ request_fingerprint, order_id, created_at
 Set-Location 'D:\Projects\SchoolWorks\SW_2609\SE_Practicum'
 git status --short -- 'backend/src/main/resources/db/migration'
 git diff --name-only -- 'backend/src/main/resources/db/migration'
-Get-Content -LiteralPath 'backend/src/main/resources/db/migration/V10__harden_v12_persistence.sql'
+Get-Content -LiteralPath 'backend/src/main/resources/db/migration/V10__harden_v12_persistence.sql' -Encoding UTF8
 ```
 
-`git status` 必须显示新增 V10；未暂存的新文件不会出现在 `git diff` 中，所以同时用 `Get-Content` 检查其内容。再确认 V1-V9，无输出且退出码为 0 才正确：
+`git status` 必须显示新增 V10；未暂存的新文件不会出现在 `git diff` 中，所以同时用 `Get-Content` 检查其内容。Windows PowerShell 5.1 必须明确指定 `-Encoding UTF8`，否则正确的“默认规格”也可能被显示成乱码。再确认 V1-V9，无输出且退出码为 0 才正确：
 
 ```powershell
 git diff --exit-code origin/develop -- 'backend/src/main/resources/db/migration/V1__create_core_tables.sql' 'backend/src/main/resources/db/migration/V2__align_schema_with_api_contract.sql' 'backend/src/main/resources/db/migration/V3__frontend_contract.sql' 'backend/src/main/resources/db/migration/V4__transaction_idempotency.sql' 'backend/src/main/resources/db/migration/V5__sku_cart_constraints.sql' 'backend/src/main/resources/db/migration/V6__image_content.sql' 'backend/src/main/resources/db/migration/V7__order_action_idempotency.sql' 'backend/src/main/resources/db/migration/V8__fulfillment_idempotency.sql' 'backend/src/main/resources/db/migration/V9__refund_payment_reference.sql'
@@ -749,25 +749,62 @@ Set-Location 'D:\Projects\SchoolWorks\SW_2609\SE_Practicum\backend'
 
 ### 10.1 创建排练库
 
+`delivery_app` 是后端应用账号，通常只有指定数据库内的建表、读写权限，不能创建一个全新的数据库。因此创建排练库时要临时使用 MySQL 管理员账号（一般是 `root`），创建完成后再只把这个排练库授权给 `delivery_app`。
+
+先生成并显示本次排练库名：
+
 ```powershell
 $rehearsalDb = 'delivery_v10_' + (Get-Date -Format 'yyyyMMddHHmmss')
-mysql.exe --host=127.0.0.1 --port=3306 --user=$env:DELIVERY_DB_USERNAME --password --execute="CREATE DATABASE $rehearsalDb CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;"
 $rehearsalDb
 ```
 
-记下数据库名。
+记下屏幕显示的数据库名。然后使用 MySQL 管理员账号创建它，并仅向应用账号授予这个排练库的权限：
+
+```powershell
+$mysqlAdminUser = Read-Host '输入 MySQL 管理员账号（一般为 root）'
+mysql.exe --host=localhost --port=3306 --user=$mysqlAdminUser --password --execute="CREATE DATABASE $rehearsalDb CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci; GRANT ALL PRIVILEGES ON $rehearsalDb.* TO 'delivery_app'@'127.0.0.1';"
+```
+
+出现 `Enter password:` 时输入的是 **MySQL 管理员密码**。输入时屏幕不显示字符是正常现象。
+
+不要给 `delivery_app` 增加全局 `CREATE DATABASE` 权限；这里只授权一个可随时删除的排练库。
+
+最后改回应用账号，验证它已经能够进入排练库：
+
+```powershell
+mysql.exe --host=127.0.0.1 --port=3306 --user=$env:DELIVERY_DB_USERNAME --password --database=$rehearsalDb --execute="SELECT DATABASE() AS current_database;"
+```
+
+成功标准：命令没有 `ERROR`，结果中的 `current_database` 等于 `$rehearsalDb` 显示的数据库名。
+
+如果刚刚已经遇到 `ERROR 1044 ... Access denied`，不需要更换数据库名。失败的命令没有创建数据库，当前 PowerShell 窗口里的 `$rehearsalDb` 仍可继续使用；先运行 `$rehearsalDb` 确认它有值，再执行上面的管理员创建与授权命令。如果已经关闭了原 PowerShell 窗口，则把实际名称重新赋值，例如：
+
+```powershell
+$rehearsalDb = 'delivery_v10_20260912174442'
+```
 
 ### 10.2 只迁移到 V9
 
 ```powershell
 Set-Location 'D:\Projects\SchoolWorks\SW_2609\SE_Practicum\backend'
 $env:SPRING_PROFILES_ACTIVE = 'test'
-$env:SPRING_DATASOURCE_URL = "jdbc:mysql://127.0.0.1:3306/$rehearsalDb?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai"
+$env:SPRING_DATASOURCE_URL = "jdbc:mysql://127.0.0.1:3306/${rehearsalDb}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai"
 $env:SPRING_FLYWAY_TARGET = '9'
-.\mvnw.cmd "-Dspring-boot.run.arguments=--spring.main.web-application-type=none" spring-boot:run
+$env:SPRING_DATASOURCE_URL
+.\mvnw.cmd "-Dspring-boot.run.jvmArguments=-Dspring.devtools.restart.enabled=false" "-Dspring-boot.run.arguments=--spring.main.web-application-type=none" spring-boot:run
 ```
 
-成功标准：日志显示迁移到版本 9，应用上下文正常启动并退出。
+这里必须写成 `${rehearsalDb}`，用花括号明确变量边界。如果写成 `$rehearsalDb?useUnicode`，Windows PowerShell 会错误解析变量名，最终可能尝试连接一个名为 `=true&characterencoding...` 的数据库。
+
+运行 Maven 前，上一条输出必须是类似下面的完整 URL，其中数据库名必须是实际排练库，问号也必须存在：
+
+```text
+jdbc:mysql://127.0.0.1:3306/delivery_v10_20260912174442?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+```
+
+成功标准：日志显示迁移到版本 9，应用上下文正常启动并退出。不能只看最后的 `BUILD SUCCESS`；日志中不得出现 `Application run failed`、`Access denied` 或 `ERROR`。关闭 DevTools 自动重启是为了让启动失败能够正确传回 Maven，而不是被最后一行 `BUILD SUCCESS` 掩盖。
+
+如果此前报错中的数据库名是 `=true&characterencoding=utf8&servertimezone=asia/shanghai`，说明只是 URL 被 PowerShell 拼错，排练库没有被这次命令修改。无需重新建库，直接重新执行本节全部命令。
 
 ### 10.3 插入 V9 最小旧数据
 
@@ -811,7 +848,7 @@ exit
 
 ```powershell
 Remove-Item Env:SPRING_FLYWAY_TARGET -ErrorAction SilentlyContinue
-.\mvnw.cmd "-Dspring-boot.run.arguments=--spring.main.web-application-type=none" spring-boot:run
+.\mvnw.cmd "-Dspring-boot.run.jvmArguments=-Dspring.devtools.restart.enabled=false" "-Dspring-boot.run.arguments=--spring.main.web-application-type=none" spring-boot:run
 ```
 
 成功标准：出现 V10，无 SQL 错误，不删库，应用正常退出。
@@ -849,8 +886,15 @@ exit
 ```powershell
 Remove-Item Env:SPRING_DATASOURCE_URL -ErrorAction SilentlyContinue
 Remove-Item Env:SPRING_FLYWAY_TARGET -ErrorAction SilentlyContinue
+Remove-Item Env:SPRING_DEVTOOLS_RESTART_ENABLED -ErrorAction SilentlyContinue
 $env:SPRING_PROFILES_ACTIVE = 'test'
+$env:SPRING_DATASOURCE_URL
+$env:SPRING_FLYWAY_TARGET
+$env:SPRING_DEVTOOLS_RESTART_ENABLED
+$env:SPRING_PROFILES_ACTIVE
 ```
+
+成功标准：前三项不输出任何值，最后一项只输出 `test`。这表示后续命令不会继续误用排练库，也不会停留在只迁移到 V9 的模式。
 
 排练库保留到验收完成。以后删除时必须使用记下的准确库名，不能用通配符，不能删除 `delivery_dev` 或 `delivery_test`。
 
@@ -1095,17 +1139,41 @@ git rev-parse --short HEAD
 
 ## 15. 当前停止点和下一条指令
 
-第 6 节已经完成：5 个测试类、18 个测试方法均已写完并实际运行；结果为 7 个通过、8 个失败、3 个错误。11 个未通过项全部来自预期的业务契约缺口，不存在编译、数据库连接或 Flyway 迁移故障。
+第 6 节已经完成：5 个测试类、18 个测试方法均已写完并实际运行；结果为 7 个通过、8 个失败、3 个错误。11 个未通过项全部来自预期的业务契约缺口，不存在编译、数据库连接或 Flyway 迁移故障。Red 里程碑已经提交为 `b8ee570`，没有 push。
 
-本次只建立一个 Red 阶段里程碑提交，不 push。提交后进入第 7 节编写 V10：
+第 7.1 和 7.4 已经完成：已新建并写完 `V10__harden_v12_persistence.sql`。V10 当前包含默认 SKU 和购物车回填、默认地址唯一约束、图片归属、统一动作幂等表，以及支付/退款约束修正。V1～V9 没有修改，V10 尚未提交。
+
+2026-09-12 的实际测试日志已经证明 `delivery_test` 成功执行 V10：Flyway 显示成功校验 10 个迁移、当前版本为 10、无需继续迁移。
+
+第 8 节及其对应的第 9 节 Green 行为已经完成：地址写操作统一锁用户并转换唯一冲突；图片上传保存 merchantId，商品用图按商家校验；购物车写入必填 skuVersion 并以 SKU 为业务真相；订单写操作锁行并使用主体+动作+key 的统一幂等记录；待支付取消不退款，已支付/制作中取消必须引用真实 Payment 并全额退款；下单重放先于地址重新校验，备注先规范化再计算 fingerprint。
+
+实际验证结果：
+
+```text
+第 8 节相关测试：47 个通过，0 失败，0 错误
+完整后端测试：225 个通过，0 失败，0 错误
+最后一次订单收口复测：24 个通过，0 失败，0 错误
+BUILD SUCCESS
+```
+
+为满足图片归属契约，原测试夹具只补充了 `merchant_id` 建数参数，没有改变业务断言。V1～V9 没有修改；V10、生产代码和夹具调整目前均未提交、未 push。`ABC阶段1业务TDD开发与联调执行文档.md` 仍是用户原有的独立修改，不纳入 B 的提交。
+
+第 10 节旧库升级排练已经完成。独立排练库 `delivery_v10_20260912174728` 先执行 V1～V9，再插入无 SKU 商品、无 skuId/skuVersion 购物车、重复默认地址及无 merchantId 图片等旧数据，随后成功升级到 V10。查询结果为：V10 `success=1`；默认 SKU 的价格、库存、状态和版本正确；购物车完成 SKU 回填；有效默认地址收敛为 1；图片归属回填为原商家；统一动作幂等表及其唯一约束存在。排练库暂时保留，不影响 `delivery_dev` 和 `delivery_test`。
+
+第 11 节也已经完成：`mvn test` 与 `clean package` 均成功，Surefire 报告合计 225 个测试，0 失败、0 错误、0 跳过；生成的 JAR 时间为 2026-09-12 18:02:46。真实 `delivery_test` 中 V10 查询结果为 `row_count=1`、`success_count=1`。
+
+第 12.1 节范围检查已经完成：当前分支是 `codex/b-v12-green`；没有前端、Controller 或 V1～V9 改动；`git diff --check` 无错误。LF/CRLF 信息只是 Windows 换行提醒。`ABC阶段1业务TDD开发与联调执行文档.md` 是用户已有的独立修改，必须继续排除在 B 的暂存和提交之外。
+
+已经执行 `git fetch origin`；`git log --oneline --decorate HEAD..origin/develop` 没有输出，说明当前不存在需要合入的远程 `develop` 新提交，不执行无意义的 merge。
+
+下一步是只暂存并检查 B 的最终 Green 文件：
 
 ```powershell
 Set-Location 'D:\Projects\SchoolWorks\SW_2609\SE_Practicum'
-git status --short
-git add -- 'backend/src/test' 'B-V1.2后端持久化收口执行文档.md'
+git add -- 'backend/src/main/java' 'backend/src/main/resources/mapper' 'backend/src/main/resources/db/migration/V10__harden_v12_persistence.sql' 'backend/src/test/java' 'B-V1.2后端持久化收口执行文档.md'
 git restore --staged -- 'ABC阶段1业务TDD开发与联调执行文档.md'
 git status --short
-git commit -m 'test(red): define B V1.2 persistence contracts'
+git diff --cached --name-only
 ```
 
-下一项生产代码工作是第 7 节的 `V10__complete_v12_persistence_contract.sql`。在 V10 完成前，这 11 个 Red 保持失败是正确状态。
+成功标准：所有 B 代码、测试、Mapper、V10 和本执行文档显示在暂存区；`ABC阶段1业务TDD开发与联调执行文档.md` 只能显示为未暂存的 ` M`，不能出现在 `git diff --cached --name-only` 中。确认后才创建最终 Green 提交，不在检查前 push。

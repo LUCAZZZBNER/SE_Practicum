@@ -65,6 +65,7 @@ public class ShoppingServiceImpl implements ShoppingService {
 		item.setUserId(userId);
 		item.setProductId(product.id());
 		item.setSkuId(sku.getId());
+		item.setSkuVersion(sku.getVersion());
 		item.setQuantity(request.quantity());
 		try {
 			shoppingDao.insert(item);
@@ -133,8 +134,7 @@ public class ShoppingServiceImpl implements ShoppingService {
 		return items.stream().map(item -> {
 			ensureAvailable(item);
 			return new CheckoutItem(item.getId(), item.getProductId(), item.getShopId(), item.getQuantity(),
-					item.getSkuVersion() == null ? item.getProductVersion() : item.getSkuVersion(), item.getSkuId() == null ? 0 : item.getSkuId(),
-					item.getSkuVersion() == null ? item.getProductVersion() : item.getSkuVersion());
+					item.getSkuVersion(), item.getSkuId(), item.getSkuVersion());
 		}).toList();
 	}
 
@@ -179,13 +179,14 @@ public class ShoppingServiceImpl implements ShoppingService {
 	}
 
 	private static CartItemView toView(CartItemEntity item) {
+		BigDecimal unit = item.getSkuPrice();
 		CartProductView product = new CartProductView(item.getProductId(), item.getShopId(),
-				item.getProductName(), item.getProductPrice(), item.getProductStock(),
-				item.getProductStatus(), item.getProductVersion(), item.getProductImageUrl());
-		BigDecimal unit=item.getSkuPrice()==null?item.getProductPrice():item.getSkuPrice();
+				item.getProductName(), unit, item.getSkuStock(),
+				item.getProductStatus(), item.getSkuVersion(), item.getProductImageUrl());
 		BigDecimal subtotal = unit.multiply(BigDecimal.valueOf(item.getQuantity()));
 		String unavailableReason = unavailableReason(item);
-		CartSkuView sku=item.getSkuId()==null?null:new CartSkuView(item.getSkuId(),item.getSkuName(),unit,item.getSkuStock(),item.getSkuStatus(),item.getSkuVersion());
+		CartSkuView sku = new CartSkuView(item.getSkuId(), item.getSkuName(), unit,
+				item.getSkuStock(), item.getSkuStatus(), item.getSkuVersion());
 		return new CartItemView(item.getId(), product, item.getQuantity(), subtotal,
 				unavailableReason == null, unavailableReason, item.getCreatedAt(), item.getUpdatedAt(),sku);
 	}
@@ -198,7 +199,7 @@ public class ShoppingServiceImpl implements ShoppingService {
 			throw new BusinessException(ApiError.PRODUCT_OFF_SALE);
 		}
 		if (!ON_SALE.equals(item.getSkuStatus())) throw new BusinessException(ApiError.SKU_OFF_SALE);
-		ensureStock(item.getQuantity(), item.getSkuStock() == null ? item.getProductStock() : item.getSkuStock());
+		ensureStock(item.getQuantity(), item.getSkuStock());
 	}
 
 	private static String unavailableReason(CartItemEntity item) {
@@ -209,7 +210,7 @@ public class ShoppingServiceImpl implements ShoppingService {
 			return ApiError.PRODUCT_OFF_SALE.name();
 		}
 		if (!ON_SALE.equals(item.getSkuStatus())) return ApiError.SKU_OFF_SALE.name();
-		if (item.getQuantity() > (item.getSkuStock() == null ? item.getProductStock() : item.getSkuStock())) {
+		if (item.getQuantity() > item.getSkuStock()) {
 			return ApiError.INSUFFICIENT_STOCK.name();
 		}
 		return null;

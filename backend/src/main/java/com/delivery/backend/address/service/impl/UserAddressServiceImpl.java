@@ -2,6 +2,7 @@ package com.delivery.backend.address.service.impl;
 
 import java.util.List;
 
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,7 +30,11 @@ public class UserAddressServiceImpl implements UserAddressService {
 		entity.setUserId(userId); entity.setRecipient(request.recipient().trim()); entity.setPhone(request.phone().trim());
 		entity.setRegion(request.region().trim()); entity.setDetail(request.detail().trim());
 		entity.setDefaultAddress(Boolean.TRUE.equals(request.isDefault()) || firstAddress);
-		dao.insert(entity);
+		try {
+			dao.insert(entity);
+		} catch (DataIntegrityViolationException exception) {
+			throw new BusinessException(ApiError.RESOURCE_CONFLICT);
+		}
 		return toView(owned(userId, entity.getId()));
 	}
 
@@ -45,13 +50,20 @@ public class UserAddressServiceImpl implements UserAddressService {
 		if (request.regionSpecified() && (request.region() == null || request.region().isBlank())) throw new BusinessException(ApiError.VALIDATION_ERROR);
 		if (request.detailSpecified() && (request.detail() == null || request.detail().isBlank())) throw new BusinessException(ApiError.VALIDATION_ERROR);
 		if (request.defaultSpecified() && Boolean.TRUE.equals(request.isDefault())) dao.clearDefaults(userId);
-		dao.update(addressId, userId, request.recipientSpecified(), trim(request.recipient()), request.phoneSpecified(), trim(request.phone()),
-				request.regionSpecified(), trim(request.region()), request.detailSpecified(), trim(request.detail()), request.defaultSpecified(), request.isDefault());
+		try {
+			if (dao.update(addressId, userId, request.recipientSpecified(), trim(request.recipient()),
+					request.phoneSpecified(), trim(request.phone()), request.regionSpecified(), trim(request.region()),
+					request.detailSpecified(), trim(request.detail()), request.defaultSpecified(), request.isDefault()) != 1) {
+				throw new BusinessException(ApiError.RESOURCE_NOT_FOUND);
+			}
+		} catch (DataIntegrityViolationException exception) {
+			throw new BusinessException(ApiError.RESOURCE_CONFLICT);
+		}
 		return toView(owned(userId, addressId));
 	}
 
 	@Override @Transactional
-	public DeleteResult remove(long userId, long addressId) { userService.requireActive(userId); owned(userId, addressId); if (dao.softDelete(userId, addressId) != 1) throw new BusinessException(ApiError.RESOURCE_NOT_FOUND); return new DeleteResult(addressId, true); }
+	public DeleteResult remove(long userId, long addressId) { userService.requireActiveForUpdate(userId); owned(userId, addressId); if (dao.softDelete(userId, addressId) != 1) throw new BusinessException(ApiError.RESOURCE_NOT_FOUND); return new DeleteResult(addressId, true); }
 
 	@Override @Transactional(readOnly = true)
 	public AddressView requireOwned(long userId, long addressId) { return toView(owned(userId, addressId)); }
