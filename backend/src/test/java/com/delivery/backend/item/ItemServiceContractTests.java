@@ -137,14 +137,14 @@ class ItemServiceContractTests extends ServiceContractTestSupport {
 	}
 
 	private ItemService.ProductView createProduct(Fixture fixture) {
-		long imageId = insertImage();
+		long imageId = insertImage(fixture.merchantId());
 		return service.createProduct(fixture.merchantId(), new ItemService.CreateProductRequest(fixture.shopId(),
 				fixture.categoryId(), "Rice", null, new BigDecimal("12.50"), 5, imageId,
 				List.of(new com.delivery.backend.item.service.SkuService.CreateRequest("默认规格", new BigDecimal("12.50"), 5))));
 	}
 
-	private long insertImage() {
-		jdbcTemplate.update("INSERT INTO images(url,content_type,size) VALUES('/uploads/test.webp','image/webp',4)");
+	private long insertImage(long merchantId) {
+		jdbcTemplate.update("INSERT INTO images(merchant_id,url,content_type,size) VALUES(?, '/uploads/test.webp','image/webp',4)", merchantId);
 		return jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
 	}
 
