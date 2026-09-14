@@ -33,7 +33,7 @@ docs/                    项目文档
   dev-log/               开发日志和过程记录
 ```
 
-需求基线见 [软件需求规格说明书](docs/software-requirements-specification.md)，HTTP 契约见 [后端 API 设计](docs/api/backend-api-design.md)，最终数据库结构见 [数据库设计说明书](docs/database/数据库设计说明书.md)，测试证据见 [测试执行日志](docs/test/test-log.md)。
+需求基线见 [软件需求规格说明书](docs/软件需求规格说明书.md)，HTTP 契约见 [后端 API 设计](docs/api/backend-api-design.md)，最终数据库结构见 [数据库设计说明书](docs/database/数据库设计说明书.md)，测试证据见 [测试执行日志](docs/test/test-log.md)。
 
 后端采用简单四层 MVC，不使用 Spring Modulith。各业务模块的边界和职责见[架构设计](docs/architecture/README.md)。
 
