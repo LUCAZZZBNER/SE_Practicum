@@ -18,6 +18,8 @@ frontend/.vite/
 
 # Backend build output
 backend/target/
+gateway/target/
+services/**/target/
 
 # Logs
 *.log
@@ -34,3 +36,6 @@ pnpm-debug.log*
 SE_Practicum.md
 
 AGENTS.md
+
+# Temporary reports
+tmp/
