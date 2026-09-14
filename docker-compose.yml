@@ -7,11 +7,22 @@ services:
       MYSQL_USER: ${DELIVERY_DB_USERNAME:?DELIVERY_DB_USERNAME must be set}
       MYSQL_PASSWORD: ${DELIVERY_DB_PASSWORD:?DELIVERY_DB_PASSWORD must be set}
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD must be set}
+      IDENTITY_DB_USERNAME: ${IDENTITY_DB_USERNAME:-identity_app}
+      IDENTITY_DB_PASSWORD: ${IDENTITY_DB_PASSWORD:-identity_local_password}
+      CATALOG_DB_USERNAME: ${CATALOG_DB_USERNAME:-catalog_app}
+      CATALOG_DB_PASSWORD: ${CATALOG_DB_PASSWORD:-catalog_local_password}
+      CART_DB_USERNAME: ${CART_DB_USERNAME:-cart_app}
+      CART_DB_PASSWORD: ${CART_DB_PASSWORD:-cart_local_password}
+      ORDER_DB_USERNAME: ${ORDER_DB_USERNAME:-order_app}
+      ORDER_DB_PASSWORD: ${ORDER_DB_PASSWORD:-order_local_password}
+      MEDIA_DB_USERNAME: ${MEDIA_DB_USERNAME:-media_app}
+      MEDIA_DB_PASSWORD: ${MEDIA_DB_PASSWORD:-media_local_password}
     command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
     ports:
       - "${MYSQL_PORT:-3306}:3306"
     volumes:
       - delivery-mysql-data:/var/lib/mysql
+      - ./deploy/mysql/01-create-service-databases.sh:/docker-entrypoint-initdb.d/01-create-service-databases.sh:ro
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root -p\"$${MYSQL_ROOT_PASSWORD}\" --silent"]
       interval: 5s
@@ -19,29 +30,159 @@ services:
       retries: 30
       start_period: 20s
 
-  backend:
-    build:
-      context: ./backend
+  identity-service:
+    stop_grace_period: 30s
+    build: {context: ./services/identity-service}
     restart: unless-stopped
     depends_on:
-      db:
-        condition: service_healthy
+      db: {condition: service_healthy}
     environment:
-      SPRING_PROFILES_ACTIVE: dev
-      SPRING_DATASOURCE_URL: jdbc:mysql://db:3306/${MYSQL_DATABASE:-delivery_dev}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
-      DELIVERY_DB_USERNAME: ${DELIVERY_DB_USERNAME:?DELIVERY_DB_USERNAME must be set}
-      DELIVERY_DB_PASSWORD: ${DELIVERY_DB_PASSWORD:?DELIVERY_DB_PASSWORD must be set}
+      SERVICE_NAME: identity-service
+      IDENTITY_DATASOURCE_URL: jdbc:mysql://db:3306/delivery_identity?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+      IDENTITY_DB_USERNAME: ${IDENTITY_DB_USERNAME:-identity_app}
+      IDENTITY_DB_PASSWORD: ${IDENTITY_DB_PASSWORD:-identity_local_password}
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set}
       JWT_EXPIRATION_SECONDS: ${JWT_EXPIRATION_SECONDS:-7200}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?INTERNAL_SERVICE_TOKEN must be set}
+
+  catalog-service:
+    stop_grace_period: 30s
+    build: {context: ./services/catalog-service}
+    restart: unless-stopped
+    depends_on:
+      db: {condition: service_healthy}
+      identity-service: {condition: service_started}
+      media-service: {condition: service_started}
+    environment:
+      SERVICE_NAME: catalog-service
+      CATALOG_DATASOURCE_URL: jdbc:mysql://db:3306/delivery_catalog?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+      CATALOG_DB_USERNAME: ${CATALOG_DB_USERNAME:-catalog_app}
+      CATALOG_DB_PASSWORD: ${CATALOG_DB_PASSWORD:-catalog_local_password}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set}
+      JWT_EXPIRATION_SECONDS: ${JWT_EXPIRATION_SECONDS:-7200}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?INTERNAL_SERVICE_TOKEN must be set}
+      SERVICES_ORDER_URL: http://order-service:8080
+
+  cart-service:
+    stop_grace_period: 30s
+    build: {context: ./services/cart-service}
+    restart: unless-stopped
+    depends_on:
+      db: {condition: service_healthy}
+      identity-service: {condition: service_started}
+      catalog-service: {condition: service_started}
+      media-service: {condition: service_started}
+    environment:
+      SERVICE_NAME: cart-service
+      CART_DATASOURCE_URL: jdbc:mysql://db:3306/delivery_cart?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+      CART_DB_USERNAME: ${CART_DB_USERNAME:-cart_app}
+      CART_DB_PASSWORD: ${CART_DB_PASSWORD:-cart_local_password}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set}
+      JWT_EXPIRATION_SECONDS: ${JWT_EXPIRATION_SECONDS:-7200}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?INTERNAL_SERVICE_TOKEN must be set}
+      SERVICES_ORDER_URL: http://order-service:8080
+
+  order-service:
+    stop_grace_period: 30s
+    build: {context: ./services/order-service}
+    restart: unless-stopped
+    depends_on:
+      db: {condition: service_healthy}
+      identity-service: {condition: service_started}
+      catalog-service: {condition: service_started}
+      cart-service: {condition: service_started}
+      media-service: {condition: service_started}
+    environment:
+      SERVICE_NAME: order-service
+      ORDER_DATASOURCE_URL: jdbc:mysql://db:3306/delivery_order?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+      ORDER_DB_USERNAME: ${ORDER_DB_USERNAME:-order_app}
+      ORDER_DB_PASSWORD: ${ORDER_DB_PASSWORD:-order_local_password}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set}
+      JWT_EXPIRATION_SECONDS: ${JWT_EXPIRATION_SECONDS:-7200}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SERVICES_CATALOG_URL: http://catalog-service:8080
+      SERVICES_CART_URL: http://cart-service:8080
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?INTERNAL_SERVICE_TOKEN must be set}
+
+  media-service:
+    stop_grace_period: 30s
+    build: {context: ./services/media-service}
+    restart: unless-stopped
+    depends_on:
+      db: {condition: service_healthy}
+      identity-service: {condition: service_started}
+    environment:
+      SERVICE_NAME: media-service
+      MEDIA_DATASOURCE_URL: jdbc:mysql://db:3306/delivery_media?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+      MEDIA_DB_USERNAME: ${MEDIA_DB_USERNAME:-media_app}
+      MEDIA_DB_PASSWORD: ${MEDIA_DB_PASSWORD:-media_local_password}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set}
+      JWT_EXPIRATION_SECONDS: ${JWT_EXPIRATION_SECONDS:-7200}
+      IDENTITY_INTERNAL_URL: http://identity-service:8080
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?INTERNAL_SERVICE_TOKEN must be set}
+
+  gateway:
+    stop_grace_period: 30s
+    build:
+      context: ./gateway
+    restart: unless-stopped
+    depends_on:
+      identity-service:
+        condition: service_started
+      catalog-service:
+        condition: service_started
+      cart-service:
+        condition: service_started
+      order-service:
+        condition: service_started
+      media-service:
+        condition: service_started
+    environment:
+      SERVER_PORT: 8081
+      IDENTITY_SERVICE_URL: http://identity-service:8080
+      CATALOG_SERVICE_URL: http://catalog-service:8080
+      CART_SERVICE_URL: http://cart-service:8080
+      ORDER_SERVICE_URL: http://order-service:8080
+      MEDIA_SERVICE_URL: http://media-service:8080
     ports:
-      - "${BACKEND_PORT:-8080}:8080"
+      - "${GATEWAY_PORT:-8081}:8081"
+
+  kafka:
+    image: apache/kafka:3.9.0
+    restart: unless-stopped
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      # The single-broker development stack creates the declared event topic
+      # lazily on first publish; production should provision topics explicitly.
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_NUM_PARTITIONS: 3
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+    ports:
+      - "${KAFKA_PORT:-9092}:9092"
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
 
   frontend:
     build:
       context: ./frontend
     restart: unless-stopped
     depends_on:
-      - backend
+      - gateway
     ports:
       - "${FRONTEND_PORT:-5173}:80"
 

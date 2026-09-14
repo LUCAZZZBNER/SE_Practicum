@@ -1,0 +1,23 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: delivery-kafka-topics
+  namespace: delivery
+spec:
+  backoffLimit: 6
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: provision-topics
+          image: apache/kafka:3.9.0
+          env:
+            - {name: KAFKA_BOOTSTRAP_SERVERS, value: kafka:9092}
+          command: [sh, -c]
+          args:
+            - >-
+              until /opt/kafka/bin/kafka-topics.sh --bootstrap-server "$KAFKA_BOOTSTRAP_SERVERS" --list >/dev/null 2>&1;
+              do sleep 5; done;
+              /opt/kafka/bin/kafka-topics.sh --bootstrap-server "$KAFKA_BOOTSTRAP_SERVERS"
+              --create --if-not-exists --topic delivery.order.events.v1
+              --partitions 3 --replication-factor 1;

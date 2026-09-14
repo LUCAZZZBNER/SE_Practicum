@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: delivery-external-config
+  namespace: delivery
+# Replace these endpoints with the DNS names/URLs of the managed services in the
+# target cluster before applying the cloud overlay.
+data:
+  IDENTITY_DATASOURCE_URL: jdbc:mysql://mysql:3306/delivery_identity
+  CATALOG_DATASOURCE_URL: jdbc:mysql://mysql:3306/delivery_catalog
+  CART_DATASOURCE_URL: jdbc:mysql://mysql:3306/delivery_cart
+  ORDER_DATASOURCE_URL: jdbc:mysql://mysql:3306/delivery_order
+  MEDIA_DATASOURCE_URL: jdbc:mysql://mysql:3306/delivery_media
+  KAFKA_BOOTSTRAP_SERVERS: kafka:9092

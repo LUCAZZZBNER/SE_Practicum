@@ -1,0 +1,84 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: identity-service, namespace: delivery}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: identity-service}}
+  template:
+    metadata: {labels: {app: identity-service}}
+    spec:
+      containers:
+        - {name: service, image: delivery/identity-service:latest, ports: [{containerPort: 8080}], envFrom: [{secretRef: {name: delivery-secrets}}], env: [{name: SERVICE_NAME, value: identity-service}, {name: IDENTITY_DATASOURCE_URL, value: jdbc:mysql://mysql:3306/delivery_identity}, {name: INTERNAL_SERVICE_TOKEN, valueFrom: {secretKeyRef: {name: delivery-secrets, key: INTERNAL_SERVICE_TOKEN}}}]}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: identity-service, namespace: delivery}
+spec: {selector: {app: identity-service}, ports: [{port: 8080, targetPort: 8080}]}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: catalog-service, namespace: delivery}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: catalog-service}}
+  template:
+    metadata: {labels: {app: catalog-service}}
+    spec:
+      containers:
+        - {name: service, image: delivery/catalog-service:latest, ports: [{containerPort: 8080}], envFrom: [{secretRef: {name: delivery-secrets}}], env: [{name: SERVICE_NAME, value: catalog-service}, {name: CATALOG_DATASOURCE_URL, value: jdbc:mysql://mysql:3306/delivery_catalog}, {name: SERVICES_ORDER_URL, value: http://order-service:8080}, {name: INTERNAL_SERVICE_TOKEN, valueFrom: {secretKeyRef: {name: delivery-secrets, key: INTERNAL_SERVICE_TOKEN}}}]}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: catalog-service, namespace: delivery}
+spec: {selector: {app: catalog-service}, ports: [{port: 8080, targetPort: 8080}]}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: cart-service, namespace: delivery}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: cart-service}}
+  template:
+    metadata: {labels: {app: cart-service}}
+    spec:
+      containers:
+        - {name: service, image: delivery/cart-service:latest, ports: [{containerPort: 8080}], envFrom: [{secretRef: {name: delivery-secrets}}], env: [{name: SERVICE_NAME, value: cart-service}, {name: CART_DATASOURCE_URL, value: jdbc:mysql://mysql:3306/delivery_cart}, {name: SERVICES_ORDER_URL, value: http://order-service:8080}, {name: INTERNAL_SERVICE_TOKEN, valueFrom: {secretKeyRef: {name: delivery-secrets, key: INTERNAL_SERVICE_TOKEN}}}]}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: cart-service, namespace: delivery}
+spec: {selector: {app: cart-service}, ports: [{port: 8080, targetPort: 8080}]}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: order-service, namespace: delivery}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: order-service}}
+  template:
+    metadata: {labels: {app: order-service}}
+    spec:
+      containers:
+        - {name: service, image: delivery/order-service:latest, ports: [{containerPort: 8080}], envFrom: [{secretRef: {name: delivery-secrets}}], env: [{name: SERVICE_NAME, value: order-service}, {name: ORDER_DATASOURCE_URL, value: jdbc:mysql://mysql:3306/delivery_order}, {name: KAFKA_BOOTSTRAP_SERVERS, value: kafka:9092}, {name: SERVICES_CATALOG_URL, value: http://catalog-service:8080}, {name: SERVICES_CART_URL, value: http://cart-service:8080}, {name: INTERNAL_SERVICE_TOKEN, valueFrom: {secretKeyRef: {name: delivery-secrets, key: INTERNAL_SERVICE_TOKEN}}}]}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: order-service, namespace: delivery}
+spec: {selector: {app: order-service}, ports: [{port: 8080, targetPort: 8080}]}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: media-service, namespace: delivery}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: media-service}}
+  template:
+    metadata: {labels: {app: media-service}}
+    spec:
+      containers:
+        - {name: service, image: delivery/media-service:latest, ports: [{containerPort: 8080}], envFrom: [{secretRef: {name: delivery-secrets}}], env: [{name: SERVICE_NAME, value: media-service}, {name: MEDIA_DATASOURCE_URL, value: jdbc:mysql://mysql:3306/delivery_media}, {name: IDENTITY_INTERNAL_URL, value: http://identity-service:8080}, {name: INTERNAL_SERVICE_TOKEN, valueFrom: {secretKeyRef: {name: delivery-secrets, key: INTERNAL_SERVICE_TOKEN}}}]}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: media-service, namespace: delivery}
+spec: {selector: {app: media-service}, ports: [{port: 8080, targetPort: 8080}]}

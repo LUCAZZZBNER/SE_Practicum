@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: Service
+metadata: {name: kafka, namespace: delivery}
+$patch: delete
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata: {name: kafka, namespace: delivery}
+$patch: delete

@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: identity-service}
+spec: {replicas: 2}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: catalog-service}
+spec: {replicas: 2}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: cart-service}
+spec: {replicas: 2}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: order-service}
+spec: {replicas: 2}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: media-service}
+spec: {replicas: 2}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: delivery-gateway}
+spec: {replicas: 2}

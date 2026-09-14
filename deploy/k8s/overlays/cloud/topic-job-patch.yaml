@@ -1,0 +1,10 @@
+apiVersion: batch/v1
+kind: Job
+metadata: {name: delivery-kafka-topics}
+spec:
+  template:
+    spec:
+      containers:
+        - name: provision-topics
+          env:
+            - {name: KAFKA_BOOTSTRAP_SERVERS, valueFrom: {configMapKeyRef: {name: delivery-external-config, key: KAFKA_BOOTSTRAP_SERVERS}}}

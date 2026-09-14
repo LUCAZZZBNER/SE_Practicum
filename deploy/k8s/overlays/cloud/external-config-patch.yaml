@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: identity-service}
+spec:
+  template:
+    spec:
+      containers:
+        - name: service
+          env: [{name: IDENTITY_DATASOURCE_URL, valueFrom: {configMapKeyRef: {name: delivery-external-config, key: IDENTITY_DATASOURCE_URL}}}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: catalog-service}
+spec:
+  template:
+    spec:
+      containers:
+        - name: service
+          env: [{name: CATALOG_DATASOURCE_URL, valueFrom: {configMapKeyRef: {name: delivery-external-config, key: CATALOG_DATASOURCE_URL}}}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: cart-service}
+spec:
+  template:
+    spec:
+      containers:
+        - name: service
+          env: [{name: CART_DATASOURCE_URL, valueFrom: {configMapKeyRef: {name: delivery-external-config, key: CART_DATASOURCE_URL}}}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: order-service}
+spec:
+  template:
+    spec:
+      containers:
+        - name: service
+          env:
+            - {name: ORDER_DATASOURCE_URL, valueFrom: {configMapKeyRef: {name: delivery-external-config, key: ORDER_DATASOURCE_URL}}}
+            - {name: KAFKA_BOOTSTRAP_SERVERS, valueFrom: {configMapKeyRef: {name: delivery-external-config, key: KAFKA_BOOTSTRAP_SERVERS}}}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: media-service}
+spec:
+  template:
+    spec:
+      containers:
+        - name: service
+          env: [{name: MEDIA_DATASOURCE_URL, valueFrom: {configMapKeyRef: {name: delivery-external-config, key: MEDIA_DATASOURCE_URL}}}]
