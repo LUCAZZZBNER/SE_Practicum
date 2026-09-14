@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.delivery.catalog.item.dao.StockReservationDao">
+<select id="findQuantity" resultType="int">SELECT quantity FROM stock_reservations WHERE reservation_id=#{reservationId} AND product_id=#{productId} AND sku_id=#{skuId} AND status='RESERVED'</select>
+<insert id="insert">INSERT INTO stock_reservations(reservation_id,product_id,sku_id,quantity) VALUES(#{reservationId},#{productId},#{skuId},#{quantity})</insert>
+<update id="claimRestore">UPDATE stock_reservations SET status='RELEASED', released_at=CURRENT_TIMESTAMP(3) WHERE reservation_id=#{reservationId} AND product_id=#{productId} AND sku_id=#{skuId} AND status IN ('RESERVED','COMMITTED')</update>
+<update id="claimExpired">UPDATE stock_reservations SET status='RELEASED', released_at=CURRENT_TIMESTAMP(3) WHERE reservation_id=#{reservationId} AND product_id=#{productId} AND sku_id=#{skuId} AND status='RESERVED' AND expires_at &lt; CURRENT_TIMESTAMP(3)</update>
+<update id="confirm">UPDATE stock_reservations SET status='COMMITTED' WHERE reservation_id=#{reservationId} AND status='RESERVED'</update>
+<update id="claimReaperRows">UPDATE stock_reservations SET reaper_claimed_by=#{worker}, reaper_claim_until=DATE_ADD(CURRENT_TIMESTAMP(3),INTERVAL 60 SECOND) WHERE status='RESERVED' AND created_at &lt; CURRENT_TIMESTAMP(3) - INTERVAL 10 SECOND AND (reaper_claim_until IS NULL OR reaper_claim_until &lt; CURRENT_TIMESTAMP(3)) ORDER BY created_at LIMIT #{limit}</update>
+<select id="findClaimed" resultType="com.delivery.catalog.item.dao.StockReservationDao$Expired">SELECT reservation_id,product_id,sku_id,quantity FROM stock_reservations WHERE status='RESERVED' AND reaper_claimed_by=#{worker} AND reaper_claim_until &gt; CURRENT_TIMESTAMP(3) ORDER BY created_at</select>
+<update id="clearReaperClaim">UPDATE stock_reservations SET reaper_claimed_by=NULL,reaper_claim_until=NULL WHERE reservation_id=#{reservationId} AND reaper_claimed_by=#{worker}</update>
+</mapper>
