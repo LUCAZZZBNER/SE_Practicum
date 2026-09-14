@@ -21,6 +21,14 @@ export function getAuthState() {
 export function resolveNavigation(to, auth = getAuthState()) {
   const { token, role } = auth
 
+  if (to.meta?.requiresAuth && !token) {
+    return { path: '/', query: { redirect: to.fullPath || to.path } }
+  }
+
+  if (to.meta?.role && token && to.meta.role !== role) {
+    return getDashboardPath(role)
+  }
+
   if (PUBLIC_PATHS.has(to.path)) {
     if (token && (to.path === '/' || to.path.startsWith('/login') || to.path.startsWith('/register'))) {
       return getDashboardPath(role)

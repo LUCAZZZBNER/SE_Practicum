@@ -75,4 +75,11 @@ public class RestaurantController {
 			@Valid @RequestBody RestaurantService.UpdateRequest request) {
 		return ApiResponse.success(restaurantService.update(principal.id(), shopId, request));
 	}
+
+	@PatchMapping("/{shopId}/address")
+	@RequireRole(Role.MERCHANT)
+	public ApiResponse<RestaurantService.ShopView> updateAddress(@RequestAttribute("currentPrincipal") CurrentPrincipal principal,
+			@PathVariable @Positive long shopId, @Valid @RequestBody RestaurantService.AddressRequest request) {
+		return ApiResponse.success(restaurantService.updateAddress(principal.id(), shopId, request));
+	}
 }

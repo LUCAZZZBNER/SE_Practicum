@@ -32,7 +32,8 @@ public class UserServiceImpl implements UserService {
 	@Override
 	@Transactional
 	public UserView register(RegisterRequest request) {
-		if (!request.password().equals(request.passwordConfirm())) {
+		if (request == null || request.password() == null
+				|| !request.password().equals(request.passwordConfirm())) {
 			throw new BusinessException(ApiError.VALIDATION_ERROR);
 		}
 		String account = normalizeRequired(request.account());
@@ -81,7 +82,7 @@ public class UserServiceImpl implements UserService {
 		if (!request.isUpdateSpecified()) {
 			throw new BusinessException(ApiError.VALIDATION_ERROR);
 		}
-		requireById(userId);
+		requireActive(userId);
 		String nickname = request.isNicknameSpecified() ? normalizeRequired(request.nickname()) : null;
 		String phone = request.isPhoneSpecified() ? normalizeNullable(request.phone()) : null;
 		userDao.updateProfile(userId, request.isNicknameSpecified(), nickname,
@@ -93,6 +94,19 @@ public class UserServiceImpl implements UserService {
 	@Transactional(readOnly = true)
 	public UserSnapshot requireActive(long userId) {
 		UserEntity user = requireById(userId);
+		if (!ACTIVE.equals(user.getStatus())) {
+			throw new BusinessException(ApiError.ACCOUNT_DISABLED);
+		}
+		return new UserSnapshot(user.getId(), user.getStatus());
+	}
+
+	@Override
+	@Transactional
+	public UserSnapshot requireActiveForUpdate(long userId) {
+		UserEntity user = userDao.findByIdForUpdate(userId);
+		if (user == null) {
+			throw new BusinessException(ApiError.RESOURCE_NOT_FOUND);
+		}
 		if (!ACTIVE.equals(user.getStatus())) {
 			throw new BusinessException(ApiError.ACCOUNT_DISABLED);
 		}

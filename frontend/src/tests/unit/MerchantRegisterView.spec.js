@@ -46,7 +46,8 @@ function mountView() {
             '<input :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />',
         },
         'el-button': {
-          template: '<button type="button"><slot /></button>',
+          emits: ['click'],
+          template: '<button type="button" @click="$emit(\'click\')"><slot /></button>',
         },
       },
     },
@@ -67,10 +68,10 @@ describe('MerchantRegisterView', () => {
     expect(wrapper.text()).toContain('商家注册')
     expect(wrapper.text()).toContain('提交注册')
     expect(wrapper.text()).toContain('去登录')
-    expect(wrapper.text()).toContain('返回首页')
+    expect(wrapper.text()).not.toContain('返回首页')
   })
 
-  it('submits merchant registration with contract fields and redirects to login', async () => {
+  it('submits merchant registration with contract fields and returns to merchant login', async () => {
     mocks.registerMerchant.mockResolvedValue({
       id: 2,
       account: 'merchant01',
@@ -100,7 +101,15 @@ describe('MerchantRegisterView', () => {
       phone: '13900000000',
     })
     expect(mocks.messageSuccess).toHaveBeenCalledWith('注册成功')
-    expect(mocks.routerPush).toHaveBeenCalledWith('/login/merchant')
+    expect(mocks.routerPush).toHaveBeenCalledWith({ path: '/', query: { role: 'merchant' } })
+  })
+
+  it('returns to the merchant tab on the combined login page', async () => {
+    const wrapper = mountView()
+
+    await wrapper.findAll('button').find((button) => button.text() === '去登录').trigger('click')
+
+    expect(mocks.routerPush).toHaveBeenCalledWith({ path: '/', query: { role: 'merchant' } })
   })
 
   it('shows backend error when merchant registration fails', async () => {
@@ -120,6 +129,6 @@ describe('MerchantRegisterView', () => {
     await flushPromises()
 
     expect(mocks.messageError).toHaveBeenCalledWith('商家账号已存在')
-    expect(mocks.routerPush).not.toHaveBeenCalledWith('/login/merchant')
+    expect(mocks.routerPush).not.toHaveBeenCalledWith({ path: '/', query: { role: 'merchant' } })
   })
 })

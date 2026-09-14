@@ -11,12 +11,15 @@ import static com.delivery.backend.ControllerTestSupport.userPrincipal;
 import static com.delivery.backend.TestFixtures.order;
 import static com.delivery.backend.TestFixtures.orderPage;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 
 import java.util.List;
 
@@ -46,16 +49,60 @@ class OrderControllerTests {
 		mvc.perform(post("/api/v1/orders").requestAttr("currentPrincipal", userPrincipal(7))
 				.header("X-Idempotency-Key", "key-1")
 				.contentType(JSON).content("""
-				{"items":[{"cartItemId":31,"productVersion":3},{"cartItemId":32,"productVersion":7}]}
+				{"items":[{"cartItemId":31,"skuVersion":3},{"cartItemId":32,"skuVersion":7}],"addressId":51}
 				"""))
 				.andExpect(status().isCreated()).andExpect(successfulDataId(40));
 		verify(service).create(7, "key-1", new OrderService.CreateRequest(
-				List.of(new OrderService.ItemRequest(31, 3), new OrderService.ItemRequest(32, 7))));
+				List.of(new OrderService.ItemRequest(31, 3), new OrderService.ItemRequest(32, 7)), 51L, null));
+	}
+
+	@Test
+	void createForwardsSkuVersionAddressAndRemarkSentByCartView() throws Exception {
+		when(service.create(any(Long.class), any(String.class), any())).thenReturn(order(40));
+		mvc.perform(post("/api/v1/orders").requestAttr("currentPrincipal", userPrincipal(7))
+				.header("X-Idempotency-Key", "checkout-key").contentType(JSON).content("""
+				{"items":[{"cartItemId":31,"skuVersion":3}],"addressId":51,"remark":"少放辣椒"}
+				"""))
+				.andExpect(status().isCreated()).andExpect(successfulDataId(40));
+		verify(service).create(eq(7L), eq("checkout-key"), argThat(request -> request.addressId() == 51
+				&& request.items().get(0).skuVersion() == 3 && request.remark().equals("少放辣椒")));
+	}
+
+	@Test
+	void actionEndpointsForwardIdempotencyKeysUsedByOrderViews() throws Exception {
+		when(service.pay(7, 40, "pay-key")).thenReturn(order(40));
+		when(service.confirmReceipt(7, 40, "receipt-key")).thenReturn(order(40));
+		when(service.prepare(2, 40, "prepare-key")).thenReturn(order(40));
+		when(service.deliver(2, 40, "deliver-key")).thenReturn(order(40));
+		mvc.perform(post("/api/v1/orders/40/pay").requestAttr("currentPrincipal", userPrincipal(7))
+				.header("X-Idempotency-Key", "pay-key").contentType(JSON).content("{}"))
+				.andExpect(status().isOk()).andExpect(successfulDataId(40));
+		mvc.perform(post("/api/v1/orders/40/confirm-receipt").requestAttr("currentPrincipal", userPrincipal(7))
+				.header("X-Idempotency-Key", "receipt-key").contentType(JSON).content("{}"))
+				.andExpect(status().isOk()).andExpect(successfulDataId(40));
+		mvc.perform(post("/api/v1/merchant/orders/40/prepare").requestAttr("currentPrincipal", merchantPrincipal(2))
+				.header("X-Idempotency-Key", "prepare-key").contentType(JSON).content("{}"))
+				.andExpect(status().isOk()).andExpect(successfulDataId(40));
+		mvc.perform(post("/api/v1/merchant/orders/40/deliver").requestAttr("currentPrincipal", merchantPrincipal(2))
+				.header("X-Idempotency-Key", "deliver-key").contentType(JSON).content("{}"))
+				.andExpect(status().isOk()).andExpect(successfulDataId(40));
+		verify(service).pay(7, 40, "pay-key");
+		verify(service).confirmReceipt(7, 40, "receipt-key");
+		verify(service).prepare(2, 40, "prepare-key");
+		verify(service).deliver(2, 40, "deliver-key");
+	}
+
+	@Test
+	void refundLookupForwardsUserOwnershipAndOrderId() throws Exception {
+		when(service.getRefund(7, 40)).thenReturn(new OrderService.RefundView(40, "REFUND-40", new java.math.BigDecimal("12.50"), "REFUNDED"));
+		mvc.perform(get("/api/v1/orders/40/refund").requestAttr("currentPrincipal", userPrincipal(7)))
+				.andExpect(status().isOk()).andExpect(jsonPath("$.data.orderId").value(40));
+		verify(service).getRefund(7, 40);
 	}
 
 	@Test
 	void createRejectsMissingPrincipalHeaderBlankHeaderOrItems() throws Exception {
-		String valid = "{\"items\":[{\"cartItemId\":31,\"productVersion\":3}]}";
+		String valid = "{\"items\":[{\"cartItemId\":31,\"skuVersion\":3}],\"addressId\":51}";
 		mvc.perform(post("/api/v1/orders").header("X-Idempotency-Key", "key-1").contentType(JSON).content(valid))
 				.andExpect(status().isUnauthorized()).andExpect(unauthenticated());
 		mvc.perform(post("/api/v1/orders").requestAttr("currentPrincipal", userPrincipal(7))
@@ -75,10 +122,10 @@ class OrderControllerTests {
 	@ParameterizedTest
 	@ValueSource(strings = {
 			"{\"items\":[null]}",
-			"{\"items\":[{\"cartItemId\":0,\"productVersion\":3}]}",
-			"{\"items\":[{\"cartItemId\":31,\"productVersion\":0}]}",
-			"{\"items\":[{\"cartItemId\":-1,\"productVersion\":3}]}",
-			"{\"items\":[{\"cartItemId\":31,\"productVersion\":-1}]}" })
+			"{\"items\":[{\"cartItemId\":0,\"skuVersion\":3}]}",
+			"{\"items\":[{\"cartItemId\":31,\"skuVersion\":0}]}",
+			"{\"items\":[{\"cartItemId\":-1,\"skuVersion\":3}]}",
+			"{\"items\":[{\"cartItemId\":31,\"skuVersion\":-1}]}" })
 	void createRejectsZeroAndNegativeItemInputs(String body) throws Exception {
 		mvc.perform(post("/api/v1/orders").requestAttr("currentPrincipal", userPrincipal(7))
 				.header("X-Idempotency-Key", "key-1")
@@ -108,13 +155,14 @@ class OrderControllerTests {
 	@Test
 	void userGetAndCancelForwardOwnershipAndOrderId() throws Exception {
 		when(service.getMine(7, 40)).thenReturn(order(40));
-		when(service.cancel(7, 40)).thenReturn(order(40));
+		when(service.cancel(7, 40, "cancel-key", null)).thenReturn(order(40));
 		mvc.perform(get("/api/v1/orders/40").requestAttr("currentPrincipal", userPrincipal(7)))
 				.andExpect(status().isOk()).andExpect(successfulDataId(40));
-		mvc.perform(post("/api/v1/orders/40/cancel").requestAttr("currentPrincipal", userPrincipal(7)))
+		mvc.perform(post("/api/v1/orders/40/cancel").requestAttr("currentPrincipal", userPrincipal(7))
+				.header("X-Idempotency-Key", "cancel-key").contentType(JSON).content("{}"))
 				.andExpect(status().isOk()).andExpect(successfulDataId(40));
 		verify(service).getMine(7, 40);
-		verify(service).cancel(7, 40);
+		verify(service).cancel(7, 40, "cancel-key", null);
 	}
 
 	@Test

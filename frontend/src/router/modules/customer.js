@@ -3,6 +3,7 @@ export default [
     path: '/customer',
     component: () => import('../../layouts/CustomerLayout.vue'),
     redirect: '/customer/stores',
+    meta: { requiresAuth: true, role: 'USER' },
     children: [
       {
         path: 'stores',
@@ -39,6 +40,12 @@ export default [
         name: 'CustomerOrderDetail',
         component: () => import('../../views/OrderDetailView.vue'),
         meta: { title: '订单详情' },
+      },
+      {
+        path: 'addresses',
+        name: 'CustomerAddresses',
+        component: () => import('../../views/CustomerAddressesView.vue'),
+        meta: { title: '收货地址' },
       },
       {
         path: 'profile',

@@ -31,6 +31,13 @@
         WHERE id = #{id}
     </select>
 
+    <select id="findByIdForUpdate" resultMap="userResultMap">
+        SELECT <include refid="userColumns"/>
+        FROM users
+        WHERE id = #{id}
+        FOR UPDATE
+    </select>
+
     <insert id="insert" parameterType="com.delivery.backend.user.entity.UserEntity"
             useGeneratedKeys="true" keyProperty="id">
         INSERT INTO users (account, password_hash, nickname, phone, status)

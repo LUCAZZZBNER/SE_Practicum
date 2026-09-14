@@ -24,6 +24,8 @@ public interface UserService {
 
 	UserSnapshot requireActive(long userId);
 
+	UserSnapshot requireActiveForUpdate(long userId);
+
 	record RegisterRequest(@NotBlank String account, @NotBlank String password, @NotBlank String passwordConfirm,
 			@NotBlank String nickname, @Pattern(regexp = "(?s).*\\S.*") String phone) {
 	}

@@ -15,3 +15,7 @@ export function createShop(data) {
 export function updateStoreStatus(storeId, data) {
   return http.patch(`/shops/${storeId}`, data)
 }
+
+export function updateStoreAddress(storeId, data) {
+  return http.patch(`/shops/${storeId}/address`, data)
+}

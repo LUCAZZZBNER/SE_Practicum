@@ -14,17 +14,24 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DuplicateKeyException;
 
 import com.delivery.backend.common.ApiError;
 import com.delivery.backend.common.BusinessException;
 import com.delivery.backend.common.PageResult;
+import com.delivery.backend.address.service.UserAddressService;
 import com.delivery.backend.item.service.ItemService;
 import com.delivery.backend.merchant.service.MerchantService;
 import com.delivery.backend.order.dao.OrderDao;
+import com.delivery.backend.order.entity.OrderActionIdempotencyEntity;
 import com.delivery.backend.order.entity.OrderEntity;
 import com.delivery.backend.order.entity.OrderItemEntity;
+import com.delivery.backend.order.entity.PaymentEntity;
+import com.delivery.backend.order.entity.RefundEntity;
 import com.delivery.backend.order.service.OrderService;
 import com.delivery.backend.restaurant.service.RestaurantService;
 import com.delivery.backend.shopping.service.ShoppingService;
@@ -37,6 +44,13 @@ public class OrderServiceImpl implements OrderService {
 	private static final int DEFAULT_PAGE = 1;
 	private static final int DEFAULT_PAGE_SIZE = 10;
 	private static final String PENDING_PAYMENT = "PENDING_PAYMENT";
+	private static final String USER_ACTOR = "USER";
+	private static final String MERCHANT_ACTOR = "MERCHANT";
+	private static final String PAY_ACTION = "PAY_ORDER";
+	private static final String CANCEL_ACTION = "CANCEL_ORDER";
+	private static final String PREPARE_ACTION = "PREPARE_ORDER";
+	private static final String DELIVER_ACTION = "DELIVER_ORDER";
+	private static final String RECEIPT_ACTION = "CONFIRM_RECEIPT";
 	private static final Set<String> ORDER_STATUSES = Set.of(
 			PENDING_PAYMENT, "PAID", "PREPARING", "DELIVERING", "COMPLETED", "CANCELLED");
 
@@ -46,24 +60,37 @@ public class OrderServiceImpl implements OrderService {
 	private final RestaurantService restaurantService;
 	private final ShoppingService shoppingService;
 	private final ItemService itemService;
+	private final UserAddressService addressService;
 
 	public OrderServiceImpl(OrderDao orderDao, UserService userService, MerchantService merchantService,
 			RestaurantService restaurantService, ShoppingService shoppingService, ItemService itemService) {
+		this(orderDao, userService, merchantService, restaurantService, shoppingService, itemService, null);
+	}
+
+	@Autowired
+	public OrderServiceImpl(OrderDao orderDao, UserService userService, MerchantService merchantService,
+			RestaurantService restaurantService, ShoppingService shoppingService, ItemService itemService,
+			UserAddressService addressService) {
 		this.orderDao = orderDao;
 		this.userService = userService;
 		this.merchantService = merchantService;
 		this.restaurantService = restaurantService;
 		this.shoppingService = shoppingService;
 		this.itemService = itemService;
+		this.addressService = addressService;
 	}
 
 	@Override
 	@Transactional
 	public OrderView create(long userId, String idempotencyKey, CreateRequest request) {
-		userService.requireActive(userId);
+		userService.requireActiveForUpdate(userId);
 		String key = normalizeIdempotencyKey(idempotencyKey);
 		List<ItemRequest> requestedItems = validateItems(request);
-		String fingerprint = fingerprint(requestedItems);
+		if (request.addressId() == null || request.addressId() <= 0 || addressService == null) {
+			throw new BusinessException(ApiError.VALIDATION_ERROR);
+		}
+		String normalizedRemark = normalizeReason(request.remark());
+		String fingerprint = fingerprint(requestedItems, request.addressId(), normalizedRemark);
 
 		OrderEntity existing = orderDao.findByUserAndIdempotency(userId, key);
 		if (existing != null) {
@@ -72,6 +99,7 @@ public class OrderServiceImpl implements OrderService {
 			}
 			return toOrderView(existing, orderDao.listItems(existing.getId()));
 		}
+		UserAddressService.AddressView address = addressService.requireOwned(userId, request.addressId());
 
 		Map<Long, Long> versionsByCartItem = new HashMap<>();
 		for (ItemRequest item : requestedItems) {
@@ -89,7 +117,7 @@ public class OrderServiceImpl implements OrderService {
 
 		List<ItemService.ReservationRequest> reservations = checkoutItems.stream()
 				.map(item -> new ItemService.ReservationRequest(item.productId(),
-						versionsByCartItem.get(item.cartItemId()), item.quantity()))
+						versionsByCartItem.get(item.cartItemId()), item.quantity(), item.skuId()))
 				.sorted(Comparator.comparingLong(ItemService.ReservationRequest::productId))
 				.toList();
 		List<ItemService.ProductSnapshot> snapshots = itemService.reserveForOrder(reservations);
@@ -106,6 +134,13 @@ public class OrderServiceImpl implements OrderService {
 		order.setShopName(shop.name());
 		order.setTotalAmount(total);
 		order.setStatus(PENDING_PAYMENT);
+		order.setPaymentStatus("UNPAID");
+		order.setRefundStatus("NOT_REFUNDED");
+		order.setRemark(normalizedRemark);
+		order.setUserAddressSnapshot(OrderAddressSnapshotCodec.write("recipient", address.recipient(), "phone", address.phone(),
+				"region", address.region(), "detail", address.detail()));
+		order.setShopAddressSnapshot(OrderAddressSnapshotCodec.write(
+				"region", shop.region(), "detail", shop.detail(), "phone", shop.phone()));
 		orderDao.insertOrder(order);
 
 		List<OrderItemEntity> lines = snapshots.stream().map(snapshot -> toEntity(order.getId(), snapshot)).toList();
@@ -140,27 +175,145 @@ public class OrderServiceImpl implements OrderService {
 	@Override
 	@Transactional
 	public OrderView cancel(long userId, long orderId) {
-		userService.requireActive(userId);
-		OrderEntity order = findMine(userId, orderId);
-		if (!PENDING_PAYMENT.equals(order.getStatus())) {
+		return cancel(userId, orderId, null, null);
+	}
+
+	@Override
+	@Transactional
+	public OrderView cancel(long userId, long orderId, String idempotencyKey, String reason) {
+		userService.requireActiveForUpdate(userId);
+		String key = idempotencyKey == null ? null : normalizeIdempotencyKey(idempotencyKey);
+		String normalizedReason = normalizeReason(reason);
+		OrderEntity order = findMineForUpdate(userId, orderId);
+		String actionFingerprint = actionFingerprint(orderId, normalizedReason);
+		if (key != null && reserveAction(USER_ACTOR, userId, CANCEL_ACTION, key,
+				actionFingerprint, orderId)) {
+			return toOrderView(order, orderDao.listItems(orderId));
+		}
+		if (!Set.of(PENDING_PAYMENT, "PAID", "PREPARING").contains(order.getStatus())) {
 			throw new BusinessException(ApiError.ORDER_STATE_CONFLICT);
 		}
 		List<OrderItemEntity> lines = orderDao.listItems(orderId);
-		if (orderDao.cancelPending(userId, orderId) != 1) {
+		boolean refund = !PENDING_PAYMENT.equals(order.getStatus());
+		PaymentEntity payment = null;
+		if (refund) {
+			payment = orderDao.findPayment(orderId);
+			if (payment == null) {
+				throw new BusinessException(ApiError.ORDER_STATE_CONFLICT);
+			}
+		}
+		if (orderDao.cancelEligible(userId, orderId, normalizedReason, refund, key) != 1) {
 			throw new BusinessException(ApiError.ORDER_STATE_CONFLICT);
 		}
-		itemService.restoreStock(lines.stream()
-				.map(line -> new ItemService.StockRestore(line.getProductId(), line.getQuantity()))
-				.toList());
+		itemService.restoreStock(lines.stream().map(line -> new ItemService.StockRestore(line.getProductId(), line.getQuantity(),
+				line.getSkuId() == null ? 0 : line.getSkuId())).toList());
+		if (refund) {
+			RefundEntity refundEntity = new RefundEntity();
+			refundEntity.setOrderId(orderId); refundEntity.setRefundNumber("REFUND-" + orderId);
+			refundEntity.setPaymentId(payment.getId());
+			refundEntity.setAmount(order.getTotalAmount()); refundEntity.setStatus("REFUNDED"); refundEntity.setIdempotencyKey(key);
+			try { orderDao.insertRefund(refundEntity); } catch (DuplicateKeyException exception) {
+				throw new BusinessException(ApiError.ORDER_STATE_CONFLICT);
+			}
+		}
 		return requireMine(userId, orderId);
+	}
+
+	@Override
+	@Transactional
+	public OrderView pay(long userId, long orderId, String idempotencyKey) {
+		userService.requireActiveForUpdate(userId);
+		String key = normalizeIdempotencyKey(idempotencyKey);
+		OrderEntity order = findMineForUpdate(userId, orderId);
+		String actionFingerprint = actionFingerprint(orderId, null);
+		if (reserveAction(USER_ACTOR, userId, PAY_ACTION, key, actionFingerprint, orderId)) {
+			return toOrderView(order, orderDao.listItems(orderId));
+		}
+		PaymentEntity prior = orderDao.findPayment(orderId);
+		if (prior != null) {
+			if (key.equals(prior.getIdempotencyKey())) return toOrderView(order, orderDao.listItems(orderId));
+			throw new BusinessException(ApiError.ORDER_STATE_CONFLICT);
+		}
+		if (orderDao.transitionStatus(orderId, "PAID", PENDING_PAYMENT) != 1) {
+			throw new BusinessException(ApiError.ORDER_STATE_CONFLICT);
+		}
+		PaymentEntity payment = new PaymentEntity();
+		payment.setOrderId(orderId); payment.setPaymentNumber("PAY-" + orderId);
+		payment.setAmount(order.getTotalAmount()); payment.setStatus("PAID"); payment.setIdempotencyKey(key);
+		try { orderDao.insertPayment(payment); } catch (DuplicateKeyException exception) {
+			throw new BusinessException(ApiError.IDEMPOTENCY_CONFLICT);
+		}
+		return requireMine(userId, orderId);
+	}
+
+	@Override
+	@Transactional
+	public OrderView confirmReceipt(long userId, long orderId, String idempotencyKey) {
+		userService.requireActiveForUpdate(userId);
+		String key = normalizeIdempotencyKey(idempotencyKey);
+		OrderEntity current = findMineForUpdate(userId, orderId);
+		if (reserveAction(USER_ACTOR, userId, RECEIPT_ACTION, key,
+				actionFingerprint(orderId, null), orderId)) {
+			return toOrderView(current, orderDao.listItems(orderId));
+		}
+		if ("COMPLETED".equals(current.getStatus())) throw new BusinessException(ApiError.ORDER_STATE_CONFLICT);
+		if (orderDao.transitionStatus(orderId, "COMPLETED", "DELIVERING") != 1) {
+			throw new BusinessException(ApiError.ORDER_STATE_CONFLICT);
+		}
+		return requireMine(userId, orderId);
+	}
+
+	@Override
+	@Transactional
+	public OrderView prepare(long merchantId, long orderId, String idempotencyKey) {
+		merchantService.getCurrent(merchantId);
+		String key = normalizeIdempotencyKey(idempotencyKey);
+		OrderEntity order = findMerchantForUpdate(merchantId, orderId);
+		if (reserveAction(MERCHANT_ACTOR, merchantId, PREPARE_ACTION, key,
+				actionFingerprint(orderId, null), orderId)) {
+			return toOrderView(order, orderDao.listItems(orderId));
+		}
+		if (order != null && "PREPARING".equals(order.getStatus())) throw new BusinessException(ApiError.ORDER_STATE_CONFLICT);
+		if (orderDao.transitionStatus(orderId, "PREPARING", "PAID") != 1) {
+			throw new BusinessException(ApiError.ORDER_STATE_CONFLICT);
+		}
+		return toOrderView(orderDao.findMerchantOrder(merchantId, orderId), orderDao.listItems(orderId));
+	}
+
+	@Override
+	@Transactional
+	public OrderView deliver(long merchantId, long orderId, String idempotencyKey) {
+		merchantService.getCurrent(merchantId);
+		String key = normalizeIdempotencyKey(idempotencyKey);
+		OrderEntity order = findMerchantForUpdate(merchantId, orderId);
+		if (reserveAction(MERCHANT_ACTOR, merchantId, DELIVER_ACTION, key,
+				actionFingerprint(orderId, null), orderId)) {
+			return toOrderView(order, orderDao.listItems(orderId));
+		}
+		if (order != null && "DELIVERING".equals(order.getStatus())) throw new BusinessException(ApiError.ORDER_STATE_CONFLICT);
+		if (orderDao.transitionStatus(orderId, "DELIVERING", "PREPARING") != 1) {
+			throw new BusinessException(ApiError.ORDER_STATE_CONFLICT);
+		}
+		return toOrderView(orderDao.findMerchantOrder(merchantId, orderId), orderDao.listItems(orderId));
+	}
+
+	@Override
+	@Transactional(readOnly = true)
+	public RefundView getRefund(long userId, long orderId) {
+		userService.requireActive(userId);
+		OrderEntity order = findMine(userId, orderId);
+		if (!"REFUNDED".equals(order.getRefundStatus())) throw new BusinessException(ApiError.RESOURCE_NOT_FOUND);
+		RefundEntity refund = orderDao.findRefund(orderId);
+		if (refund == null) throw new BusinessException(ApiError.RESOURCE_NOT_FOUND);
+		return new RefundView(orderId, refund.getRefundNumber(), refund.getAmount(), refund.getStatus(), refund.getPaymentId());
 	}
 
 	@Override
 	@Transactional(readOnly = true)
 	public PageResult<OrderSummaryView> listMerchantOrders(long merchantId, MerchantListQuery query) {
-		merchantService.requireActive(merchantId);
+		merchantService.getCurrent(merchantId);
 		if (query.shopId() != null) {
-			restaurantService.requireOwned(merchantId, query.shopId());
+			restaurantService.requireOwnedForRead(merchantId, query.shopId());
 		}
 		String status = validateStatus(query.status());
 		int page = defaultPage(query.page());
@@ -177,7 +330,7 @@ public class OrderServiceImpl implements OrderService {
 	@Override
 	@Transactional(readOnly = true)
 	public OrderView getMerchantOrder(long merchantId, long orderId) {
-		merchantService.requireActive(merchantId);
+		merchantService.getCurrent(merchantId);
 		OrderEntity order = orderDao.findMerchantOrder(merchantId, orderId);
 		if (order == null) {
 			throw new BusinessException(ApiError.RESOURCE_NOT_FOUND);
@@ -198,8 +351,66 @@ public class OrderServiceImpl implements OrderService {
 		return order;
 	}
 
+	private OrderEntity findMineForUpdate(long userId, long orderId) {
+		OrderEntity order = orderDao.findMineForUpdate(userId, orderId);
+		if (order == null) {
+			throw new BusinessException(ApiError.RESOURCE_NOT_FOUND);
+		}
+		return order;
+	}
+
+	private OrderEntity findMerchantForUpdate(long merchantId, long orderId) {
+		OrderEntity order = orderDao.findMerchantOrderForUpdate(merchantId, orderId);
+		if (order == null) {
+			throw new BusinessException(ApiError.RESOURCE_NOT_FOUND);
+		}
+		return order;
+	}
+
+	/**
+	 * Reserves a scoped action key. Returns true only when this is a valid replay
+	 * of the same action against the same order.
+	 */
+	private boolean reserveAction(String actorType, long actorId, String actionName, String key,
+			String requestFingerprint, long orderId) {
+		OrderActionIdempotencyEntity existing = orderDao.findActionIdempotency(
+				actorType, actorId, actionName, key);
+		if (existing != null) {
+			validateActionReplay(existing, requestFingerprint, orderId);
+			return true;
+		}
+
+		OrderActionIdempotencyEntity record = new OrderActionIdempotencyEntity();
+		record.setActorType(actorType);
+		record.setActorId(actorId);
+		record.setActionName(actionName);
+		record.setIdempotencyKey(key);
+		record.setRequestFingerprint(requestFingerprint);
+		record.setOrderId(orderId);
+		try {
+			orderDao.insertActionIdempotency(record);
+			return false;
+		} catch (DuplicateKeyException exception) {
+			OrderActionIdempotencyEntity concurrent = orderDao.findActionIdempotency(
+					actorType, actorId, actionName, key);
+			if (concurrent == null) {
+				throw new BusinessException(ApiError.IDEMPOTENCY_CONFLICT);
+			}
+			validateActionReplay(concurrent, requestFingerprint, orderId);
+			return true;
+		}
+	}
+
+	private static void validateActionReplay(OrderActionIdempotencyEntity existing,
+			String requestFingerprint, long orderId) {
+		if (!existing.getOrderId().equals(orderId)
+				|| !existing.getRequestFingerprint().equals(requestFingerprint)) {
+			throw new BusinessException(ApiError.IDEMPOTENCY_CONFLICT);
+		}
+	}
+
 	private static List<ItemRequest> validateItems(CreateRequest request) {
-		if (request == null || request.items().isEmpty()) {
+		if (request == null || request.items() == null || request.items().isEmpty()) {
 			throw new BusinessException(ApiError.CART_EMPTY);
 		}
 		Set<Long> cartItemIds = new HashSet<>();
@@ -221,22 +432,44 @@ public class OrderServiceImpl implements OrderService {
 	}
 
 	private static String normalizeIdempotencyKey(String key) {
-		if (key == null || key.isBlank() || key.length() > 100) {
+		if (key == null) {
 			throw new BusinessException(ApiError.VALIDATION_ERROR);
 		}
-		return key.trim();
+		String normalized = key.trim();
+		if (normalized.isEmpty() || normalized.length() > 100) {
+			throw new BusinessException(ApiError.VALIDATION_ERROR);
+		}
+		return normalized;
 	}
 
-	private static String fingerprint(List<ItemRequest> items) {
+	private static String normalizeReason(String reason) {
+		if (reason == null || reason.isBlank()) return null;
+		String normalized = reason.trim();
+		if (normalized.length() > 200) throw new BusinessException(ApiError.VALIDATION_ERROR);
+		return normalized;
+	}
+
+	private static String fingerprint(List<ItemRequest> items, long addressId, String normalizedRemark) {
 		List<ItemRequest> sorted = new ArrayList<>(items);
 		sorted.sort(Comparator.comparingLong(ItemRequest::cartItemId));
 		StringBuilder canonical = new StringBuilder();
 		for (ItemRequest item : sorted) {
 			canonical.append(item.cartItemId()).append(':').append(item.productVersion()).append(';');
 		}
+		canonical.append("address=").append(addressId).append(";remark=")
+				.append(normalizedRemark == null ? "" : normalizedRemark).append(';');
+		return sha256(canonical.toString());
+	}
+
+	private static String actionFingerprint(long orderId, String normalizedPayload) {
+		return sha256("order=" + orderId + ";payload="
+				+ (normalizedPayload == null ? "" : normalizedPayload));
+	}
+
+	private static String sha256(String value) {
 		try {
 			byte[] digest = MessageDigest.getInstance("SHA-256")
-					.digest(canonical.toString().getBytes(StandardCharsets.UTF_8));
+					.digest(value.getBytes(StandardCharsets.UTF_8));
 			return HexFormat.of().formatHex(digest);
 		} catch (NoSuchAlgorithmException exception) {
 			throw new IllegalStateException("SHA-256 is unavailable", exception);
@@ -250,21 +483,28 @@ public class OrderServiceImpl implements OrderService {
 		item.setProductName(snapshot.name());
 		item.setUnitPrice(snapshot.unitPrice());
 		item.setQuantity(snapshot.quantity());
+		item.setSkuId(snapshot.skuId() > 0 ? snapshot.skuId() : null);
+		item.setSkuName(snapshot.skuName());
+		item.setImageUrl(snapshot.imageUrl());
 		return item;
 	}
 
 	private static OrderView toOrderView(OrderEntity order, List<OrderItemEntity> items) {
 		List<OrderLineView> lines = items.stream().map(item -> new OrderLineView(
-				item.getProductId(), item.getProductName(), item.getUnitPrice(), item.getQuantity(),
-				item.getUnitPrice().multiply(BigDecimal.valueOf(item.getQuantity())))).toList();
+				item.getProductId(), item.getSkuId(), item.getProductName(), item.getSkuName(), item.getImageUrl(),
+				item.getUnitPrice(), item.getQuantity(), item.getUnitPrice().multiply(BigDecimal.valueOf(item.getQuantity())))).toList();
 		return new OrderView(order.getId(), order.getOrderNumber(), order.getUserId(), order.getShopId(),
 				order.getShopName(), lines, order.getTotalAmount(), order.getStatus(), order.getCreatedAt(),
-				order.getUpdatedAt(), order.getCancelledAt());
+				order.getUpdatedAt(), order.getCancelledAt(), order.getPaymentStatus(), order.getRefundStatus(),
+				order.getRemark(), order.getCancelReason(), order.getCompletedAt(),
+				OrderAddressSnapshotCodec.read(order.getUserAddressSnapshot()),
+				OrderAddressSnapshotCodec.read(order.getShopAddressSnapshot()));
 	}
 
 	private static OrderSummaryView toSummaryView(OrderEntity order) {
 		return new OrderSummaryView(order.getId(), order.getOrderNumber(), order.getShopId(),
-				order.getShopName(), order.getTotalAmount(), order.getStatus(), order.getCreatedAt());
+				order.getShopName(), order.getTotalAmount(), order.getStatus(), order.getPaymentStatus(),
+				order.getRefundStatus(), order.getCreatedAt());
 	}
 
 	private static <T> PageResult<T> page(List<T> items, int page, int pageSize, long total) {

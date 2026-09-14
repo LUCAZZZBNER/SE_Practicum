@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 class GlobalExceptionHandlerTests {
 
@@ -32,6 +33,15 @@ class GlobalExceptionHandlerTests {
 		assertThat(response.getStatusCode()).isEqualTo(ApiError.INTERNAL_ERROR.status());
 		assertThat(response.getBody()).isEqualTo(new ApiResponse<>(9000, "服务器内部错误", null));
 		assertThat(response.toString()).doesNotContain("password", "database", "secret");
+	}
+
+	@Test
+	void oversizedMultipartUsesTheDocumentedImageError() {
+		ResponseEntity<ApiResponse<Object>> response = handler.uploadTooLarge(
+				new MaxUploadSizeExceededException(5L * 1024 * 1024));
+
+		assertThat(response.getStatusCode()).isEqualTo(ApiError.IMAGE_INVALID.status());
+		assertThat(response.getBody()).isEqualTo(new ApiResponse<>(1405, "图片格式或大小不合法", null));
 	}
 
 	private static Stream<ApiError> businessErrors() {

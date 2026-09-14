@@ -14,6 +14,7 @@ import static com.delivery.backend.TestFixtures.product;
 import static com.delivery.backend.TestFixtures.productPage;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -37,16 +38,48 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import com.delivery.backend.item.controller.ItemController;
 import com.delivery.backend.item.service.ItemService;
+import com.delivery.backend.item.service.SkuService;
 
 class ItemControllerTests {
 
 	private ItemService service;
+	private SkuService skuService;
 	private MockMvc mvc;
 
 	@BeforeEach
 	void setUp() {
 		service = org.mockito.Mockito.mock(ItemService.class);
-		mvc = withApiErrors(new ItemController(service)).build();
+		skuService = org.mockito.Mockito.mock(SkuService.class);
+		mvc = withApiErrors(new ItemController(service, skuService)).build();
+	}
+
+	@Test
+	void createProductAcceptsTheSkuOnlyPayloadSentByMerchantProductsView() throws Exception {
+		when(service.createProduct(any(Long.class), any())).thenReturn(product(30));
+
+		mvc.perform(post("/api/v1/products").requestAttr("currentPrincipal", merchantPrincipal(2))
+				.contentType(JSON).content("""
+				{"shopId":10,"categoryId":21,"name":"Rice","description":"","imageId":7,
+				 "skus":[{"name":"Large","price":12.50,"stock":4}]}
+				"""))
+				.andExpect(status().isCreated()).andExpect(successfulDataId(30));
+
+		verify(service).createProduct(eq(2L), argThat(request -> request.shopId() == 10
+				&& request.categoryId() == 21 && request.skus().size() == 1
+				&& request.skus().get(0).name().equals("Large")));
+	}
+
+	@Test
+	void skuStatusToggleAcceptsOnlyStatusAndVersionFromMerchantProductsView() throws Exception {
+		when(skuService.update(any(Long.class), any(Long.class), any())).thenReturn(
+				new SkuService.SkuView(1001, 11, "Large", new BigDecimal("12.50"), 4,
+						"ON_SALE", 4, null, null));
+
+		mvc.perform(patch("/api/v1/skus/1001").requestAttr("currentPrincipal", merchantPrincipal(2))
+				.contentType(JSON).content("{\"status\":\"ON_SALE\",\"version\":3}"))
+				.andExpect(status().isOk()).andExpect(successfulDataId(1001));
+		verify(skuService).update(eq(2L), eq(1001L), argThat(request -> "ON_SALE".equals(request.status())
+				&& request.version() == 3L && request.name() == null && request.price() == null));
 	}
 
 	@Test
@@ -88,22 +121,25 @@ class ItemControllerTests {
 	void createProductForwardsDecimalAndZeroStockBoundary() throws Exception {
 		when(service.createProduct(any(Long.class), any())).thenReturn(product(30));
 		mvc.perform(post("/api/v1/products").requestAttr("currentPrincipal", merchantPrincipal(2)).contentType(JSON).content("""
-				{"shopId":10,"categoryId":21,"name":"Rice","description":null,"price":0.01,"stock":0}
+				{"shopId":10,"categoryId":21,"name":"Rice","description":null,
+				 "skus":[{"name":"Default","price":0.01,"stock":0}]}
 				"""))
 				.andExpect(status().isCreated()).andExpect(successfulDataId(30));
-		verify(service).createProduct(2,
-				new ItemService.CreateProductRequest(10, 21, "Rice", null, new BigDecimal("0.01"), 0));
+		verify(service).createProduct(eq(2L),
+				argThat(request -> request.shopId() == 10 && request.categoryId() == 21
+						&& request.skus().size() == 1 && request.skus().get(0).stock() == 0));
 	}
 
 	@ParameterizedTest
 	@ValueSource(strings = {
 			"{}",
-			"{\"shopId\":0,\"categoryId\":21,\"name\":\"Rice\",\"price\":1,\"stock\":0}",
-			"{\"shopId\":10,\"categoryId\":0,\"name\":\"Rice\",\"price\":1,\"stock\":0}",
-			"{\"shopId\":10,\"categoryId\":21,\"name\":\"\",\"price\":1,\"stock\":0}",
-			"{\"shopId\":10,\"categoryId\":21,\"name\":\"Rice\",\"price\":0,\"stock\":0}",
-			"{\"shopId\":10,\"categoryId\":21,\"name\":\"Rice\",\"price\":1.001,\"stock\":0}",
-			"{\"shopId\":10,\"categoryId\":21,\"name\":\"Rice\",\"price\":1,\"stock\":-1}" })
+			"{\"shopId\":0,\"categoryId\":21,\"name\":\"Rice\",\"skus\":[{\"name\":\"Default\",\"price\":1,\"stock\":0}]}",
+			"{\"shopId\":10,\"categoryId\":0,\"name\":\"Rice\",\"skus\":[{\"name\":\"Default\",\"price\":1,\"stock\":0}]}",
+			"{\"shopId\":10,\"categoryId\":21,\"name\":\"\",\"skus\":[{\"name\":\"Default\",\"price\":1,\"stock\":0}]}",
+			"{\"shopId\":10,\"categoryId\":21,\"name\":\"Rice\",\"skus\":[]}",
+			"{\"shopId\":10,\"categoryId\":21,\"name\":\"Rice\",\"skus\":[{\"name\":\"\",\"price\":1,\"stock\":0}]}",
+			"{\"shopId\":10,\"categoryId\":21,\"name\":\"Rice\",\"skus\":[{\"name\":\"Default\",\"price\":0,\"stock\":0}]}",
+			"{\"shopId\":10,\"categoryId\":21,\"name\":\"Rice\",\"skus\":[{\"name\":\"Default\",\"price\":1,\"stock\":-1}]}" })
 	void createProductRejectsMissingInvalidIdsNamePriceAndStock(String body) throws Exception {
 		mvc.perform(post("/api/v1/products").requestAttr("currentPrincipal", merchantPrincipal(2))
 				.contentType(JSON).content(body))
@@ -115,7 +151,8 @@ class ItemControllerTests {
 	void productListForwardsAbsentAndFullySpecifiedQueries() throws Exception {
 		when(service.listProducts(any(Long.class), any())).thenReturn(productPage());
 		mvc.perform(get("/api/v1/shops/10/products"))
-				.andExpect(status().isOk()).andExpect(successfulPage(1, 10, 1));
+				.andExpect(status().isOk()).andExpect(successfulPage(1, 10, 1))
+				.andExpect(jsonPath("$.data.items[0].inStock").value(true));
 		verify(service).listProducts(10, new ItemService.ProductQuery(null, null, null, null, null, null, null, null));
 
 		mvc.perform(get("/api/v1/shops/10/products").requestAttr("currentPrincipal", merchantPrincipal(2))
@@ -179,6 +216,15 @@ class ItemControllerTests {
 				argThat(request -> request.categoryId() == 22L && request.name().equals("Noodles")
 						&& request.description() == null && request.price().equals(new BigDecimal("12.50"))
 						&& request.stock() == 5 && request.status().equals("ON_SALE") && request.version() == 3L));
+	}
+
+	@Test
+	void updateProductForwardsTheFrontendImageReference() throws Exception {
+		when(service.updateProduct(any(Long.class), any(Long.class), any())).thenReturn(product(30));
+		mvc.perform(patch("/api/v1/products/30").requestAttr("currentPrincipal", merchantPrincipal(2))
+				.contentType(JSON).content("{\"imageId\":301}"))
+				.andExpect(status().isOk()).andExpect(successfulDataId(30));
+		verify(service).updateProduct(eq(2L), eq(30L), argThat(request -> request.imageId() == 301L));
 	}
 
 	@Test

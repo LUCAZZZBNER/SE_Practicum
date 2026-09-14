@@ -68,7 +68,7 @@ public class RestaurantServiceImpl implements RestaurantService {
 		String status = validateStatus(query.status());
 		String sortBy = validateSortBy(query.sortBy());
 		String sortOrder = validateSortOrder(query.sortOrder());
-		int offset = Math.multiplyExact(page - 1, pageSize);
+		long offset = (long) (page - 1) * pageSize;
 		List<ShopView> items = restaurantDao.list(mine, query.merchantId(), keyword, status,
 				sortBy, sortOrder, pageSize, offset).stream().map(RestaurantServiceImpl::toView).toList();
 		long total = restaurantDao.count(mine, query.merchantId(), keyword, status);
@@ -97,6 +97,11 @@ public class RestaurantServiceImpl implements RestaurantService {
 			}
 		}
 		String status = request.isStatusSpecified() ? validateRequiredStatus(request.status()) : null;
+		if (OPEN.equals(status) && (shop.getAddressRegion() == null || shop.getAddressRegion().isBlank()
+				|| shop.getAddressDetail() == null || shop.getAddressDetail().isBlank()
+				|| shop.getAddressPhone() == null || shop.getAddressPhone().isBlank())) {
+			throw new BusinessException(ApiError.SHOP_ADDRESS_REQUIRED);
+		}
 		try {
 			restaurantDao.update(shopId, request.isNameSpecified(), name,
 					request.isDescriptionSpecified(), request.description(),
@@ -108,11 +113,26 @@ public class RestaurantServiceImpl implements RestaurantService {
 	}
 
 	@Override
+	@Transactional
+	public ShopView updateAddress(long merchantId, long shopId, AddressRequest request) {
+		ShopEntity shop = requireOwnedEntity(merchantId, shopId);
+		if (request == null || request.region() == null || request.region().isBlank() || request.detail() == null
+				|| request.detail().isBlank() || request.phone() == null || !request.phone().matches("1[0-9]{10}|0[0-9]{10,11}")) {
+			throw new BusinessException(ApiError.VALIDATION_ERROR);
+		}
+		restaurantDao.updateAddress(shopId, request.region().trim(), request.detail().trim(), request.phone().trim());
+		return toView(requireById(shopId));
+	}
+
+	@Override
 	@Transactional(readOnly = true)
 	public ShopSnapshot requireOrderable(long shopId) {
 		ShopEntity shop = requireById(shopId);
 		if (!OPEN.equals(shop.getStatus())) {
 			throw new BusinessException(ApiError.SHOP_NOT_OPEN);
+		}
+		if (shop.getAddressRegion() == null || shop.getAddressDetail() == null || shop.getAddressPhone() == null) {
+			throw new BusinessException(ApiError.SHOP_ADDRESS_REQUIRED);
 		}
 		return toSnapshot(shop);
 	}
@@ -121,6 +141,16 @@ public class RestaurantServiceImpl implements RestaurantService {
 	@Transactional(readOnly = true)
 	public ShopSnapshot requireOwned(long merchantId, long shopId) {
 		return toSnapshot(requireOwnedEntity(merchantId, shopId));
+	}
+
+	@Override
+	@Transactional(readOnly = true)
+	public ShopSnapshot requireOwnedForRead(long merchantId, long shopId) {
+		ShopEntity shop = requireById(shopId);
+		if (shop.getMerchantId() != merchantId) {
+			throw new BusinessException(ApiError.FORBIDDEN);
+		}
+		return toSnapshot(shop);
 	}
 
 	private ShopEntity requireOwnedEntity(long merchantId, long shopId) {
@@ -142,11 +172,12 @@ public class RestaurantServiceImpl implements RestaurantService {
 
 	private static ShopView toView(ShopEntity shop) {
 		return new ShopView(shop.getId(), shop.getMerchantId(), shop.getName(), shop.getDescription(),
-				shop.getStatus(), shop.getCreatedAt(), shop.getUpdatedAt());
+				shop.getStatus(), shop.getAddressRegion(), shop.getAddressDetail(), shop.getAddressPhone(), shop.getCreatedAt(), shop.getUpdatedAt());
 	}
 
 	private static ShopSnapshot toSnapshot(ShopEntity shop) {
-		return new ShopSnapshot(shop.getId(), shop.getMerchantId(), shop.getName(), shop.getStatus());
+		return new ShopSnapshot(shop.getId(), shop.getMerchantId(), shop.getName(), shop.getStatus(),
+				shop.getAddressRegion(), shop.getAddressDetail(), shop.getAddressPhone());
 	}
 
 	private static int defaultPage(Integer page) {

@@ -15,3 +15,11 @@ export function createProduct(data) {
 export function updateProduct(productId, data) {
   return http.patch(`/products/${productId}`, data)
 }
+
+export function createProductSku(productId, data) {
+  return http.post(`/products/${productId}/skus`, data)
+}
+
+export function updateProductSku(skuId, data) {
+  return http.patch(`/skus/${skuId}`, data)
+}

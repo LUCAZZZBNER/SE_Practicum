@@ -1,5 +1,5 @@
 <script setup>
-import { ShoppingCart, User } from '@element-plus/icons-vue'
+import { Food, SwitchButton, User } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
@@ -9,9 +9,9 @@ defineProps({
     type: String,
     default: '轻量级外卖服务平台',
   },
-  statusText: {
+  profilePath: {
     type: String,
-    default: '未登录',
+    required: true,
   },
 })
 
@@ -25,13 +25,32 @@ function logout() {
 <template>
   <el-header class="app-header">
     <div class="brand">
-      <el-icon><ShoppingCart /></el-icon>
+      <el-icon><Food /></el-icon>
       <router-link to="/">{{ title }}</router-link>
     </div>
-    <div class="header-user">
-      <el-icon><User /></el-icon>
-      <span>{{ statusText }}</span>
-      <router-link to="/" @click="logout">退出</router-link>
+    <div class="header-actions">
+      <el-tooltip content="个人信息" placement="bottom">
+        <router-link
+          :to="profilePath"
+          class="header-icon-link"
+          data-testid="profile-link"
+          aria-label="个人信息"
+        >
+          <el-icon><User /></el-icon>
+        </router-link>
+      </el-tooltip>
+      <el-tooltip content="退出登录" placement="bottom">
+        <el-button
+          class="header-icon-button"
+          data-testid="logout-button"
+          aria-label="退出登录"
+          text
+          circle
+          @click="logout"
+        >
+          <el-icon><SwitchButton /></el-icon>
+        </el-button>
+      </el-tooltip>
     </div>
   </el-header>
 </template>

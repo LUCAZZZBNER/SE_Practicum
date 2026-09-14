@@ -15,8 +15,8 @@ vi.mock('vue-router', () => ({
 function mountHeader() {
   return mount(AppHeader, {
     props: {
-      title: '外卖平台',
-      statusText: '普通用户',
+      title: '轻量级外卖',
+      profilePath: '/customer/profile',
     },
     global: {
       stubs: {
@@ -29,7 +29,15 @@ function mountHeader() {
         'router-link': {
           props: ['to'],
           emits: ['click'],
-          template: '<a @click="$emit(\'click\')"><slot /></a>',
+          template: '<a :data-to="typeof to === \'string\' ? to : to.path" @click="$emit(\'click\')"><slot /></a>',
+        },
+        'el-tooltip': {
+          template: '<span><slot /></span>',
+        },
+        'el-button': {
+          props: ['ariaLabel'],
+          emits: ['click'],
+          template: '<button type="button" :aria-label="ariaLabel" @click="$emit(\'click\')"><slot /></button>',
         },
       },
     },
@@ -42,12 +50,12 @@ describe('AppHeader', () => {
     mocks.routerReplace.mockReset()
   })
 
-  it('renders title and status text', () => {
+  it('renders the platform brand and customer profile entry', () => {
     const wrapper = mountHeader()
 
-    expect(wrapper.text()).toContain('外卖平台')
-    expect(wrapper.text()).toContain('普通用户')
-    expect(wrapper.text()).toContain('退出')
+    expect(wrapper.text()).toContain('轻量级外卖')
+    expect(wrapper.get('[data-testid="profile-link"]').attributes('data-to')).toBe('/customer/profile')
+    expect(wrapper.get('[data-testid="logout-button"]').attributes('aria-label')).toBe('退出登录')
   })
 
   it('clears auth state and returns to home when logging out', async () => {
@@ -55,7 +63,7 @@ describe('AppHeader', () => {
     localStorage.setItem('user_role', 'USER')
 
     const wrapper = mountHeader()
-    await wrapper.findAll('a')[1].trigger('click')
+    await wrapper.get('[data-testid="logout-button"]').trigger('click')
 
     expect(localStorage.getItem('access_token')).toBeNull()
     expect(localStorage.getItem('user_role')).toBeNull()

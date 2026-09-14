@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="280" height="280" viewBox="0 0 280 280" fill="none">
+  <g stroke="#64756e" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" opacity="0.10">
+    <!-- burger -->
+    <path d="M38 45c2-10 12-17 27-17s25 7 27 17" />
+    <path d="M35 48h60l-5 8H40l-5-8Z" />
+    <path d="M40 60h50l-5 9H45l-5-9Z" />
+    <path d="M43 73h44" />
+    <path d="M52 37h1m10-3h1m11 5h1" />
+
+    <!-- drink cup -->
+    <path d="m191 30 8 48h30l8-48" />
+    <path d="M188 30h52" />
+    <path d="M219 30 229 13" />
+    <path d="M195 43h38m-35 18h32" />
+    <path d="M208 30v48" />
+
+    <!-- fork and spoon -->
+    <path d="M55 183v55" />
+    <path d="M55 183c-8 0-12-8-12-17v-16m12 16v-16m0 16v-16m0 16v-16" />
+    <path d="M86 183v55" />
+    <path d="M86 183c-9 0-14-7-14-17 0-10 5-17 14-17s14 7 14 17c0 10-5 17-14 17Z" />
+
+    <!-- takeaway box -->
+    <path d="m183 178 8 54h46l8-54h-62Z" />
+    <path d="M183 178h62m-55 11h48" />
+    <path d="M201 178c0-13 8-22 17-22s17 9 17 22" />
+    <path d="M207 204h26m-22 12h18" />
+  </g>
+</svg>

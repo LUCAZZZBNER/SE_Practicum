@@ -11,6 +11,11 @@ public class OrderEntity {
 	private Long userId;
 	private String idempotencyKey;
 	private String requestFingerprint;
+	private String cancelIdempotencyKey;
+	private String payIdempotencyKey;
+	private String prepareIdempotencyKey;
+	private String deliverIdempotencyKey;
+	private String receiptIdempotencyKey;
 	private Long shopId;
 	private String shopName;
 	private BigDecimal totalAmount;
@@ -18,6 +23,13 @@ public class OrderEntity {
 	private Instant createdAt;
 	private Instant updatedAt;
 	private Instant cancelledAt;
+	private String paymentStatus;
+	private String refundStatus;
+	private String remark;
+	private String cancelReason;
+	private Instant completedAt;
+	private String userAddressSnapshot;
+	private String shopAddressSnapshot;
 
 	public Long getId() {
 		return id;
@@ -58,6 +70,11 @@ public class OrderEntity {
 	public void setRequestFingerprint(String requestFingerprint) {
 		this.requestFingerprint = requestFingerprint;
 	}
+	public String getCancelIdempotencyKey(){return cancelIdempotencyKey;} public void setCancelIdempotencyKey(String v){cancelIdempotencyKey=v;}
+	public String getPayIdempotencyKey(){return payIdempotencyKey;} public void setPayIdempotencyKey(String v){payIdempotencyKey=v;}
+	public String getPrepareIdempotencyKey(){return prepareIdempotencyKey;} public void setPrepareIdempotencyKey(String v){prepareIdempotencyKey=v;}
+	public String getDeliverIdempotencyKey(){return deliverIdempotencyKey;} public void setDeliverIdempotencyKey(String v){deliverIdempotencyKey=v;}
+	public String getReceiptIdempotencyKey(){return receiptIdempotencyKey;} public void setReceiptIdempotencyKey(String v){receiptIdempotencyKey=v;}
 
 	public Long getShopId() {
 		return shopId;
@@ -114,4 +131,11 @@ public class OrderEntity {
 	public void setCancelledAt(Instant cancelledAt) {
 		this.cancelledAt = cancelledAt;
 	}
+	public String getPaymentStatus(){return paymentStatus;} public void setPaymentStatus(String v){paymentStatus=v;}
+	public String getRefundStatus(){return refundStatus;} public void setRefundStatus(String v){refundStatus=v;}
+	public String getRemark(){return remark;} public void setRemark(String v){remark=v;}
+	public String getCancelReason(){return cancelReason;} public void setCancelReason(String v){cancelReason=v;}
+	public Instant getCompletedAt(){return completedAt;} public void setCompletedAt(Instant v){completedAt=v;}
+	public String getUserAddressSnapshot(){return userAddressSnapshot;} public void setUserAddressSnapshot(String v){userAddressSnapshot=v;}
+	public String getShopAddressSnapshot(){return shopAddressSnapshot;} public void setShopAddressSnapshot(String v){shopAddressSnapshot=v;}
 }

@@ -5,11 +5,14 @@ import java.time.Instant;
 import java.util.List;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 import jakarta.validation.constraints.AssertTrue;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Positive;
@@ -95,8 +98,10 @@ public interface ItemService {
 	}
 
 	record CreateProductRequest(@Positive long shopId, @Positive long categoryId, @NotBlank String name, String description,
-			@NotNull @DecimalMin("0.01") @Digits(integer = 1000, fraction = 2) BigDecimal price,
-			@PositiveOrZero int stock) {
+			BigDecimal price, Integer stock, @Positive Long imageId,
+			@NotEmpty @Valid List<SkuService.CreateRequest> skus) {
+		public CreateProductRequest(long shopId,long categoryId,String name,String description,BigDecimal price,int stock){this(shopId,categoryId,name,description,price,stock,null,List.of(new SkuService.CreateRequest("默认规格", price, stock)));}
+		public CreateProductRequest { skus=skus==null?List.of():List.copyOf(skus); }
 	}
 
 	final class UpdateProductRequest extends PatchRequest {
@@ -114,6 +119,8 @@ public interface ItemService {
 		private String status;
 		@Positive
 		private Long version;
+		@Positive
+		private Long imageId;
 		private boolean categoryIdSpecified;
 		private boolean nameSpecified;
 		private boolean descriptionSpecified;
@@ -121,6 +128,7 @@ public interface ItemService {
 		private boolean stockSpecified;
 		private boolean statusSpecified;
 		private boolean versionSpecified;
+		private boolean imageIdSpecified;
 
 		public UpdateProductRequest() {
 		}
@@ -202,6 +210,9 @@ public interface ItemService {
 			markUpdateSpecified();
 		}
 
+		public Long imageId() { return imageId; }
+		public void setImageId(Long imageId) { this.imageId = imageId; this.imageIdSpecified = true; markUpdateSpecified(); }
+
 		@JsonIgnore
 		public boolean isCategoryIdSpecified() {
 			return categoryIdSpecified;
@@ -236,6 +247,9 @@ public interface ItemService {
 		public boolean isVersionSpecified() {
 			return versionSpecified;
 		}
+
+		@JsonIgnore
+		public boolean isImageIdSpecified() { return imageIdSpecified; }
 	}
 
 	record ProductQuery(Long categoryId, String keyword, Integer page, Integer pageSize, String sortBy,
@@ -245,17 +259,28 @@ public interface ItemService {
 	record CategoryView(long id, long shopId, String name, int sortOrder, Instant createdAt, Instant updatedAt) {
 	}
 
-	record ProductView(long id, long shopId, long categoryId, String name, String description, BigDecimal price,
-			int stock, String status, long version, Instant createdAt, Instant updatedAt) {
+	record ProductView(long id, long shopId, long categoryId, String name, String description, BigDecimal minPrice,
+			int stock, String status, long version, Instant createdAt, Instant updatedAt, ImageView image, List<SkuService.SkuView> skus) {
+		public ProductView(long id,long shopId,long categoryId,String name,String description,BigDecimal price,int stock,String status,long version,Instant createdAt,Instant updatedAt){this(id,shopId,categoryId,name,description,price,stock,status,version,createdAt,updatedAt,null,List.of());}
+		public ProductView { skus=skus==null?List.of():List.copyOf(skus); }
+		@JsonProperty("inStock")
+		public boolean inStock(){return stock > 0;}
+		public BigDecimal price(){return minPrice;}
 	}
+	record ImageView(long id,String url,String contentType,long size,Instant createdAt) { public ImageView(long id,String url){this(id,url,null,0,null);} }
 
-	record ReservationRequest(long productId, long expectedVersion, int quantity) {
+	record ReservationRequest(long productId, long expectedVersion, int quantity, long skuId) {
+		public ReservationRequest(long productId, long expectedVersion, int quantity) { this(productId, expectedVersion, quantity, 0); }
 	}
 
 	record ProductSnapshot(long productId, long shopId, String name, BigDecimal unitPrice, int quantity,
-			long version) {
+			long version, long skuId, String skuName, String imageUrl) {
+		public ProductSnapshot(long productId, long shopId, String name, BigDecimal unitPrice, int quantity, long version) {
+			this(productId, shopId, name, unitPrice, quantity, version, 0, null, null);
+		}
 	}
 
-	record StockRestore(long productId, int quantity) {
+	record StockRestore(long productId, int quantity, long skuId) {
+		public StockRestore(long productId, int quantity) { this(productId, quantity, 0); }
 	}
 }

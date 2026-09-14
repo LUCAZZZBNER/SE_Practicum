@@ -25,6 +25,7 @@ public interface RestaurantDao {
 			@Param("description") String description,
 			@Param("statusSpecified") boolean statusSpecified,
 			@Param("status") String status);
+	int updateAddress(@Param("id") long id, @Param("region") String region, @Param("detail") String detail, @Param("phone") String phone);
 
 	List<ShopEntity> list(@Param("mine") boolean mine,
 			@Param("merchantId") Long merchantId,
@@ -33,7 +34,7 @@ public interface RestaurantDao {
 			@Param("sortBy") String sortBy,
 			@Param("sortOrder") String sortOrder,
 			@Param("limit") int limit,
-			@Param("offset") int offset);
+			@Param("offset") long offset);
 
 	long count(@Param("mine") boolean mine,
 			@Param("merchantId") Long merchantId,

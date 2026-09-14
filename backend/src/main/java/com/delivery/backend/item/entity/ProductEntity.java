@@ -15,6 +15,10 @@ public class ProductEntity {
 	private Integer stock;
 	private String status;
 	private Long version;
+	private Long imageId;
+	private String imageUrl;
+	public Long getImageId(){return imageId;} public void setImageId(Long v){imageId=v;}
+	public String getImageUrl(){return imageUrl;} public void setImageUrl(String v){imageUrl=v;}
 	private Instant createdAt;
 	private Instant updatedAt;
 

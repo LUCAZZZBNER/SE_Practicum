@@ -8,11 +8,13 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.delivery.backend.ServiceContractTestSupport;
 import com.delivery.backend.common.ApiError;
 import com.delivery.backend.item.service.ItemService;
+import com.delivery.backend.item.service.SkuService;
 import com.delivery.backend.merchant.service.MerchantService;
 import com.delivery.backend.restaurant.service.RestaurantService;
 import com.delivery.backend.shopping.service.ShoppingService;
@@ -32,14 +34,18 @@ class ShoppingServiceContractTests extends ServiceContractTestSupport {
 	private RestaurantService restaurantService;
 	@Autowired
 	private ItemService itemService;
+	@Autowired
+	private JdbcTemplate jdbcTemplate;
+	@Autowired
+	private SkuService skuService;
 
 	@Test
 	void addingTheSameProductCreatesOnceThenMergesQuantity() {
 		Fixture fixture = fixture("cart-merge");
 		ShoppingService.AddResult created = service.add(fixture.userId(),
-				new ShoppingService.AddRequest(fixture.productId(), 1));
+				new ShoppingService.AddRequest(fixture.skuId(), 1));
 		ShoppingService.AddResult merged = service.add(fixture.userId(),
-				new ShoppingService.AddRequest(fixture.productId(), 2));
+				new ShoppingService.AddRequest(fixture.skuId(), 2));
 
 		assertThat(created.created()).isTrue();
 		assertThat(merged.created()).isFalse();
@@ -50,7 +56,7 @@ class ShoppingServiceContractTests extends ServiceContractTestSupport {
 	@Test
 	void cartUsesLatestProductDataAndCalculatesDisplayTotal() {
 		Fixture fixture = fixture("cart-total");
-		service.add(fixture.userId(), new ShoppingService.AddRequest(fixture.productId(), 2));
+		service.add(fixture.userId(), new ShoppingService.AddRequest(fixture.skuId(), 2));
 
 		ShoppingService.CartView cart = service.getCart(fixture.userId());
 		assertThat(cart.items()).singleElement().satisfies(item -> {
@@ -66,7 +72,7 @@ class ShoppingServiceContractTests extends ServiceContractTestSupport {
 		Fixture fixture = fixture("cart-owner");
 		long otherUserId = user("cart-other").id();
 		ShoppingService.CartItemView item = service.add(fixture.userId(),
-				new ShoppingService.AddRequest(fixture.productId(), 1)).item();
+				new ShoppingService.AddRequest(fixture.skuId(), 1)).item();
 
 		assertThat(service.changeQuantity(fixture.userId(), item.id(), 2).quantity()).isEqualTo(2);
 		assertBusinessError(ApiError.RESOURCE_NOT_FOUND,
@@ -79,7 +85,7 @@ class ShoppingServiceContractTests extends ServiceContractTestSupport {
 	void checkoutLoadingReturnsOnlySelectedOwnedItemsAndSuccessfulRemovalIsSelective() {
 		Fixture fixture = fixture("cart-checkout");
 		ShoppingService.CartItemView selected = service.add(fixture.userId(),
-				new ShoppingService.AddRequest(fixture.productId(), 1)).item();
+				new ShoppingService.AddRequest(fixture.skuId(), 1)).item();
 		List<ShoppingService.CheckoutItem> checkout = service.loadForCheckout(fixture.userId(),
 				List.of(selected.id()));
 		assertThat(checkout).singleElement().satisfies(item -> {
@@ -101,17 +107,23 @@ class ShoppingServiceContractTests extends ServiceContractTestSupport {
 				new RestaurantService.CreateRequest("Shop " + name, null));
 		RestaurantService.UpdateRequest open = new RestaurantService.UpdateRequest();
 		open.setStatus("OPEN");
+		restaurantService.updateAddress(merchantId, shop.id(), new RestaurantService.AddressRequest("杭州", "学院路", "05711234567"));
 		restaurantService.update(merchantId, shop.id(), open);
 		long categoryId = itemService.createCategory(merchantId, shop.id(),
 				new ItemService.CreateCategoryRequest("Meals", 0)).id();
+		long imageId = insertImage(merchantId);
 		ItemService.ProductView product = itemService.createProduct(merchantId,
 				new ItemService.CreateProductRequest(shop.id(), categoryId, "Rice", null,
-						new BigDecimal("12.50"), 5));
+						new BigDecimal("12.50"), 5, imageId,
+						List.of(new com.delivery.backend.item.service.SkuService.CreateRequest("默认规格", new BigDecimal("12.50"), 5))));
 		ItemService.UpdateProductRequest onSale = new ItemService.UpdateProductRequest();
 		onSale.setStatus("ON_SALE");
 		onSale.setVersion(product.version());
 		product = itemService.updateProduct(merchantId, product.id(), onSale);
-		return new Fixture(userId, product.id());
+		SkuService.UpdateRequest skuUpdate = new SkuService.UpdateRequest();
+		skuUpdate.setStatus("ON_SALE"); skuUpdate.setVersion(product.skus().get(0).version());
+		skuService.update(merchantId, product.skus().get(0).id(), skuUpdate);
+		return new Fixture(userId, product.id(), product.skus().get(0).id());
 	}
 
 	private UserService.UserView user(String account) {
@@ -119,6 +131,11 @@ class ShoppingServiceContractTests extends ServiceContractTestSupport {
 				"ExamplePass123!", "Alice", null));
 	}
 
-	private record Fixture(long userId, long productId) {
+	private long insertImage(long merchantId) {
+		jdbcTemplate.update("INSERT INTO images(merchant_id,url,content_type,size) VALUES(?, '/uploads/test.webp','image/webp',4)", merchantId);
+		return jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
+	}
+
+	private record Fixture(long userId, long productId, long skuId) {
 	}
 }

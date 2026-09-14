@@ -24,7 +24,7 @@ async function submitRegister() {
     })
 
     ElMessage.success('注册成功')
-    instance?.proxy?.$router?.push('/login/customer')
+    instance?.proxy?.$router?.push({ path: '/', query: { role: 'customer' } })
   } catch (error) {
     ElMessage.error(error?.message || '注册失败')
   }
@@ -51,8 +51,7 @@ async function submitRegister() {
       </el-form-item>
       <el-form-item>
         <el-button type="primary" @click="submitRegister">提交注册</el-button>
-        <el-button @click="$router.push('/login/customer')">去登录</el-button>
-        <el-button link @click="$router.push('/')">返回首页</el-button>
+        <el-button @click="$router.push({ path: '/', query: { role: 'customer' } })">去登录</el-button>
       </el-form-item>
     </el-form>
   </AuthFormCard>

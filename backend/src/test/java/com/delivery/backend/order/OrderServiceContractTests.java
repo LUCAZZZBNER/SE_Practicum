@@ -6,13 +6,17 @@ import java.math.BigDecimal;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
+import org.apache.ibatis.session.SqlSession;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.delivery.backend.ServiceContractTestSupport;
 import com.delivery.backend.common.ApiError;
+import com.delivery.backend.address.service.UserAddressService;
 import com.delivery.backend.item.service.ItemService;
+import com.delivery.backend.item.service.SkuService;
 import com.delivery.backend.merchant.service.MerchantService;
 import com.delivery.backend.order.service.OrderService;
 import com.delivery.backend.restaurant.service.RestaurantService;
@@ -35,6 +39,14 @@ class OrderServiceContractTests extends ServiceContractTestSupport {
 	private ItemService itemService;
 	@Autowired
 	private ShoppingService shoppingService;
+	@Autowired
+	private UserAddressService addressService;
+	@Autowired
+	private SkuService skuService;
+	@Autowired
+	private JdbcTemplate jdbcTemplate;
+	@Autowired
+	private SqlSession sqlSession;
 
 	@Test
 	void createCalculatesServerTotalStoresSnapshotsAndRemovesSelectedCartItems() {
@@ -61,7 +73,7 @@ class OrderServiceContractTests extends ServiceContractTestSupport {
 		assertThat(service.create(fixture.userId(), "same-key", request).id()).isEqualTo(first.id());
 		assertBusinessError(ApiError.IDEMPOTENCY_CONFLICT, () -> service.create(fixture.userId(), "same-key",
 				new OrderService.CreateRequest(List.of(
-						new OrderService.ItemRequest(fixture.cartItemId(), fixture.productVersion() + 1)))));
+						new OrderService.ItemRequest(fixture.cartItemId(), fixture.productVersion() + 1)), fixture.addressId(), null)));
 	}
 
 	@Test
@@ -71,7 +83,7 @@ class OrderServiceContractTests extends ServiceContractTestSupport {
 				() -> service.create(fixture.userId(), "empty-key", new OrderService.CreateRequest(List.of())));
 		assertBusinessError(ApiError.PRICE_CHANGED, () -> service.create(fixture.userId(), "changed-key",
 				new OrderService.CreateRequest(List.of(
-						new OrderService.ItemRequest(fixture.cartItemId(), fixture.productVersion() - 1)))));
+						new OrderService.ItemRequest(fixture.cartItemId(), fixture.productVersion() - 1)), fixture.addressId(), null)));
 
 		assertThat(shoppingService.getCart(fixture.userId()).items()).extracting(ShoppingService.CartItemView::id)
 				.contains(fixture.cartItemId());
@@ -111,6 +123,116 @@ class OrderServiceContractTests extends ServiceContractTestSupport {
 		assertThat(itemService.getProduct(fixture.productId(), true, fixture.merchantId()).stock()).isEqualTo(5);
 	}
 
+	@Test
+	void suspendedMerchantsCanStillReadHistoricalOrders() {
+		Fixture fixture = fixture("order-suspended-merchant");
+		OrderService.OrderView order = service.create(fixture.userId(), "suspended-key", request(fixture));
+		jdbcTemplate.update("UPDATE merchants SET status = 'SUSPENDED' WHERE id = ?", fixture.merchantId());
+		sqlSession.clearCache();
+
+		assertThat(service.listMerchantOrders(fixture.merchantId(),
+				new OrderService.MerchantListQuery(fixture.shopId(), null, 1, 10, null, null)).items())
+				.extracting(OrderService.OrderSummaryView::id).contains(order.id());
+		assertThat(service.getMerchantOrder(fixture.merchantId(), order.id()).id()).isEqualTo(order.id());
+	}
+
+	@Test
+	void nullOrderItemsProduceTheCartEmptyBusinessError() {
+		Fixture fixture = fixture("order-null-items");
+		assertBusinessError(ApiError.CART_EMPTY,
+				() -> service.create(fixture.userId(), "null-items-key", new OrderService.CreateRequest(null)));
+	}
+
+	@Test
+	void checkoutRejectsAnAddressThatDoesNotBelongToTheUser() {
+		Fixture fixture = fixture("order-address-ownership");
+		OrderService.CreateRequest request = new OrderService.CreateRequest(
+				List.of(new OrderService.ItemRequest(fixture.cartItemId(), fixture.productVersion())),
+				999999L, "少放辣椒");
+
+		assertBusinessError(ApiError.RESOURCE_NOT_FOUND,
+				() -> service.create(fixture.userId(), "address-key", request));
+		assertThat(shoppingService.getCart(fixture.userId()).items())
+				.extracting(ShoppingService.CartItemView::id).contains(fixture.cartItemId());
+	}
+
+	@Test
+	void checkoutRejectsRemarksLongerThanTwoHundredCharacters() {
+		Fixture fixture = fixture("order-remark-length");
+		String remark = "x".repeat(201);
+		OrderService.CreateRequest request = new OrderService.CreateRequest(
+				List.of(new OrderService.ItemRequest(fixture.cartItemId(), fixture.productVersion())),
+				null, remark);
+
+		assertBusinessError(ApiError.VALIDATION_ERROR,
+				() -> service.create(fixture.userId(), "remark-key", request));
+	}
+
+	@Test
+	void paymentFulfillmentAndReceiptFollowTheDocumentedStateMachine() {
+		Fixture fixture = fixture("order-state-machine");
+		OrderService.OrderView created = service.create(fixture.userId(), "state-key", request(fixture));
+		assertThat(service.pay(fixture.userId(), created.id(), "pay-key").status()).isEqualTo("PAID");
+		assertThat(service.prepare(fixture.merchantId(), created.id(), "prepare-key").status()).isEqualTo("PREPARING");
+		assertThat(service.deliver(fixture.merchantId(), created.id(), "deliver-key").status()).isEqualTo("DELIVERING");
+		assertThat(service.confirmReceipt(fixture.userId(), created.id(), "receipt-key").status()).isEqualTo("COMPLETED");
+		assertBusinessError(ApiError.ORDER_STATE_CONFLICT,
+				() -> service.confirmReceipt(fixture.userId(), created.id(), "receipt-again"));
+	}
+
+	@Test
+	void repeatedPaymentWithTheSameIdempotencyKeyReturnsTheOriginalResult() {
+		Fixture fixture = fixture("order-payment-idempotency");
+		OrderService.OrderView created = service.create(fixture.userId(), "payment-order-key", request(fixture));
+
+		OrderService.OrderView first = service.pay(fixture.userId(), created.id(), "payment-key");
+		OrderService.OrderView retry = service.pay(fixture.userId(), created.id(), "payment-key");
+
+		assertThat(retry.id()).isEqualTo(first.id());
+		assertThat(retry.status()).isEqualTo("PAID");
+		assertThat(retry.paymentStatus()).isEqualTo("PAID");
+	}
+
+	@Test
+	void fulfillmentActionsReplayTheSameIdempotencyKey() {
+		Fixture fixture = fixture("order-action-retries");
+		OrderService.OrderView created = service.create(fixture.userId(), "create-key", request(fixture));
+		service.pay(fixture.userId(), created.id(), "pay-key");
+		service.prepare(fixture.merchantId(), created.id(), "prepare-key");
+		assertThat(service.prepare(fixture.merchantId(), created.id(), "prepare-key").status()).isEqualTo("PREPARING");
+		service.deliver(fixture.merchantId(), created.id(), "deliver-key");
+		assertThat(service.deliver(fixture.merchantId(), created.id(), "deliver-key").status()).isEqualTo("DELIVERING");
+		service.confirmReceipt(fixture.userId(), created.id(), "receipt-key");
+		assertThat(service.confirmReceipt(fixture.userId(), created.id(), "receipt-key").status()).isEqualTo("COMPLETED");
+	}
+
+	@Test
+	void checkoutIdempotencyIncludesTheAddressAndRemark() {
+		Fixture fixture = fixture("order-fingerprint");
+		service.create(fixture.userId(), "fingerprint-key", request(fixture));
+		assertBusinessError(ApiError.IDEMPOTENCY_CONFLICT,
+				() -> service.create(fixture.userId(), "fingerprint-key", new OrderService.CreateRequest(
+						request(fixture).items(), fixture.addressId(), "another remark")));
+	}
+
+	@Test
+	void orderDetailReturnsAddressSnapshotsAfterMysqlJsonRoundTrip() {
+		Fixture fixture = fixture("order-address-snapshots");
+
+		OrderService.OrderView created = service.create(
+				fixture.userId(), "address-snapshot-key", request(fixture));
+
+		assertThat(created.userAddressSnapshot())
+				.containsEntry("recipient", "张三")
+				.containsEntry("phone", "13800000000")
+				.containsEntry("region", "杭州")
+				.containsEntry("detail", "学院路");
+		assertThat(created.shopAddressSnapshot())
+				.containsEntry("region", "杭州")
+				.containsEntry("detail", "学院路")
+				.containsEntry("phone", "05711234567");
+	}
+
 	private Fixture fixture(String name) {
 		long userId = user(name + "-user").id();
 		long merchantId = merchant(name + "-merchant").id();
@@ -118,24 +240,39 @@ class OrderServiceContractTests extends ServiceContractTestSupport {
 				new RestaurantService.CreateRequest("Shop " + name, null));
 		RestaurantService.UpdateRequest open = new RestaurantService.UpdateRequest();
 		open.setStatus("OPEN");
+		restaurantService.updateAddress(merchantId, shop.id(), new RestaurantService.AddressRequest("杭州", "学院路", "05711234567"));
 		restaurantService.update(merchantId, shop.id(), open);
 		long categoryId = itemService.createCategory(merchantId, shop.id(),
 				new ItemService.CreateCategoryRequest("Meals", 0)).id();
+		long imageId = insertImage(merchantId);
 		ItemService.ProductView product = itemService.createProduct(merchantId,
 				new ItemService.CreateProductRequest(shop.id(), categoryId, "Rice", null,
-						new BigDecimal("12.50"), 5));
+						new BigDecimal("12.50"), 5, imageId,
+						List.of(new com.delivery.backend.item.service.SkuService.CreateRequest("默认规格", new BigDecimal("12.50"), 5))));
 		ItemService.UpdateProductRequest onSale = new ItemService.UpdateProductRequest();
 		onSale.setStatus("ON_SALE");
 		onSale.setVersion(product.version());
 		product = itemService.updateProduct(merchantId, product.id(), onSale);
+		if (!product.skus().isEmpty()) {
+			SkuService.UpdateRequest skuUpdate = new SkuService.UpdateRequest();
+			skuUpdate.setStatus("ON_SALE"); skuUpdate.setVersion(product.skus().get(0).version());
+			skuService.update(merchantId, product.skus().get(0).id(), skuUpdate);
+		}
 		ShoppingService.CartItemView cartItem = shoppingService.add(userId,
-				new ShoppingService.AddRequest(product.id(), 2)).item();
-		return new Fixture(userId, merchantId, shop.id(), product.id(), product.version(), cartItem.id());
+				new ShoppingService.AddRequest(product.skus().get(0).id(), 2)).item();
+		long addressId = addressService.create(userId,
+				new UserAddressService.CreateRequest("张三", "13800000000", "杭州", "学院路", true)).id();
+		return new Fixture(userId, merchantId, shop.id(), product.id(), product.version(), cartItem.id(), addressId);
 	}
 
 	private UserService.UserView user(String account) {
 		return userService.register(new UserService.RegisterRequest(account, "ExamplePass123!",
 				"ExamplePass123!", "Alice", null));
+	}
+
+	private long insertImage(long merchantId) {
+		jdbcTemplate.update("INSERT INTO images(merchant_id,url,content_type,size) VALUES(?, '/uploads/test.webp','image/webp',4)", merchantId);
+		return jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
 	}
 
 	private MerchantService.MerchantView merchant(String account) {
@@ -145,10 +282,10 @@ class OrderServiceContractTests extends ServiceContractTestSupport {
 
 	private static OrderService.CreateRequest request(Fixture fixture) {
 		return new OrderService.CreateRequest(List.of(
-				new OrderService.ItemRequest(fixture.cartItemId(), fixture.productVersion())));
+				new OrderService.ItemRequest(fixture.cartItemId(), fixture.productVersion())), fixture.addressId(), null);
 	}
 
 	private record Fixture(long userId, long merchantId, long shopId, long productId, long productVersion,
-			long cartItemId) {
+			long cartItemId, long addressId) {
 	}
 }

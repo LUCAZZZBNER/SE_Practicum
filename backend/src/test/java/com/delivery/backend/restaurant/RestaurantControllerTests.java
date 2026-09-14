@@ -12,6 +12,7 @@ import static com.delivery.backend.TestFixtures.shop;
 import static com.delivery.backend.TestFixtures.shopPage;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -114,6 +115,25 @@ class RestaurantControllerTests {
 		verify(service).update(org.mockito.ArgumentMatchers.eq(2L), org.mockito.ArgumentMatchers.eq(10L),
 				argThat(request -> request.name().equals("Renamed") && request.description() == null
 						&& request.status().equals("CLOSED")));
+	}
+
+	@Test
+	void updateAddressForwardsMerchantShopAndAddressFields() throws Exception {
+		when(service.updateAddress(any(Long.class), any(Long.class), any())).thenReturn(shop(10));
+		mvc.perform(patch("/api/v1/shops/10/address").requestAttr("currentPrincipal", merchantPrincipal(2))
+				.contentType(JSON).content("{\"region\":\"杭州\",\"detail\":\"学院路\",\"phone\":\"05710000000\"}"))
+				.andExpect(status().isOk()).andExpect(successfulDataId(10));
+		verify(service).updateAddress(eq(2L), eq(10L), any());
+	}
+
+	@Test
+	void shopAddressUsesTheFieldsReadByTheFrontend() throws Exception {
+		when(service.get(10)).thenReturn(new RestaurantService.ShopView(10, 2, "Shop", null, "CLOSED", "杭州", "学院路", "05710000000", null, null));
+		mvc.perform(get("/api/v1/shops/10"))
+				.andExpect(status().isOk())
+				.andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.data.region").value("杭州"))
+				.andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.data.detail").value("学院路"))
+				.andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.data.phone").value("05710000000"));
 	}
 
 	@Test

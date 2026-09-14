@@ -21,13 +21,17 @@ public interface RestaurantService {
 	ShopView get(long shopId);
 
 	ShopView update(long merchantId, long shopId, UpdateRequest request);
+	ShopView updateAddress(long merchantId, long shopId, AddressRequest request);
 
 	ShopSnapshot requireOrderable(long shopId);
 
 	ShopSnapshot requireOwned(long merchantId, long shopId);
 
+	ShopSnapshot requireOwnedForRead(long merchantId, long shopId);
+
 	record CreateRequest(@NotBlank String name, String description) {
 	}
+	record AddressRequest(@NotBlank String region, @NotBlank String detail, @Pattern(regexp = "1[0-9]{10}|0[0-9]{10,11}") String phone) {}
 
 	final class UpdateRequest extends PatchRequest {
 		@Pattern(regexp = "(?s).*\\S.*")
@@ -100,9 +104,13 @@ public interface RestaurantService {
 	}
 
 	record ShopView(long id, long merchantId, String name, String description, String status,
-			Instant createdAt, Instant updatedAt) {
+			String region, String detail, String phone, Instant createdAt, Instant updatedAt) {
+		public ShopView(long id,long merchantId,String name,String description,String status,Instant createdAt,Instant updatedAt){this(id,merchantId,name,description,status,null,null,null,createdAt,updatedAt);}
 	}
 
-	record ShopSnapshot(long id, long merchantId, String name, String status) {
+	record ShopSnapshot(long id, long merchantId, String name, String status, String region, String detail, String phone) {
+		public ShopSnapshot(long id, long merchantId, String name, String status) {
+			this(id, merchantId, name, status, null, null, null);
+		}
 	}
 }

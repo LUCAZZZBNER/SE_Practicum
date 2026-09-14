@@ -3,6 +3,7 @@ export default [
     path: '/merchant',
     component: () => import('../../layouts/MerchantLayout.vue'),
     redirect: '/merchant/store',
+    meta: { requiresAuth: true, role: 'MERCHANT' },
     children: [
       {
         path: 'store',

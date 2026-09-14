@@ -10,6 +10,11 @@
         <result property="userId" column="user_id"/>
         <result property="idempotencyKey" column="idempotency_key"/>
         <result property="requestFingerprint" column="request_fingerprint"/>
+        <result property="cancelIdempotencyKey" column="cancel_idempotency_key"/>
+        <result property="payIdempotencyKey" column="pay_idempotency_key"/>
+        <result property="prepareIdempotencyKey" column="prepare_idempotency_key"/>
+        <result property="deliverIdempotencyKey" column="deliver_idempotency_key"/>
+        <result property="receiptIdempotencyKey" column="receipt_idempotency_key"/>
         <result property="shopId" column="shop_id"/>
         <result property="shopName" column="shop_name"/>
         <result property="totalAmount" column="total_amount"/>
@@ -17,6 +22,7 @@
         <result property="createdAt" column="created_at"/>
         <result property="updatedAt" column="updated_at"/>
         <result property="cancelledAt" column="cancelled_at"/>
+        <result property="paymentStatus" column="payment_status"/><result property="refundStatus" column="refund_status"/><result property="remark" column="remark"/><result property="cancelReason" column="cancel_reason"/><result property="completedAt" column="completed_at"/><result property="userAddressSnapshot" column="user_address_snapshot"/><result property="shopAddressSnapshot" column="shop_address_snapshot"/>
     </resultMap>
 
     <resultMap id="orderItemResultMap" type="com.delivery.backend.order.entity.OrderItemEntity">
@@ -26,12 +32,15 @@
         <result property="productName" column="product_name"/>
         <result property="unitPrice" column="unit_price"/>
         <result property="quantity" column="quantity"/>
+        <result property="skuId" column="sku_id"/><result property="skuName" column="sku_name"/><result property="imageUrl" column="image_url"/>
     </resultMap>
 
     <sql id="orderColumns">
         o.id, o.order_no, o.user_id, o.idempotency_key, o.request_fingerprint,
         o.shop_id, o.shop_name, o.total_amount, o.status, o.created_at,
         o.updated_at, o.cancelled_at
+        , o.payment_status, o.refund_status, o.remark, o.cancel_reason, o.completed_at, o.user_address_snapshot, o.shop_address_snapshot, o.cancel_idempotency_key,
+        o.pay_idempotency_key, o.prepare_idempotency_key, o.deliver_idempotency_key, o.receipt_idempotency_key
     </sql>
 
     <sql id="orderSort">
@@ -65,6 +74,14 @@
           AND o.id = #{orderId}
     </select>
 
+    <select id="findMineForUpdate" resultMap="orderResultMap">
+        SELECT <include refid="orderColumns"/>
+        FROM orders o
+        WHERE o.user_id = #{userId}
+          AND o.id = #{orderId}
+        FOR UPDATE
+    </select>
+
     <select id="findMerchantOrder" resultMap="orderResultMap">
         SELECT <include refid="orderColumns"/>
         FROM orders o
@@ -73,27 +90,71 @@
           AND o.id = #{orderId}
     </select>
 
+    <select id="findMerchantOrderForUpdate" resultMap="orderResultMap">
+        SELECT <include refid="orderColumns"/>
+        FROM orders o
+        JOIN shops s ON s.id = o.shop_id
+        WHERE s.merchant_id = #{merchantId}
+          AND o.id = #{orderId}
+        FOR UPDATE
+    </select>
+
+    <resultMap id="actionIdempotencyResultMap"
+               type="com.delivery.backend.order.entity.OrderActionIdempotencyEntity">
+        <id property="id" column="id"/>
+        <result property="actorType" column="actor_type"/>
+        <result property="actorId" column="actor_id"/>
+        <result property="actionName" column="action_name"/>
+        <result property="idempotencyKey" column="idempotency_key"/>
+        <result property="requestFingerprint" column="request_fingerprint"/>
+        <result property="orderId" column="order_id"/>
+        <result property="createdAt" column="created_at"/>
+    </resultMap>
+
+    <select id="findActionIdempotency" resultMap="actionIdempotencyResultMap">
+        SELECT id, actor_type, actor_id, action_name, idempotency_key,
+               request_fingerprint, order_id, created_at
+        FROM order_action_idempotency
+        WHERE actor_type = #{actorType}
+          AND actor_id = #{actorId}
+          AND action_name = #{actionName}
+          AND idempotency_key = #{idempotencyKey}
+    </select>
+
+    <insert id="insertActionIdempotency"
+            parameterType="com.delivery.backend.order.entity.OrderActionIdempotencyEntity"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO order_action_idempotency (
+            actor_type, actor_id, action_name, idempotency_key, request_fingerprint, order_id
+        ) VALUES (
+            #{actorType}, #{actorId}, #{actionName}, #{idempotencyKey}, #{requestFingerprint}, #{orderId}
+        )
+    </insert>
+
     <insert id="insertOrder" parameterType="com.delivery.backend.order.entity.OrderEntity"
             useGeneratedKeys="true" keyProperty="id">
         INSERT INTO orders (
             order_no, user_id, idempotency_key, request_fingerprint,
-            shop_id, shop_name, total_amount, status
+            shop_id, shop_name, total_amount, status, payment_status, refund_status,
+            remark, user_address_snapshot, shop_address_snapshot
         ) VALUES (
             #{orderNumber}, #{userId}, #{idempotencyKey}, #{requestFingerprint},
-            #{shopId}, #{shopName}, #{totalAmount}, #{status}
+            #{shopId}, #{shopName}, #{totalAmount}, #{status}, #{paymentStatus}, #{refundStatus},
+            #{remark}, #{userAddressSnapshot}, #{shopAddressSnapshot}
         )
     </insert>
 
     <insert id="insertItems">
-        INSERT INTO order_items (order_id, product_id, product_name, unit_price, quantity)
+        INSERT INTO order_items (order_id, product_id, product_name, unit_price, quantity, sku_id, sku_name, image_url)
         VALUES
         <foreach collection="items" item="item" separator=",">
-            (#{item.orderId}, #{item.productId}, #{item.productName}, #{item.unitPrice}, #{item.quantity})
+            (#{item.orderId}, #{item.productId}, #{item.productName}, #{item.unitPrice}, #{item.quantity},
+             #{item.skuId}, #{item.skuName}, #{item.imageUrl})
         </foreach>
     </insert>
 
     <select id="listItems" resultMap="orderItemResultMap">
-        SELECT id, order_id, product_id, product_name, unit_price, quantity
+        SELECT id, order_id, product_id, product_name, unit_price, quantity, sku_id, sku_name, image_url
         FROM order_items
         WHERE order_id = #{orderId}
         ORDER BY id ASC
@@ -147,13 +208,43 @@
         </if>
     </select>
 
-    <update id="cancelPending">
+    <update id="transitionStatus">
         UPDATE orders
-        SET status = 'CANCELLED',
-            cancelled_at = CURRENT_TIMESTAMP(3)
-        WHERE id = #{orderId}
-          AND user_id = #{userId}
-          AND status = 'PENDING_PAYMENT'
+        SET status = #{status}, updated_at = CURRENT_TIMESTAMP(3),
+            payment_status = CASE WHEN #{status} = 'PAID' THEN 'PAID' ELSE payment_status END,
+            completed_at = CASE WHEN #{status} = 'COMPLETED' THEN CURRENT_TIMESTAMP(3) ELSE completed_at END
+        WHERE id = #{orderId} AND status = #{fromStatus}
     </update>
+
+    <update id="cancelEligible">
+        UPDATE orders
+        SET status='CANCELLED', cancelled_at=CURRENT_TIMESTAMP(3), cancel_reason=#{reason}, cancel_idempotency_key=#{idempotencyKey},
+            refund_status=CASE WHEN #{refund} THEN 'REFUNDED' ELSE refund_status END,
+            updated_at=CURRENT_TIMESTAMP(3)
+        WHERE id=#{orderId} AND user_id=#{userId} AND status IN ('PENDING_PAYMENT','PAID','PREPARING')
+    </update>
+
+    <resultMap id="paymentResultMap" type="com.delivery.backend.order.entity.PaymentEntity">
+        <id property="id" column="id"/><result property="orderId" column="order_id"/>
+        <result property="paymentNumber" column="payment_number"/><result property="amount" column="amount"/>
+        <result property="status" column="status"/><result property="idempotencyKey" column="idempotency_key"/>
+        <result property="paidAt" column="paid_at"/><result property="createdAt" column="created_at"/>
+    </resultMap>
+    <select id="findPayment" resultMap="paymentResultMap">SELECT * FROM payments WHERE order_id=#{orderId}</select>
+    <insert id="insertPayment" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO payments(order_id,payment_number,amount,status,idempotency_key,paid_at)
+        VALUES(#{orderId},#{paymentNumber},#{amount},#{status},#{idempotencyKey},CURRENT_TIMESTAMP(3))
+    </insert>
+    <resultMap id="refundResultMap" type="com.delivery.backend.order.entity.RefundEntity">
+        <id property="id" column="id"/><result property="orderId" column="order_id"/><result property="paymentId" column="payment_id"/>
+        <result property="refundNumber" column="refund_number"/><result property="amount" column="amount"/>
+        <result property="status" column="status"/><result property="idempotencyKey" column="idempotency_key"/>
+        <result property="completedAt" column="completed_at"/><result property="createdAt" column="created_at"/>
+    </resultMap>
+    <select id="findRefund" resultMap="refundResultMap">SELECT * FROM refunds WHERE order_id=#{orderId}</select>
+    <insert id="insertRefund" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO refunds(order_id,payment_id,refund_number,amount,status,idempotency_key,completed_at)
+        VALUES(#{orderId},#{paymentId},#{refundNumber},#{amount},#{status},#{idempotencyKey},CURRENT_TIMESTAMP(3))
+    </insert>
 
 </mapper>

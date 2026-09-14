@@ -63,6 +63,19 @@ describe('router guards', () => {
     expect(merchantToCustomer).toBe('/merchant/store')
   })
 
+  it('enforces explicit route role metadata independently of URL prefixes', () => {
+    const result = resolveNavigation(
+      {
+        path: '/workspace',
+        fullPath: '/workspace',
+        meta: { requiresAuth: true, role: 'MERCHANT' },
+      },
+      { token: 'token-1', role: 'USER' },
+    )
+
+    expect(result).toBe('/customer/stores')
+  })
+
   it('updates document title for navigable protected pages', () => {
     localStorage.setItem('access_token', 'token-abc')
     localStorage.setItem('user_role', 'USER')

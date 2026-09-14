@@ -13,6 +13,8 @@ public interface UserDao {
 
 	UserEntity findById(@Param("id") long id);
 
+	UserEntity findByIdForUpdate(@Param("id") long id);
+
 	int insert(UserEntity user);
 
 	int updateProfile(@Param("id") long id,
