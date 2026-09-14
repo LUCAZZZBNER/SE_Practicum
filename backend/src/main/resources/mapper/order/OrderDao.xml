@@ -176,8 +176,24 @@
         WHERE id = #{orderId} AND status = #{fromStatus}
     </update>
 
-    <update id="updateActionKey">
-        UPDATE orders SET ${column} = #{key}, updated_at = CURRENT_TIMESTAMP(3) WHERE id = #{orderId}
+    <update id="updatePayIdempotencyKey">
+        UPDATE orders SET pay_idempotency_key = #{key}, updated_at = CURRENT_TIMESTAMP(3)
+        WHERE id = #{orderId}
+    </update>
+
+    <update id="updatePrepareIdempotencyKey">
+        UPDATE orders SET prepare_idempotency_key = #{key}, updated_at = CURRENT_TIMESTAMP(3)
+        WHERE id = #{orderId}
+    </update>
+
+    <update id="updateDeliverIdempotencyKey">
+        UPDATE orders SET deliver_idempotency_key = #{key}, updated_at = CURRENT_TIMESTAMP(3)
+        WHERE id = #{orderId}
+    </update>
+
+    <update id="updateReceiptIdempotencyKey">
+        UPDATE orders SET receipt_idempotency_key = #{key}, updated_at = CURRENT_TIMESTAMP(3)
+        WHERE id = #{orderId}
     </update>
 
     <update id="cancelEligible">

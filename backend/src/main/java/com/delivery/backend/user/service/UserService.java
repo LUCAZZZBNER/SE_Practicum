@@ -1,97 +1,102 @@
 package com.delivery.backend.user.service;
 
+import com.delivery.backend.common.PatchRequest;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import jakarta.validation.constraints.AssertTrue;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import java.time.Instant;
 import java.util.List;
-
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.AssertTrue;
-import jakarta.validation.constraints.Pattern;
-
-import com.fasterxml.jackson.annotation.JsonIgnore;
-
-import com.delivery.backend.common.PatchRequest;
 
 /** User business contract. Implementation and persistence are intentionally pending. */
 public interface UserService {
 
-	UserView register(RegisterRequest request);
+  UserView register(RegisterRequest request);
 
-	AuthSession login(LoginRequest request);
+  AuthSession login(LoginRequest request);
 
-	UserView getCurrent(long userId);
+  UserView getCurrent(long userId);
 
-	UserView updateCurrent(long userId, UpdateRequest request);
+  UserView updateCurrent(long userId, UpdateRequest request);
 
-	UserSnapshot requireActive(long userId);
+  UserSnapshot requireActive(long userId);
 
-	UserSnapshot requireActiveForUpdate(long userId);
+  UserSnapshot requireActiveForUpdate(long userId);
 
-	record RegisterRequest(@NotBlank String account, @NotBlank String password, @NotBlank String passwordConfirm,
-			@NotBlank String nickname, @Pattern(regexp = "(?s).*\\S.*") String phone) {
-	}
+  record RegisterRequest(
+      @NotBlank String account,
+      @NotBlank String password,
+      @NotBlank String passwordConfirm,
+      @NotBlank String nickname,
+      @Pattern(regexp = "(?s).*\\S.*") String phone) {}
 
-	record LoginRequest(@NotBlank String account, @NotBlank String password) {
-	}
+  record LoginRequest(@NotBlank String account, @NotBlank String password) {}
 
-	final class UpdateRequest extends PatchRequest {
-		@Pattern(regexp = "(?s).*\\S.*")
-		private String nickname;
-		@Pattern(regexp = "(?s).*\\S.*")
-		private String phone;
-		private boolean nicknameSpecified;
-		private boolean phoneSpecified;
+  final class UpdateRequest extends PatchRequest {
+    @Pattern(regexp = "(?s).*\\S.*")
+    private String nickname;
 
-		public UpdateRequest() {
-		}
+    @Pattern(regexp = "(?s).*\\S.*")
+    private String phone;
 
-		@Override
-		@JsonIgnore
-		@AssertTrue
-		public boolean isUpdateSpecified() {
-			return super.isUpdateSpecified();
-		}
+    private boolean nicknameSpecified;
+    private boolean phoneSpecified;
 
-		public String nickname() {
-			return nickname;
-		}
+    public UpdateRequest() {}
 
-		public void setNickname(String nickname) {
-			this.nickname = nickname;
-			this.nicknameSpecified = true;
-			markUpdateSpecified();
-		}
+    @Override
+    @JsonIgnore
+    @AssertTrue
+    public boolean isUpdateSpecified() {
+      return super.isUpdateSpecified();
+    }
 
-		public String phone() {
-			return phone;
-		}
+    public String nickname() {
+      return nickname;
+    }
 
-		public void setPhone(String phone) {
-			this.phone = phone;
-			this.phoneSpecified = true;
-			markUpdateSpecified();
-		}
+    public void setNickname(String nickname) {
+      this.nickname = nickname;
+      this.nicknameSpecified = true;
+      markUpdateSpecified();
+    }
 
-		@JsonIgnore
-		public boolean isNicknameSpecified() {
-			return nicknameSpecified;
-		}
+    public String phone() {
+      return phone;
+    }
 
-		@JsonIgnore
-		public boolean isPhoneSpecified() {
-			return phoneSpecified;
-		}
-	}
+    public void setPhone(String phone) {
+      this.phone = phone;
+      this.phoneSpecified = true;
+      markUpdateSpecified();
+    }
 
-	record UserView(long id, String account, String nickname, String phone, String status,
-			Instant createdAt, Instant updatedAt) {
-	}
+    @JsonIgnore
+    public boolean isNicknameSpecified() {
+      return nicknameSpecified;
+    }
 
-	record AuthSession(String accessToken, String tokenType, long expiresIn, UserView user, List<String> roles) {
-		public AuthSession {
-			roles = List.copyOf(roles);
-		}
-	}
+    @JsonIgnore
+    public boolean isPhoneSpecified() {
+      return phoneSpecified;
+    }
+  }
 
-	record UserSnapshot(long id, String status) {
-	}
+  record UserView(
+      long id,
+      String account,
+      String nickname,
+      String phone,
+      String status,
+      Instant createdAt,
+      Instant updatedAt) {}
+
+  record AuthSession(
+      String accessToken, String tokenType, long expiresIn, UserView user, List<String> roles) {
+    public AuthSession {
+      roles = List.copyOf(roles);
+    }
+  }
+
+  record UserSnapshot(long id, String status) {}
 }

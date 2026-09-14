@@ -6,107 +6,122 @@ import java.time.Instant;
 /** Persistence model for a product and its current stock/version. */
 public class ProductEntity {
 
-	private Long id;
-	private Long shopId;
-	private Long categoryId;
-	private String name;
-	private String description;
-	private BigDecimal price;
-	private Integer stock;
-	private String status;
-	private Long version;
-	private Long imageId;
-	private String imageUrl;
-	public Long getImageId(){return imageId;} public void setImageId(Long v){imageId=v;}
-	public String getImageUrl(){return imageUrl;} public void setImageUrl(String v){imageUrl=v;}
-	private Instant createdAt;
-	private Instant updatedAt;
+  private Long id;
+  private Long shopId;
+  private Long categoryId;
+  private String name;
+  private String description;
+  private BigDecimal price;
+  private Integer stock;
+  private String status;
+  private Long version;
+  private Long imageId;
+  private String imageUrl;
 
-	public Long getId() {
-		return id;
-	}
+  public Long getImageId() {
+    return imageId;
+  }
 
-	public void setId(Long id) {
-		this.id = id;
-	}
+  public void setImageId(Long v) {
+    imageId = v;
+  }
 
-	public Long getShopId() {
-		return shopId;
-	}
+  public String getImageUrl() {
+    return imageUrl;
+  }
 
-	public void setShopId(Long shopId) {
-		this.shopId = shopId;
-	}
+  public void setImageUrl(String v) {
+    imageUrl = v;
+  }
 
-	public Long getCategoryId() {
-		return categoryId;
-	}
+  private Instant createdAt;
+  private Instant updatedAt;
 
-	public void setCategoryId(Long categoryId) {
-		this.categoryId = categoryId;
-	}
+  public Long getId() {
+    return id;
+  }
 
-	public String getName() {
-		return name;
-	}
+  public void setId(Long id) {
+    this.id = id;
+  }
 
-	public void setName(String name) {
-		this.name = name;
-	}
+  public Long getShopId() {
+    return shopId;
+  }
 
-	public String getDescription() {
-		return description;
-	}
+  public void setShopId(Long shopId) {
+    this.shopId = shopId;
+  }
 
-	public void setDescription(String description) {
-		this.description = description;
-	}
+  public Long getCategoryId() {
+    return categoryId;
+  }
 
-	public BigDecimal getPrice() {
-		return price;
-	}
+  public void setCategoryId(Long categoryId) {
+    this.categoryId = categoryId;
+  }
 
-	public void setPrice(BigDecimal price) {
-		this.price = price;
-	}
+  public String getName() {
+    return name;
+  }
 
-	public Integer getStock() {
-		return stock;
-	}
+  public void setName(String name) {
+    this.name = name;
+  }
 
-	public void setStock(Integer stock) {
-		this.stock = stock;
-	}
+  public String getDescription() {
+    return description;
+  }
 
-	public String getStatus() {
-		return status;
-	}
+  public void setDescription(String description) {
+    this.description = description;
+  }
 
-	public void setStatus(String status) {
-		this.status = status;
-	}
+  public BigDecimal getPrice() {
+    return price;
+  }
 
-	public Long getVersion() {
-		return version;
-	}
+  public void setPrice(BigDecimal price) {
+    this.price = price;
+  }
 
-	public void setVersion(Long version) {
-		this.version = version;
-	}
+  public Integer getStock() {
+    return stock;
+  }
 
-	public Instant getCreatedAt() {
-		return createdAt;
-	}
+  public void setStock(Integer stock) {
+    this.stock = stock;
+  }
 
-	public void setCreatedAt(Instant createdAt) {
-		this.createdAt = createdAt;
-	}
+  public String getStatus() {
+    return status;
+  }
 
-	public Instant getUpdatedAt() {
-		return updatedAt;
-	}
+  public void setStatus(String status) {
+    this.status = status;
+  }
 
-	public void setUpdatedAt(Instant updatedAt) {
-		this.updatedAt = updatedAt;
-	}
+  public Long getVersion() {
+    return version;
+  }
+
+  public void setVersion(Long version) {
+    this.version = version;
+  }
+
+  public Instant getCreatedAt() {
+    return createdAt;
+  }
+
+  public void setCreatedAt(Instant createdAt) {
+    this.createdAt = createdAt;
+  }
+
+  public Instant getUpdatedAt() {
+    return updatedAt;
+  }
+
+  public void setUpdatedAt(Instant updatedAt) {
+    this.updatedAt = updatedAt;
+  }
 }

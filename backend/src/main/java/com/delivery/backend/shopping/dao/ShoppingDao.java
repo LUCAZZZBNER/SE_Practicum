@@ -1,40 +1,37 @@
 package com.delivery.backend.shopping.dao;
 
+import com.delivery.backend.shopping.entity.CartItemEntity;
 import java.util.List;
-
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
-
-import com.delivery.backend.shopping.entity.CartItemEntity;
 
 /** MyBatis data-access contract for cart items. */
 @Mapper
 public interface ShoppingDao {
 
-	CartItemEntity findByUserAndProduct(@Param("userId") long userId,
-			@Param("productId") long productId);
-	CartItemEntity findByUserAndSku(@Param("userId") long userId,@Param("skuId") long skuId);
+  CartItemEntity findByUserAndProduct(
+      @Param("userId") long userId, @Param("productId") long productId);
 
-	CartItemEntity findOwnedById(@Param("userId") long userId,
-			@Param("id") long id);
+  CartItemEntity findByUserAndSku(@Param("userId") long userId, @Param("skuId") long skuId);
 
-	List<CartItemEntity> listByUser(@Param("userId") long userId);
+  CartItemEntity findOwnedById(@Param("userId") long userId, @Param("id") long id);
 
-	List<CartItemEntity> listSelected(@Param("userId") long userId,
-			@Param("ids") List<Long> ids);
+  List<CartItemEntity> listByUser(@Param("userId") long userId);
 
-	int insert(CartItemEntity item);
+  List<CartItemEntity> listSelected(@Param("userId") long userId, @Param("ids") List<Long> ids);
 
-	int updateQuantity(@Param("userId") long userId,
-			@Param("id") long id,
-			@Param("quantity") int quantity);
+  int insert(CartItemEntity item);
 
-	int incrementQuantity(@Param("userId") long userId,
-			@Param("id") long id,
-			@Param("addition") int addition,
-			@Param("maximum") int maximum);
+  int updateQuantity(
+      @Param("userId") long userId, @Param("id") long id, @Param("quantity") int quantity);
 
-	int deleteOwned(@Param("userId") long userId, @Param("id") long id);
+  int incrementQuantity(
+      @Param("userId") long userId,
+      @Param("id") long id,
+      @Param("addition") int addition,
+      @Param("maximum") int maximum);
 
-	int deleteSelected(@Param("userId") long userId, @Param("ids") List<Long> ids);
+  int deleteOwned(@Param("userId") long userId, @Param("id") long id);
+
+  int deleteSelected(@Param("userId") long userId, @Param("ids") List<Long> ids);
 }
