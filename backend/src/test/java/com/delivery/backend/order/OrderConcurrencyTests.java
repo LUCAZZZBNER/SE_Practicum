@@ -2,6 +2,16 @@ package com.delivery.backend.order;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.delivery.backend.common.ApiError;
+import com.delivery.backend.common.BusinessException;
+import com.delivery.backend.item.service.ItemService;
+import com.delivery.backend.item.service.SkuService;
+import com.delivery.backend.merchant.service.MerchantService;
+import com.delivery.backend.merchant.shop.service.RestaurantService;
+import com.delivery.backend.order.service.OrderService;
+import com.delivery.backend.shopping.service.ShoppingService;
+import com.delivery.backend.user.address.service.UserAddressService;
+import com.delivery.backend.user.service.UserService;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -9,161 +19,183 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-import com.delivery.backend.common.ApiError;
-import com.delivery.backend.common.BusinessException;
-import com.delivery.backend.address.service.UserAddressService;
-import com.delivery.backend.item.service.ItemService;
-import com.delivery.backend.item.service.SkuService;
-import com.delivery.backend.merchant.service.MerchantService;
-import com.delivery.backend.order.service.OrderService;
-import com.delivery.backend.restaurant.service.RestaurantService;
-import com.delivery.backend.shopping.service.ShoppingService;
-import com.delivery.backend.user.service.UserService;
-
 @SpringBootTest
 class OrderConcurrencyTests {
 
-	@Autowired
-	private OrderService orderService;
-	@Autowired
-	private UserService userService;
-	@Autowired
-	private MerchantService merchantService;
-	@Autowired
-	private RestaurantService restaurantService;
-	@Autowired
-	private ItemService itemService;
-	@Autowired
-	private ShoppingService shoppingService;
-	@Autowired
-	private UserAddressService addressService;
-	@Autowired
-	private JdbcTemplate jdbcTemplate;
-	@Autowired
-	private SkuService skuService;
+  @Autowired private OrderService orderService;
+  @Autowired private UserService userService;
+  @Autowired private MerchantService merchantService;
+  @Autowired private RestaurantService restaurantService;
+  @Autowired private ItemService itemService;
+  @Autowired private ShoppingService shoppingService;
+  @Autowired private UserAddressService addressService;
+  @Autowired private JdbcTemplate jdbcTemplate;
+  @Autowired private SkuService skuService;
 
-	@Test
-	void concurrentRetriesWithTheSameKeyReturnTheSameOrder() throws Exception {
-		Fixture fixture = fixture("same-key");
-		String key = "key-" + System.nanoTime();
-		List<Attempt> attempts = runConcurrently(
-				() -> orderService.create(fixture.userId(), key, fixture.request()),
-				() -> orderService.create(fixture.userId(), key, fixture.request()));
+  @Test
+  void concurrentRetriesWithTheSameKeyReturnTheSameOrder() throws Exception {
+    Fixture fixture = fixture("same-key");
+    String key = "key-" + System.nanoTime();
+    List<Attempt> attempts =
+        runConcurrently(
+            () -> orderService.create(fixture.userId(), key, fixture.request()),
+            () -> orderService.create(fixture.userId(), key, fixture.request()));
 
-		assertThat(attempts).allMatch(attempt -> attempt.failure() == null);
-		assertThat(attempts).extracting(attempt -> attempt.order().id()).containsOnly(attempts.get(0).order().id());
-		assertThat(orderService.listMine(fixture.userId(), query()).total()).isEqualTo(1);
-		assertThat(product(fixture).stock()).isEqualTo(8);
-	}
+    assertThat(attempts).allMatch(attempt -> attempt.failure() == null);
+    assertThat(attempts)
+        .extracting(attempt -> attempt.order().id())
+        .containsOnly(attempts.get(0).order().id());
+    assertThat(orderService.listMine(fixture.userId(), query()).total()).isEqualTo(1);
+    assertThat(product(fixture).stock()).isEqualTo(8);
+  }
 
-	@Test
-	void concurrentDifferentOrdersCannotConsumeTheSameCartItemTwice() throws Exception {
-		Fixture fixture = fixture("different-keys");
-		List<Attempt> attempts = runConcurrently(
-				() -> orderService.create(fixture.userId(), "first-" + System.nanoTime(), fixture.request()),
-				() -> orderService.create(fixture.userId(), "second-" + System.nanoTime(), fixture.request()));
+  @Test
+  void concurrentDifferentOrdersCannotConsumeTheSameCartItemTwice() throws Exception {
+    Fixture fixture = fixture("different-keys");
+    List<Attempt> attempts =
+        runConcurrently(
+            () ->
+                orderService.create(
+                    fixture.userId(), "first-" + System.nanoTime(), fixture.request()),
+            () ->
+                orderService.create(
+                    fixture.userId(), "second-" + System.nanoTime(), fixture.request()));
 
-		assertThat(attempts).filteredOn(attempt -> attempt.failure() == null).hasSize(1);
-		assertThat(attempts).filteredOn(attempt -> attempt.failure() instanceof BusinessException)
-				.singleElement().satisfies(attempt -> assertThat(((BusinessException) attempt.failure()).error())
-						.isEqualTo(ApiError.CART_EMPTY));
-		assertThat(orderService.listMine(fixture.userId(), query()).total()).isEqualTo(1);
-		assertThat(product(fixture).stock()).isEqualTo(8);
-	}
+    assertThat(attempts).filteredOn(attempt -> attempt.failure() == null).hasSize(1);
+    assertThat(attempts)
+        .filteredOn(attempt -> attempt.failure() instanceof BusinessException)
+        .singleElement()
+        .satisfies(
+            attempt ->
+                assertThat(((BusinessException) attempt.failure()).error())
+                    .isEqualTo(ApiError.CART_EMPTY));
+    assertThat(orderService.listMine(fixture.userId(), query()).total()).isEqualTo(1);
+    assertThat(product(fixture).stock()).isEqualTo(8);
+  }
 
-	private Fixture fixture(String label) {
-		String suffix = label + "-" + System.nanoTime();
-		long userId = userService.register(new UserService.RegisterRequest("u-" + suffix,
-				"ExamplePass123!", "ExamplePass123!", "User", null)).id();
-		long merchantId = merchantService.register(new MerchantService.RegisterRequest("m-" + suffix,
-				"ExamplePass123!", "ExamplePass123!", "Merchant", "13900000000")).id();
-		RestaurantService.ShopView shop = restaurantService.create(merchantId,
-				new RestaurantService.CreateRequest("Shop " + suffix, null));
-		RestaurantService.UpdateRequest open = new RestaurantService.UpdateRequest();
-		open.setStatus("OPEN");
-		restaurantService.updateAddress(merchantId, shop.id(), new RestaurantService.AddressRequest("杭州", "学院路", "05711234567"));
-		restaurantService.update(merchantId, shop.id(), open);
-		long categoryId = itemService.createCategory(merchantId, shop.id(),
-				new ItemService.CreateCategoryRequest("Meals", 0)).id();
-		long imageId = insertImage();
-		ItemService.ProductView product = itemService.createProduct(merchantId,
-				new ItemService.CreateProductRequest(shop.id(), categoryId, "Rice", null,
-						new BigDecimal("12.50"), 10, imageId,
-						List.of(new SkuService.CreateRequest("默认规格", new BigDecimal("12.50"), 10))));
-		ItemService.UpdateProductRequest onSale = new ItemService.UpdateProductRequest();
-		onSale.setStatus("ON_SALE");
-		onSale.setVersion(product.version());
-		product = itemService.updateProduct(merchantId, product.id(), onSale);
-		SkuService.UpdateRequest skuUpdate = new SkuService.UpdateRequest();
-		skuUpdate.setStatus("ON_SALE"); skuUpdate.setVersion(product.skus().get(0).version());
-		skuService.update(merchantId, product.skus().get(0).id(), skuUpdate);
-		ShoppingService.CartItemView cartItem = shoppingService.add(userId,
-				new ShoppingService.AddRequest(product.skus().get(0).id(), 2)).item();
-		long addressId = addressService.create(userId,
-				new UserAddressService.CreateRequest("张三", "13800000000", "杭州", "学院路", true)).id();
-		OrderService.CreateRequest request = new OrderService.CreateRequest(
-				List.of(new OrderService.ItemRequest(cartItem.id(), product.version())), addressId, null);
-		return new Fixture(userId, merchantId, product.id(), request);
-	}
+  private Fixture fixture(String label) {
+    String suffix = label + "-" + System.nanoTime();
+    long userId =
+        userService
+            .register(
+                new UserService.RegisterRequest(
+                    "u-" + suffix, "ExamplePass123!", "ExamplePass123!", "User", null))
+            .id();
+    long merchantId =
+        merchantService
+            .register(
+                new MerchantService.RegisterRequest(
+                    "m-" + suffix, "ExamplePass123!", "ExamplePass123!", "Merchant", "13900000000"))
+            .id();
+    RestaurantService.ShopView shop =
+        restaurantService.create(
+            merchantId, new RestaurantService.CreateRequest("Shop " + suffix, null));
+    RestaurantService.UpdateRequest open = new RestaurantService.UpdateRequest();
+    open.setStatus("OPEN");
+    restaurantService.updateAddress(
+        merchantId, shop.id(), new RestaurantService.AddressRequest("杭州", "学院路", "05711234567"));
+    restaurantService.update(merchantId, shop.id(), open);
+    long categoryId =
+        itemService
+            .createCategory(
+                merchantId, shop.id(), new ItemService.CreateCategoryRequest("Meals", 0))
+            .id();
+    long imageId = insertImage();
+    ItemService.ProductView product =
+        itemService.createProduct(
+            merchantId,
+            new ItemService.CreateProductRequest(
+                shop.id(),
+                categoryId,
+                "Rice",
+                null,
+                new BigDecimal("12.50"),
+                10,
+                imageId,
+                List.of(new SkuService.CreateRequest("默认规格", new BigDecimal("12.50"), 10))));
+    ItemService.UpdateProductRequest onSale = new ItemService.UpdateProductRequest();
+    onSale.setStatus("ON_SALE");
+    onSale.setVersion(product.version());
+    product = itemService.updateProduct(merchantId, product.id(), onSale);
+    SkuService.UpdateRequest skuUpdate = new SkuService.UpdateRequest();
+    skuUpdate.setStatus("ON_SALE");
+    skuUpdate.setVersion(product.skus().get(0).version());
+    skuService.update(merchantId, product.skus().get(0).id(), skuUpdate);
+    ShoppingService.CartItemView cartItem =
+        shoppingService
+            .add(userId, new ShoppingService.AddRequest(product.skus().get(0).id(), 2))
+            .item();
+    long addressId =
+        addressService
+            .create(
+                userId,
+                new UserAddressService.CreateRequest("张三", "13800000000", "杭州", "学院路", true))
+            .id();
+    OrderService.CreateRequest request =
+        new OrderService.CreateRequest(
+            List.of(new OrderService.ItemRequest(cartItem.id(), product.version())),
+            addressId,
+            null);
+    return new Fixture(userId, merchantId, product.id(), request);
+  }
 
-	private ItemService.ProductView product(Fixture fixture) {
-		return itemService.getProduct(fixture.productId(), true, fixture.merchantId());
-	}
+  private ItemService.ProductView product(Fixture fixture) {
+    return itemService.getProduct(fixture.productId(), true, fixture.merchantId());
+  }
 
-	private long insertImage() {
-		jdbcTemplate.update("INSERT INTO images(url,content_type,size) VALUES('/uploads/test.webp','image/webp',4)");
-		return jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
-	}
+  private long insertImage() {
+    jdbcTemplate.update(
+        "INSERT INTO images(url,content_type,size) VALUES('/uploads/test.webp','image/webp',4)");
+    return jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
+  }
 
-	private static OrderService.ListQuery query() {
-		return new OrderService.ListQuery(null, 1, 10, null, null);
-	}
+  private static OrderService.ListQuery query() {
+    return new OrderService.ListQuery(null, 1, 10, null, null);
+  }
 
-	private static List<Attempt> runConcurrently(OrderCall first, OrderCall second) throws Exception {
-		CountDownLatch start = new CountDownLatch(1);
-		ExecutorService executor = Executors.newFixedThreadPool(2);
-		try {
-			Future<OrderService.OrderView> firstFuture = executor.submit(() -> callAfter(start, first));
-			Future<OrderService.OrderView> secondFuture = executor.submit(() -> callAfter(start, second));
-			start.countDown();
-			return List.of(attempt(firstFuture), attempt(secondFuture));
-		} finally {
-			executor.shutdownNow();
-		}
-	}
+  private static List<Attempt> runConcurrently(OrderCall first, OrderCall second) throws Exception {
+    CountDownLatch start = new CountDownLatch(1);
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    try {
+      Future<OrderService.OrderView> firstFuture = executor.submit(() -> callAfter(start, first));
+      Future<OrderService.OrderView> secondFuture = executor.submit(() -> callAfter(start, second));
+      start.countDown();
+      return List.of(attempt(firstFuture), attempt(secondFuture));
+    } finally {
+      executor.shutdownNow();
+    }
+  }
 
-	private static OrderService.OrderView callAfter(CountDownLatch start, OrderCall call) {
-		try {
-			start.await();
-			return call.run();
-		} catch (InterruptedException exception) {
-			Thread.currentThread().interrupt();
-			throw new IllegalStateException(exception);
-		}
-	}
+  private static OrderService.OrderView callAfter(CountDownLatch start, OrderCall call) {
+    try {
+      start.await();
+      return call.run();
+    } catch (InterruptedException exception) {
+      Thread.currentThread().interrupt();
+      throw new IllegalStateException(exception);
+    }
+  }
 
-	private static Attempt attempt(Future<OrderService.OrderView> future) throws Exception {
-		try {
-			return new Attempt(future.get(), null);
-		} catch (ExecutionException exception) {
-			return new Attempt(null, exception.getCause());
-		}
-	}
+  private static Attempt attempt(Future<OrderService.OrderView> future) throws Exception {
+    try {
+      return new Attempt(future.get(), null);
+    } catch (ExecutionException exception) {
+      return new Attempt(null, exception.getCause());
+    }
+  }
 
-	@FunctionalInterface
-	private interface OrderCall {
-		OrderService.OrderView run();
-	}
+  @FunctionalInterface
+  private interface OrderCall {
+    OrderService.OrderView run();
+  }
 
-	private record Attempt(OrderService.OrderView order, Throwable failure) {
-	}
+  private record Attempt(OrderService.OrderView order, Throwable failure) {}
 
-	private record Fixture(long userId, long merchantId, long productId, OrderService.CreateRequest request) {
-	}
+  private record Fixture(
+      long userId, long merchantId, long productId, OrderService.CreateRequest request) {}
 }
