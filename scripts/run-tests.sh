@@ -64,4 +64,11 @@ echo "Running end-to-end business-risk checks..."
     python3 e2e/scenarios/backend_business_risks.py
 )
 
+echo "Running frontend feature-matrix integration check..."
+(
+  cd "$ROOT_DIR"
+  DELIVERY_BASE_URL="http://localhost:${FRONTEND_PORT:-5173}/api/v1" \
+    python3 e2e/integration/test_frontend_feature_matrix.py
+)
+
 echo "All tests passed. Docker services remain running."
