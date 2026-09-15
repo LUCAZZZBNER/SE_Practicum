@@ -45,7 +45,7 @@
         FROM cart_items ci
         JOIN products p ON p.id = ci.product_id
         JOIN shops s ON s.id = p.shop_id AND s.deleted_at IS NULL
-        LEFT JOIN product_skus ps ON ps.id=ci.sku_id
+        JOIN product_skus ps ON ps.id = ci.sku_id AND ps.product_id = ci.product_id
         LEFT JOIN images i ON i.id=p.image_id
     </sql>
 
@@ -85,8 +85,8 @@
 
     <insert id="insert" parameterType="com.delivery.backend.shopping.entity.CartItemEntity"
             useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO cart_items (user_id, product_id, sku_id, quantity)
-        VALUES (#{userId}, #{productId}, #{skuId}, #{quantity})
+        INSERT INTO cart_items (user_id, product_id, sku_id, sku_version, quantity)
+        VALUES (#{userId}, #{productId}, #{skuId}, #{skuVersion}, #{quantity})
     </insert>
 
     <update id="updateQuantity">

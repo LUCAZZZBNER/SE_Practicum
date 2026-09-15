@@ -16,7 +16,7 @@ backend/                 Spring Boot compatibility/domain backend (migration sea
   src/main/resources/    后端配置和资源
   src/test/java/         后端单元、接口和集成测试
   src/test/resources/    测试配置及数据库脚本
-frontend/                Vue 3 前端（待初始化）
+frontend/                Vue 3 前端
   src/api/               Axios 接口封装
   src/components/        公共组件
   src/router/            路由
@@ -36,7 +36,7 @@ docs/                    项目文档
   dev-log/               开发日志和过程记录
 ```
 
-需求基线见 [软件需求规格说明书](docs/software-requirements-specification.md)，HTTP 契约见 [后端 API 设计](docs/api/backend-api-design.md)，当前开发步骤见 [ABC 阶段 1 业务 TDD 开发与联调执行文档](ABC阶段1业务TDD开发与联调执行文档.md)。
+需求基线见 [软件需求规格说明书](docs/软件需求规格说明书.md)，HTTP 契约见 [后端 API 设计](docs/api/backend-api-design.md)，最终数据库结构见 [数据库设计说明书](docs/database/数据库设计说明书.md)，测试证据见 [测试执行日志](docs/test/test-log.md)。
 
 后端正在从简单四层 MVC 单体迁移为由 gateway 和独立领域服务组成的架构；gateway 保留现有 `/api/v1` 契约。
 

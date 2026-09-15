@@ -45,6 +45,36 @@ def call(method, path, *, token=None, body=None, expected_status=200, expected_c
     return result.get("data")
 
 
+def upload_image(token):
+    boundary = f"----delivery-{uuid.uuid4().hex}"
+    image = bytes([82, 73, 70, 70, 0, 0, 0, 0, 87, 69, 66, 80])
+    payload = (
+        f"--{boundary}\r\n"
+        'Content-Disposition: form-data; name="file"; filename="risk.webp"\r\n'
+        "Content-Type: image/webp\r\n\r\n"
+    ).encode("ascii") + image + f"\r\n--{boundary}--\r\n".encode("ascii")
+    request = urllib.request.Request(
+        BASE_URL + "/files/images",
+        data=payload,
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Content-Type": f"multipart/form-data; boundary={boundary}",
+        },
+        method="POST",
+    )
+    try:
+        response = urllib.request.urlopen(request, timeout=15)
+        status = response.status
+        raw = response.read().decode("utf-8")
+    except urllib.error.HTTPError as error:
+        status = error.code
+        raw = error.read().decode("utf-8")
+    result = json.loads(raw)
+    if status != 201 or result.get("code") != 0:
+        raise AssertionError(f"POST /files/images: expected HTTP/code 201/0, got {status}/{result.get('code')}: {result}")
+    return result["data"]
+
+
 def main():
     suffix = uuid.uuid4().hex[:12]
     merchant_account = f"merchant-{suffix}"
@@ -81,6 +111,12 @@ def main():
 
     shop = call("POST", "/shops", token=merchant_token, body={"name": f"Risk Shop {suffix}"}, expected_status=201)
     shop_id = shop["id"]
+    call(
+        "PATCH",
+        f"/shops/{shop_id}/address",
+        token=merchant_token,
+        body={"region": "杭州", "detail": "学院路 1 号", "phone": "05711234567"},
+    )
     call("PATCH", f"/shops/{shop_id}", token=merchant_token, body={"status": "OPEN"})
     category = call(
         "POST",
@@ -99,51 +135,90 @@ def main():
         expected_code=1005,
     )
 
+    image = upload_image(merchant_token)
     product = call(
         "POST",
         "/products",
         token=merchant_token,
-        body={"shopId": shop_id, "categoryId": category_id, "name": "Rice", "price": 12.50, "stock": 5},
+        body={
+            "shopId": shop_id,
+            "categoryId": category_id,
+            "name": "Rice",
+            "imageId": image["id"],
+            "skus": [{"name": "Default", "price": 12.50, "stock": 5}],
+        },
         expected_status=201,
     )
     product_id = product["id"]
-    version = product["version"]
     product = call(
         "PATCH",
         f"/products/{product_id}",
         token=merchant_token,
-        body={"status": "ON_SALE", "version": version},
+        body={"status": "ON_SALE"},
     )
-    version = product["version"]
+    sku = product["skus"][0]
+    sku = call(
+        "PATCH",
+        f"/skus/{sku['id']}",
+        token=merchant_token,
+        body={"status": "ON_SALE", "version": sku["version"]},
+    )
     call(
         "PATCH",
-        f"/products/{product_id}",
+        f"/skus/{sku['id']}",
         token=merchant_token,
-        body={"name": "stale update", "version": version - 1},
+        body={"name": "stale update", "version": sku["version"] - 1},
         expected_status=409,
-        expected_code=1005,
+        expected_code=1404,
+    )
+
+    address = call(
+        "POST",
+        "/user-addresses",
+        token=user_token,
+        body={
+            "recipient": "Risk Test User",
+            "phone": "13900000001",
+            "region": "杭州",
+            "detail": "学院路 2 号",
+            "isDefault": True,
+        },
+        expected_status=201,
     )
 
     changed = call(
         "POST",
         "/products",
         token=merchant_token,
-        body={"shopId": shop_id, "categoryId": category_id, "name": "Price Change", "price": 8.00, "stock": 2},
+        body={
+            "shopId": shop_id,
+            "categoryId": category_id,
+            "name": "Price Change",
+            "imageId": image["id"],
+            "skus": [{"name": "Default", "price": 8.00, "stock": 2}],
+        },
         expected_status=201,
     )
     changed = call(
         "PATCH",
         f"/products/{changed['id']}",
         token=merchant_token,
-        body={"status": "ON_SALE", "version": changed["version"]},
+        body={"status": "ON_SALE"},
+    )
+    changed_sku = changed["skus"][0]
+    changed_sku = call(
+        "PATCH",
+        f"/skus/{changed_sku['id']}",
+        token=merchant_token,
+        body={"status": "ON_SALE", "version": changed_sku["version"]},
     )
     changed_cart = call(
-        "POST", "/cart-items", token=user_token, body={"productId": changed["id"], "quantity": 1}, expected_status=201
+        "POST", "/cart-items", token=user_token, body={"skuId": changed_sku["id"], "quantity": 1}, expected_status=201
     )
-    changed_version = changed["version"]
-    changed = call(
+    changed_version = changed_sku["version"]
+    call(
         "PATCH",
-        f"/products/{changed['id']}",
+        f"/skus/{changed_sku['id']}",
         token=merchant_token,
         body={"price": 9.00, "version": changed_version},
     )
@@ -151,17 +226,23 @@ def main():
         "POST",
         "/orders",
         token=user_token,
-        body={"items": [{"cartItemId": changed_cart["id"], "productVersion": changed_version}]},
+        body={
+            "items": [{"cartItemId": changed_cart["id"], "skuVersion": changed_version}],
+            "addressId": address["id"],
+        },
         headers={"X-Idempotency-Key": f"price-change-{suffix}"},
         expected_status=409,
-        expected_code=1601,
+        expected_code=1603,
     )
     call("DELETE", f"/cart-items/{changed_cart['id']}", token=user_token)
 
-    cart_item = call("POST", "/cart-items", token=user_token, body={"productId": product_id, "quantity": 2}, expected_status=201)
+    cart_item = call("POST", "/cart-items", token=user_token, body={"skuId": sku["id"], "quantity": 2}, expected_status=201)
     cart_item_id = cart_item["id"]
     idempotency_key = f"risk-{suffix}"
-    order_body = {"items": [{"cartItemId": cart_item_id, "productVersion": version}]}
+    order_body = {
+        "items": [{"cartItemId": cart_item_id, "skuVersion": sku["version"]}],
+        "addressId": address["id"],
+    }
     order = call(
         "POST",
         "/orders",
@@ -183,18 +264,26 @@ def main():
         "POST",
         "/orders",
         token=user_token,
-        body={"items": [{"cartItemId": cart_item_id, "productVersion": version + 1}]},
+        body={
+            "items": [{"cartItemId": cart_item_id, "skuVersion": sku["version"] + 1}],
+            "addressId": address["id"],
+        },
         headers={"X-Idempotency-Key": idempotency_key},
         expected_status=409,
-        expected_code=1603,
+        expected_code=1602,
     )
-    call("POST", f"/orders/{order['id']}/cancel", token=user_token)
+    cancel_headers = {"X-Idempotency-Key": f"cancel-{suffix}"}
+    cancelled = call("POST", f"/orders/{order['id']}/cancel", token=user_token, body={}, headers=cancel_headers)
+    cancel_retry = call("POST", f"/orders/{order['id']}/cancel", token=user_token, body={}, headers=cancel_headers)
+    assert cancel_retry["id"] == cancelled["id"], "idempotent cancellation did not return the original order"
     call(
         "POST",
         f"/orders/{order['id']}/cancel",
         token=user_token,
+        body={},
+        headers={"X-Idempotency-Key": f"cancel-again-{suffix}"},
         expected_status=409,
-        expected_code=1602,
+        expected_code=1601,
     )
 
     # A second product verifies cart quantity and stock limits at the API boundary.
@@ -202,21 +291,34 @@ def main():
         "POST",
         "/products",
         token=merchant_token,
-        body={"shopId": shop_id, "categoryId": category_id, "name": "Limited", "price": 1.00, "stock": 1},
+        body={
+            "shopId": shop_id,
+            "categoryId": category_id,
+            "name": "Limited",
+            "imageId": image["id"],
+            "skus": [{"name": "Default", "price": 1.00, "stock": 1}],
+        },
         expected_status=201,
     )
     limited = call(
         "PATCH",
         f"/products/{limited['id']}",
         token=merchant_token,
-        body={"status": "ON_SALE", "version": limited["version"]},
+        body={"status": "ON_SALE"},
     )
-    call("POST", "/cart-items", token=user_token, body={"productId": limited["id"], "quantity": 1}, expected_status=201)
+    limited_sku = limited["skus"][0]
+    limited_sku = call(
+        "PATCH",
+        f"/skus/{limited_sku['id']}",
+        token=merchant_token,
+        body={"status": "ON_SALE", "version": limited_sku["version"]},
+    )
+    call("POST", "/cart-items", token=user_token, body={"skuId": limited_sku["id"], "quantity": 1}, expected_status=201)
     call(
         "POST",
         "/cart-items",
         token=user_token,
-        body={"productId": limited["id"], "quantity": 1},
+        body={"skuId": limited_sku["id"], "quantity": 1},
         expected_status=409,
         expected_code=1402,
     )
