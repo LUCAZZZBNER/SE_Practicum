@@ -37,7 +37,7 @@
     <sql id="productColumns">
         id, shop_id, category_id, name, description, price, stock, status, version,
         created_at, updated_at, image_id,
-        (SELECT url FROM images WHERE images.id = products.image_id) AS image_url
+        CASE WHEN image_id IS NULL THEN NULL ELSE CONCAT('/api/v1/files/images/', image_id) END AS image_url
     </sql>
 
     <sql id="productFilters">

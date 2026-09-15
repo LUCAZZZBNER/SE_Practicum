@@ -5,17 +5,6 @@
 ## 目录结构
 
 ```text
-backend/                 Spring Boot compatibility/domain backend (migration seam)
-  src/main/java/         Java 源代码
-    com/delivery/backend/user/       用户模块
-    com/delivery/backend/merchant/   商家模块
-    com/delivery/backend/shopping/   购物车模块
-    com/delivery/backend/order/      订单模块
-    com/delivery/backend/restaurant/ 店铺模块
-    com/delivery/backend/item/       商品模块
-  src/main/resources/    后端配置和资源
-  src/test/java/         后端单元、接口和集成测试
-  src/test/resources/    测试配置及数据库脚本
 frontend/                Vue 3 前端
   src/api/               Axios 接口封装
   src/components/        公共组件
@@ -25,7 +14,7 @@ frontend/                Vue 3 前端
   src/views/             页面
   src/tests/             前端单元和集成测试
 e2e/                     端到端验收场景
-gateway/                 Spring Boot compatibility API gateway
+gateway/                 Spring Boot API gateway
 services/                Independently deployable identity, catalog, cart, order, and media services
 handin-docs/             Migration decisions and independently derived validation records
 docs/                    项目文档
@@ -38,7 +27,7 @@ docs/                    项目文档
 
 需求基线见 [软件需求规格说明书](docs/软件需求规格说明书.md)，HTTP 契约见 [后端 API 设计](docs/api/backend-api-design.md)，最终数据库结构见 [数据库设计说明书](docs/database/数据库设计说明书.md)，测试证据见 [测试执行日志](docs/test/test-log.md)。
 
-后端正在从简单四层 MVC 单体迁移为由 gateway 和独立领域服务组成的架构；gateway 保留现有 `/api/v1` 契约。
+系统由 gateway 和独立领域服务组成；gateway 保留现有 `/api/v1` 契约。
 
 ## Docker 启动
 
@@ -81,15 +70,9 @@ docker compose down -v
 ./scripts/run-tests.sh
 ```
 
-脚本会启动 Docker 服务，确保 `delivery_test` 存在，然后依次运行后端 Maven 测试、前端 Vitest 测试和端到端业务风险检查。测试结束后 Docker 服务保持运行。
+脚本会启动 Docker 服务，然后依次运行前端 Vitest 测试、端到端业务风险检查和完整前端功能矩阵。测试结束后 Docker 服务保持运行。
 
-只运行后端测试时，可以执行：
-
-```bash
-./backend/run-tests.sh
-```
-
-独立验证微服务身份与媒体边界（不启动单体后端）时，可以执行：
+独立验证微服务身份与媒体边界时，可以执行：
 
 ```bash
 ./scripts/run-microservices-tests.sh

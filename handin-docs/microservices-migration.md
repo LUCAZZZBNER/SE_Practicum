@@ -8,7 +8,7 @@ The report is aligned with the project handout's functional modules—users, mer
 
 The migration has four goals:
 
-1. Split the monolith along business ownership boundaries.
+1. Split the platform along business ownership boundaries.
 2. Prevent one service from writing another service's tables.
 3. Make checkout safe across service and broker failures.
 4. Preserve the frontend's existing API and browser behavior during the transition.
@@ -49,7 +49,7 @@ The gateway selects a target by the first resource segment:
 | `orders`, `merchant/orders` | Order |
 | `files`, `uploads` | Media |
 
-Unknown routes can still be directed to the explicitly configured compatibility backend for rollback. Normal Compose and Kubernetes deployments configure the extracted services and do not start the compatibility backend.
+Unknown routes return a gateway error. Compose and Kubernetes deployments route public resources only to the extracted services.
 
 ## 3. Service boundaries and ownership
 
@@ -75,12 +75,11 @@ delivery_catalog    catalog_app
 delivery_cart       cart_app
 delivery_order      order_app
 delivery_media      media_app
-delivery_dev        legacy compatibility backend only
 ```
 
-`deploy/mysql/01-create-service-databases.sh` creates the schemas and users. Each extracted user has full privileges only on its owned schema; there are no cross-schema grants. Read models are refreshed through authenticated service APIs or event streams, so no service needs SQL access to another domain. The legacy backend credential is restricted to `delivery_dev`.
+`deploy/mysql/01-create-service-databases.sh` creates the schemas and users. Each service user has full privileges only on its owned schema; there are no cross-schema grants. Read models are refreshed through authenticated service APIs or event streams, so no service needs SQL access to another domain.
 
-Flyway creates owned tables and local read-model tables in each service schema. The read models allow existing mappers to resolve data without cross-schema SQL access; they are not authoritative. Initial data is copied by `scripts/backfill-service-databases.sql`; subsequent deployments must refresh projections through an owner-service API or event stream. The migration does not use cross-schema views, write triggers, or shared write repositories.
+Flyway creates owned tables and local read-model tables in each service schema. The read models allow existing mappers to resolve data without cross-schema SQL access; they are not authoritative. Legacy data must be imported through an owner-service API or a separately managed export/import job; the removed monolith backfill script is not part of new deployments. Subsequent deployments must refresh projections through an owner-service API or event stream. The migration does not use cross-schema views, write triggers, or shared write repositories.
 
 ## 5. API and security behavior
 
@@ -150,12 +149,12 @@ The migration is designed as a staged cutover:
 
 1. Provision fresh service schemas and wait for Flyway migrations.
 2. Freeze legacy writes.
-3. Run `scripts/backfill-service-databases.sql`; it preserves identifiers and skips rows already copied.
-4. Compare row counts and representative IDs in `delivery_dev` and the service schemas.
+3. Import any retained legacy data through owner-service APIs or a separately managed export/import job.
+4. Compare row counts and representative IDs in the source export and service schemas.
 5. Route reads and writes through the gateway to the extracted services.
 6. Monitor service health, outbox lag, reservation cleanup, and API error rates.
 
-The backfill does not alter `delivery_dev`. Before service writes are accepted, rollback is a gateway configuration change back to the compatibility backend. After service writes begin, routing alone is insufficient because new service rows would be invisible to the legacy schema; rollback then requires copying those changes back or restoring a coordinated snapshot. The compatibility backend therefore remains an explicitly configured rollback target, not a normal deployment dependency.
+The backfill script is retained as a one-time migration aid for environments that still contain legacy data. New deployments provision service schemas directly. Rollback uses database snapshots and service-level recovery; there is no legacy application target.
 
 ## 10. Acceptance strategy
 
@@ -167,7 +166,7 @@ Existing backend tests, frontend unit tests, and existing end-to-end tests were 
 
 `e2e/integration/test_database_privileges.py` runs the same initializer with separate credentials and attempts both permitted writes and forbidden cross-schema reads/writes. This verifies isolation from outside the application code.
 
-`e2e/integration/test_media_isolation.py` launches identity and media without the monolith and checks merchant authorization, upload validation, image readback, and media schema isolation.
+`e2e/integration/test_media_isolation.py` launches identity and media independently and checks merchant authorization, upload validation, image readback, and media schema isolation.
 
 ### Black-box frontend and workflow checks
 
@@ -201,5 +200,5 @@ The current design keeps a small number of local read models so the existing map
 - Database users and grants: `deploy/mysql/01-create-service-databases.sh`
 - Local topology: `docker-compose.yml`
 - Kubernetes topology: `deploy/k8s/domain-services.yaml`, `deploy/k8s/services.yaml`, `deploy/k8s/kafka.yaml`
-- Backfill: `scripts/backfill-service-databases.sql`
+- Legacy data import: owner-service APIs or a separately managed export/import job
 - Independent acceptance checks: `e2e/integration/`

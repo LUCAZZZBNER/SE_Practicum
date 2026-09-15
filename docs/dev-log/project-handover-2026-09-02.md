@@ -1,3 +1,5 @@
+> 历史记录：本文记录早期单体后端阶段，相关 `backend/` 目录已删除，当前运行架构请以 `services/`、`gateway/` 和 `docker-compose.yml` 为准。
+
 ---
 title: SE_Practicum 项目交接记录
 date: 2026-09-02

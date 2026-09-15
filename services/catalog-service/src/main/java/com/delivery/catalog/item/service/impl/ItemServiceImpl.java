@@ -139,11 +139,6 @@ public class ItemServiceImpl implements ItemService {
     }
     List<SkuService.CreateRequest> skus = request.skus();
     if (skus.isEmpty()) throw new BusinessException(ApiError.VALIDATION_ERROR);
-    if (request.imageId() != null
-        && imageDao != null
-        && imageDao.findById(request.imageId()) == null) {
-      throw new BusinessException(ApiError.IMAGE_INVALID);
-    }
     BigDecimal price = request.price();
     int stock = request.stock() == null ? 0 : request.stock();
     if (price == null) {
@@ -268,8 +263,6 @@ public class ItemServiceImpl implements ItemService {
     }
     String status = request.isStatusSpecified() ? validateProductStatus(request.status()) : null;
     Long imageId = request.isImageIdSpecified() ? request.imageId() : product.getImageId();
-    if (imageId != null && imageDao != null && imageDao.findById(imageId) == null)
-      throw new BusinessException(ApiError.IMAGE_INVALID);
     if (ON_SALE.equals(status)
         && (imageId == null || skuDao == null || skuDao.listByProduct(productId).isEmpty())) {
       throw new BusinessException(ApiError.IMAGE_REQUIRED);
@@ -475,17 +468,6 @@ public class ItemServiceImpl implements ItemService {
         product.getImageId() == null
             ? null
             : new ImageView(product.getImageId(), product.getImageUrl());
-    if (product.getImageId() != null && imageDao != null) {
-      var asset = imageDao.findById(product.getImageId());
-      if (asset != null)
-        image =
-            new ImageView(
-                asset.getId(),
-                asset.getUrl(),
-                asset.getContentType(),
-                asset.getSize(),
-                asset.getCreatedAt());
-    }
     BigDecimal minPrice =
         skus.stream()
             .map(SkuService.SkuView::price)

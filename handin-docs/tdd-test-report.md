@@ -1,6 +1,6 @@
 # Extracted-service unit test report
 
-The extracted services now reuse the monolith's controller, security, and exception-handler scenarios while keeping the original tests under `backend/src/test` unchanged. Tests use mocked collaborators, so the service suites run without MySQL, Kafka, or another running service.
+The extracted services contain controller, security, and exception-handler scenarios. Tests use mocked collaborators, so the service suites run without MySQL, Kafka, or another running service.
 
 | Service | Test classes | Behaviors covered |
 |---|---|---|
@@ -20,4 +20,4 @@ done
 
 The gateway suite is run separately with `cd gateway && ./mvnw -q test`. These tests are regression coverage added after the service implementations; the repository’s existing implementation history is intentionally preserved.
 
-The original monolith suite remains the behavioral baseline and is deliberately retained. Database DAO tests and multi-instance concurrency scenarios remain integration-level work: they require disposable service databases and a Compose deployment with scaled instances, rather than ordinary unit-test execution. Service-only APIs are covered with successful, authentication, and forwarding assertions; additional downstream-failure cases belong in the integration harness.
+Database DAO tests and multi-instance concurrency scenarios remain integration-level work: they require disposable service databases and a Compose deployment with scaled instances, rather than ordinary unit-test execution. Service-only APIs are covered with successful, authentication, and forwarding assertions; additional downstream-failure cases belong in the integration harness.

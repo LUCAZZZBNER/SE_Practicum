@@ -2,7 +2,7 @@
 
 ## 1. 架构目标与范围
 
-后端是 Java 17、Spring Boot 单体应用，采用简单 MVC 分层和单数据库部署。六个业务模块 `user`、`merchant`、`restaurant`、`item`、`shopping`、`order` 保持独立目录、数据所有权和用例边界；这六个模块是阶段 1 的固定基线。支付、优惠、通知等后续能力在具有独立职责和数据所有权时可以增加模块。
+后端由 Java 17、Spring Boot gateway 和独立领域服务组成。identity、catalog、cart、order、media 服务分别拥有自己的数据和部署单元；服务内部采用简单 MVC 分层。支付、优惠、通知等后续能力在具有独立职责和数据所有权时可以增加服务.
 
 本设计与[后端 API 设计](../api/backend-api-design.md)配套：API 文档定义 `/api/v1` 路径、资源名称、权限、字段、状态码和错误码，本文件定义代码组织和调用规则；两者冲突时以 API 契约为准。本文只描述目标架构，不表示功能已经实现。
 
@@ -42,7 +42,7 @@ Database
 推荐的包布局如下；每个模块都必须有自己的 Controller、Service（接口和实现）以及 DAO，不建立全局的 `controller`、`service` 或 `dao` 大目录：
 
 ```text
-com.delivery.backend/
+services/*-service/src/main/java/com/delivery/*/
 ├── common/                         # ApiResponse、Page、异常、结果映射
 ├── security/                       # token 解析、CurrentPrincipal、权限拦截器
 ├── config/                         # 数据源、事务、JSON 和 Bean Validation 配置

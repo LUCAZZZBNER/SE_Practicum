@@ -3,9 +3,6 @@ services:
     image: mysql:8.4
     restart: unless-stopped
     environment:
-      MYSQL_DATABASE: ${MYSQL_DATABASE:-delivery_dev}
-      MYSQL_USER: ${DELIVERY_DB_USERNAME:?DELIVERY_DB_USERNAME must be set}
-      MYSQL_PASSWORD: ${DELIVERY_DB_PASSWORD:?DELIVERY_DB_PASSWORD must be set}
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD must be set}
       IDENTITY_DB_USERNAME: ${IDENTITY_DB_USERNAME:-identity_app}
       IDENTITY_DB_PASSWORD: ${IDENTITY_DB_PASSWORD:-identity_local_password}
