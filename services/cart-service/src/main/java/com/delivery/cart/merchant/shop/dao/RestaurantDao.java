@@ -15,6 +15,7 @@ public interface RestaurantDao {
       @Param("merchantId") long merchantId, @Param("name") String name);
 
   int insert(ShopEntity shop);
+  int upsert(ShopEntity shop);
 
   int update(
       @Param("id") long id,

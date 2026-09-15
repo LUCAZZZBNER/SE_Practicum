@@ -7,9 +7,11 @@ import com.delivery.catalog.item.dao.SkuDao;
 import com.delivery.catalog.item.entity.ProductEntity;
 import com.delivery.catalog.item.entity.SkuEntity;
 import com.delivery.catalog.item.service.SkuService;
+import com.delivery.catalog.events.CatalogProjectionPublisher;
 import com.delivery.catalog.merchant.shop.service.RestaurantService;
 import java.util.List;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,11 +23,18 @@ public class SkuServiceImpl implements SkuService {
   private final SkuDao skuDao;
   private final ItemDao itemDao;
   private final RestaurantService restaurantService;
+  private final CatalogProjectionPublisher projections;
 
   public SkuServiceImpl(SkuDao dao, ItemDao items, RestaurantService shops) {
+    this(dao, items, shops, null);
+  }
+
+  @Autowired
+  public SkuServiceImpl(SkuDao dao, ItemDao items, RestaurantService shops, CatalogProjectionPublisher projections) {
     this.skuDao = dao;
     this.itemDao = items;
     this.restaurantService = shops;
+    this.projections = projections;
   }
 
   @Override
@@ -45,7 +54,9 @@ public class SkuServiceImpl implements SkuService {
     } catch (DuplicateKeyException e) {
       throw new BusinessException(ApiError.RESOURCE_CONFLICT);
     }
-    return view(sku);
+    SkuView result = view(sku);
+    if (projections != null) projections.sku(skuDao.findById(sku.getId()));
+    return result;
   }
 
   @Override
@@ -69,7 +80,9 @@ public class SkuServiceImpl implements SkuService {
       throw new BusinessException(ApiError.VALIDATION_ERROR);
     if (skuDao.update(skuId, request.version(), name, price, stock, status) != 1)
       throw new BusinessException(ApiError.SKU_VERSION_CONFLICT);
-    return view(skuDao.findById(skuId));
+    SkuEntity saved = skuDao.findById(skuId);
+    if (projections != null) projections.sku(saved);
+    return view(saved);
   }
 
   @Override

@@ -65,6 +65,11 @@
         INSERT INTO shops (merchant_id, name, description, status)
         VALUES (#{merchantId}, #{name}, #{description}, #{status})
     </insert>
+    <insert id="upsert" parameterType="com.delivery.cart.merchant.shop.entity.ShopEntity">
+        INSERT INTO shops (id, merchant_id, name, description, status, address_region, address_detail, address_phone)
+        VALUES (#{id}, #{merchantId}, #{name}, #{description}, #{status}, #{addressRegion}, #{addressDetail}, #{addressPhone})
+        ON DUPLICATE KEY UPDATE merchant_id=VALUES(merchant_id),name=VALUES(name),description=VALUES(description),status=VALUES(status),address_region=VALUES(address_region),address_detail=VALUES(address_detail),address_phone=VALUES(address_phone)
+    </insert>
 
     <update id="update">
         UPDATE shops

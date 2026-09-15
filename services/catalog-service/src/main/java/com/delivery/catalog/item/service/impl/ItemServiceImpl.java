@@ -12,6 +12,7 @@ import com.delivery.catalog.item.entity.ProductEntity;
 import com.delivery.catalog.item.image.dao.ImageDao;
 import com.delivery.catalog.item.service.ItemService;
 import com.delivery.catalog.item.service.SkuService;
+import com.delivery.catalog.events.CatalogProjectionPublisher;
 import com.delivery.catalog.merchant.shop.service.RestaurantService;
 import java.math.BigDecimal;
 import java.util.Comparator;
@@ -34,24 +35,32 @@ public class ItemServiceImpl implements ItemService {
   private final RestaurantService restaurantService;
   private final SkuDao skuDao;
   private final ImageDao imageDao;
+  private final CatalogProjectionPublisher projections;
 
   public ItemServiceImpl(ItemDao itemDao, RestaurantService restaurantService) {
-    this(itemDao, restaurantService, null, null, null);
+    this(itemDao, restaurantService, null, null, null, null);
   }
 
   public ItemServiceImpl(ItemDao itemDao, RestaurantService restaurantService, SkuDao skuDao) {
-    this(itemDao, restaurantService, skuDao, null, null);
+    this(itemDao, restaurantService, skuDao, null, null, null);
+  }
+
+  public ItemServiceImpl(
+      ItemDao itemDao, RestaurantService restaurantService, SkuDao skuDao, ImageDao imageDao,
+      StockReservationDao stockReservationDao) {
+    this(itemDao, restaurantService, skuDao, imageDao, stockReservationDao, null);
   }
 
   @Autowired
   public ItemServiceImpl(
       ItemDao itemDao, RestaurantService restaurantService, SkuDao skuDao, ImageDao imageDao,
-      StockReservationDao stockReservationDao) {
+      StockReservationDao stockReservationDao, CatalogProjectionPublisher projections) {
     this.itemDao = itemDao;
     this.restaurantService = restaurantService;
     this.skuDao = skuDao;
     this.imageDao = imageDao;
     this.stockReservationDao = stockReservationDao;
+    this.projections = projections;
   }
 
   @Override
@@ -175,7 +184,9 @@ public class ItemServiceImpl implements ItemService {
         sku.setVersion(1L);
         skuDao.insert(sku);
       }
-    return toProductView(requireProduct(product.getId()));
+    ProductView result = toProductView(requireProduct(product.getId()));
+    if (projections != null) projections.product(requireProduct(product.getId()));
+    return result;
   }
 
   @Override
@@ -289,7 +300,9 @@ public class ItemServiceImpl implements ItemService {
     if (updated != 1) {
       throw new BusinessException(ApiError.RESOURCE_CONFLICT);
     }
-    return toProductView(requireProduct(productId));
+    ProductView result = toProductView(requireProduct(productId));
+    if (projections != null) projections.product(requireProduct(productId));
+    return result;
   }
 
   @Override

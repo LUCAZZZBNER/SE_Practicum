@@ -7,8 +7,10 @@ import com.delivery.catalog.merchant.service.MerchantService;
 import com.delivery.catalog.merchant.shop.dao.RestaurantDao;
 import com.delivery.catalog.merchant.shop.entity.ShopEntity;
 import com.delivery.catalog.merchant.shop.service.RestaurantService;
+import com.delivery.catalog.events.CatalogProjectionPublisher;
 import java.util.List;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,10 +24,17 @@ public class RestaurantServiceImpl implements RestaurantService {
   private static final String OPEN = "OPEN";
   private final RestaurantDao restaurantDao;
   private final MerchantService merchantService;
+  private final CatalogProjectionPublisher projections;
 
   public RestaurantServiceImpl(RestaurantDao restaurantDao, MerchantService merchantService) {
+    this(restaurantDao, merchantService, null);
+  }
+
+  @Autowired
+  public RestaurantServiceImpl(RestaurantDao restaurantDao, MerchantService merchantService, CatalogProjectionPublisher projections) {
     this.restaurantDao = restaurantDao;
     this.merchantService = merchantService;
+    this.projections = projections;
   }
 
   @Override
@@ -47,7 +56,9 @@ public class RestaurantServiceImpl implements RestaurantService {
     } catch (DuplicateKeyException exception) {
       throw new BusinessException(ApiError.RESOURCE_CONFLICT);
     }
-    return toView(requireById(shop.getId()));
+    ShopEntity saved = requireById(shop.getId());
+    if (projections != null) projections.shop(saved);
+    return toView(saved);
   }
 
   @Override
@@ -81,7 +92,9 @@ public class RestaurantServiceImpl implements RestaurantService {
   @Override
   @Transactional(readOnly = true)
   public ShopView get(long shopId) {
-    return toView(requireById(shopId));
+    ShopEntity saved = requireById(shopId);
+    if (projections != null) projections.shop(saved);
+    return toView(saved);
   }
 
   @Override
@@ -120,7 +133,9 @@ public class RestaurantServiceImpl implements RestaurantService {
     } catch (DuplicateKeyException exception) {
       throw new BusinessException(ApiError.RESOURCE_CONFLICT);
     }
-    return toView(requireById(shopId));
+    ShopEntity saved = requireById(shopId);
+    if (projections != null) projections.shop(saved);
+    return toView(saved);
   }
 
   @Override

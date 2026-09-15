@@ -13,6 +13,7 @@ public interface SkuDao {
   List<SkuEntity> listByProduct(long productId);
 
   int insert(SkuEntity sku);
+  int upsert(SkuEntity sku);
 
   int update(
       @Param("id") long id,

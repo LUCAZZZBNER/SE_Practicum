@@ -120,6 +120,11 @@
         INSERT INTO products (shop_id, category_id, name, description, price, stock, status, version, image_id)
         VALUES (#{shopId}, #{categoryId}, #{name}, #{description}, #{price}, #{stock}, #{status}, #{version}, #{imageId})
     </insert>
+    <insert id="upsertProduct" parameterType="com.delivery.cart.item.entity.ProductEntity">
+        INSERT INTO products (id, shop_id, category_id, name, description, price, stock, status, version, image_id)
+        VALUES (#{id}, #{shopId}, #{categoryId}, #{name}, #{description}, #{price}, #{stock}, #{status}, #{version}, #{imageId})
+        ON DUPLICATE KEY UPDATE shop_id=IF(VALUES(version)>=version,VALUES(shop_id),shop_id), category_id=IF(VALUES(version)>=version,VALUES(category_id),category_id), name=IF(VALUES(version)>=version,VALUES(name),name), description=IF(VALUES(version)>=version,VALUES(description),description), price=IF(VALUES(version)>=version,VALUES(price),price), stock=IF(VALUES(version)>=version,VALUES(stock),stock), status=IF(VALUES(version)>=version,VALUES(status),status), version=GREATEST(version,VALUES(version)), image_id=IF(VALUES(version)>=version,VALUES(image_id),image_id)
+    </insert>
 
     <update id="updateProduct">
         UPDATE products

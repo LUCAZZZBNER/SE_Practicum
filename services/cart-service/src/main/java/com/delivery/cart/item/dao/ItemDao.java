@@ -34,6 +34,7 @@ public interface ItemDao {
   ProductEntity findProductById(@Param("id") long id);
 
   int insertProduct(ProductEntity product);
+  int upsertProduct(ProductEntity product);
 
   int updateProduct(
       @Param("id") long id,
