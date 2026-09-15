@@ -13,6 +13,7 @@ public interface MerchantDao {
   MerchantEntity findById(@Param("id") long id);
 
   int insert(MerchantEntity merchant);
+  int upsert(MerchantEntity merchant);
 
   int updateProfile(
       @Param("id") long id,

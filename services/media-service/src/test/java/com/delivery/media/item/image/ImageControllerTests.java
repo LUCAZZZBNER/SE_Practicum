@@ -35,7 +35,7 @@ class ImageControllerTests {
         .thenReturn(
             new ImageService.ImageView(
                 301,
-                "/uploads/products/301.webp",
+                "/api/v1/files/images/301",
                 "image/webp",
                 4,
                 Instant.parse("2026-09-11T00:00:00Z")));

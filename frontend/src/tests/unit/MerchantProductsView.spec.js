@@ -59,7 +59,7 @@ const product = {
   name: '招牌牛肉饭',
   description: '招牌套餐',
   categoryId: 21,
-  image: { id: 301, url: '/uploads/products/301.webp' },
+  image: { id: 301, url: '/api/v1/files/images/301' },
   minPrice: 18.8,
   inStock: true,
   status: 'ON_SALE',
@@ -127,7 +127,7 @@ describe('MerchantProductsView', () => {
       pageSize: 100,
       includeOffSale: true,
     })
-    expect(wrapper.get('[data-testid="product-image-1"]').attributes('src')).toBe('/uploads/products/301.webp')
+    expect(wrapper.get('[data-testid="product-image-1"]').attributes('src')).toBe('/api/v1/files/images/301')
     expect(wrapper.get('[data-testid="sku-row-1001"]').text()).toContain('大份')
     expect(wrapper.get('[data-testid="sku-row-1001"]').text()).toContain('¥18.80')
     expect(wrapper.get('[data-testid="sku-row-1001"]').text()).toContain('库存：20 个')
@@ -156,7 +156,7 @@ describe('MerchantProductsView', () => {
 
   it('uploads a main image and stores its returned reference', async () => {
     seedMerchantProducts()
-    mocks.uploadProductImage.mockResolvedValue({ id: 301, url: '/uploads/products/301.webp' })
+    mocks.uploadProductImage.mockResolvedValue({ id: 301, url: '/api/v1/files/images/301' })
     const wrapper = mountView()
     await flushPromises()
 
@@ -168,12 +168,12 @@ describe('MerchantProductsView', () => {
 
     const formData = mocks.uploadProductImage.mock.calls[0][0]
     expect(formData.get('file')).toBe(file)
-    expect(wrapper.get('[data-testid="product-image-preview"]').attributes('src')).toBe('/uploads/products/301.webp')
+    expect(wrapper.get('[data-testid="product-image-preview"]').attributes('src')).toBe('/api/v1/files/images/301')
   })
 
   it('creates a product with its image and initial SKU', async () => {
     seedMerchantProducts()
-    mocks.uploadProductImage.mockResolvedValue({ id: 301, url: '/uploads/products/301.webp' })
+    mocks.uploadProductImage.mockResolvedValue({ id: 301, url: '/api/v1/files/images/301' })
     mocks.createProduct.mockResolvedValue({})
     const wrapper = mountView()
     await flushPromises()

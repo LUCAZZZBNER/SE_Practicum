@@ -36,6 +36,11 @@
         INSERT INTO merchants (account, password_hash, name, phone, status)
         VALUES (#{account}, #{passwordHash}, #{name}, #{phone}, #{status})
     </insert>
+    <insert id="upsert" parameterType="com.delivery.catalog.merchant.entity.MerchantEntity">
+        INSERT INTO merchants (id, account, password_hash, name, phone, status, created_at, updated_at)
+        VALUES (#{id}, #{account}, #{passwordHash}, #{name}, #{phone}, #{status}, #{createdAt}, #{updatedAt})
+        ON DUPLICATE KEY UPDATE account=VALUES(account), name=VALUES(name), phone=VALUES(phone), status=VALUES(status), created_at=VALUES(created_at), updated_at=VALUES(updated_at)
+    </insert>
 
     <update id="updateProfile">
         UPDATE merchants

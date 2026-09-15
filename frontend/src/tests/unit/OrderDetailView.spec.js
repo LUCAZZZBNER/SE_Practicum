@@ -55,7 +55,7 @@ const baseOrder = {
     skuId: 1001,
     productName: '招牌牛肉饭',
     skuName: '大份',
-    imageUrl: '/uploads/products/beef.webp',
+    imageUrl: '/api/v1/files/images/301',
     unitPrice: 18.8,
     quantity: 2,
     subtotal: 37.6,
@@ -135,7 +135,7 @@ describe('OrderDetailView', () => {
     expect(wrapper.text()).toContain('文三路 1 号 101 室')
     expect(wrapper.text()).toContain('学院路 2 号')
     expect(wrapper.text()).toContain('少放辣椒')
-    expect(wrapper.get('[data-testid="line-image-1001"]').attributes('src')).toBe('/uploads/products/beef.webp')
+    expect(wrapper.get('[data-testid="line-image-1001"]').attributes('src')).toBe('/api/v1/files/images/301')
     expect(wrapper.get('[data-testid="order-line-1001"]').text()).toContain('招牌牛肉饭')
     expect(wrapper.get('[data-testid="order-line-1001"]').text()).toContain('规格：大份')
     expect(wrapper.get('[data-testid="order-line-1001"]').text()).toContain('小计：¥37.60')

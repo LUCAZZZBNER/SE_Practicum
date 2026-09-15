@@ -52,9 +52,9 @@ public class ImageServiceImpl implements ImageService {
       image.setContentType(type);
       image.setSize(file.getSize());
       image.setContent(bytes);
-      image.setUrl("/uploads/products/pending-" + System.nanoTime());
+      image.setUrl("/api/v1/files/images/pending-" + System.nanoTime());
       imageDao.insert(image);
-      image.setUrl("/uploads/products/" + image.getId());
+      image.setUrl("/api/v1/files/images/" + image.getId());
       imageDao.updateUrl(image.getId(), image.getUrl());
       return toView(image);
     } catch (IOException ex) {

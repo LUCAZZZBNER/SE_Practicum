@@ -43,7 +43,7 @@ const cartItem = {
     id: 11,
     shopId: 7,
     name: '招牌牛肉饭',
-    imageUrl: '/uploads/products/beef.webp',
+    imageUrl: '/api/v1/files/images/301',
     status: 'ON_SALE',
   },
   sku: {
@@ -132,7 +132,7 @@ describe('CartView', () => {
 
     expect(mocks.getCart).toHaveBeenCalledTimes(1)
     expect(mocks.listUserAddresses).toHaveBeenCalledTimes(1)
-    expect(wrapper.get('[data-testid="product-image-31"]').attributes('src')).toBe('/uploads/products/beef.webp')
+    expect(wrapper.get('[data-testid="product-image-31"]').attributes('src')).toBe('/api/v1/files/images/301')
     expect(wrapper.get('[data-testid="cart-item-31"]').text()).toContain('招牌牛肉饭')
     expect(wrapper.get('[data-testid="cart-item-31"]').text()).toContain('规格：大份')
     expect(wrapper.get('[data-testid="cart-item-31"]').text()).toContain('¥18.80')

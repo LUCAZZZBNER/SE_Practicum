@@ -34,7 +34,7 @@ const product = {
   description: '招牌套餐，现做现卖',
   shopId: 7,
   categoryId: 21,
-  image: { id: 301, url: '/uploads/products/beef.webp' },
+  image: { id: 301, url: '/api/v1/files/images/301' },
   minPrice: 18.8,
   inStock: true,
   status: 'ON_SALE',
@@ -94,7 +94,7 @@ describe('ProductDetailView', () => {
     expect(mocks.getProductDetail).toHaveBeenCalledWith(11)
     expect(mocks.getStoreDetail).toHaveBeenCalledWith(7)
     expect(mocks.listCategories).toHaveBeenCalledWith(7)
-    expect(wrapper.get('[data-testid="product-image"]').attributes('src')).toBe('/uploads/products/beef.webp')
+    expect(wrapper.get('[data-testid="product-image"]').attributes('src')).toBe('/api/v1/files/images/301')
     expect(wrapper.text()).toContain('招牌牛肉饭')
     expect(wrapper.text()).toContain('示例快餐店')
     expect(wrapper.text()).toContain('主食')

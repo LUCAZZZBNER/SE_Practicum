@@ -264,9 +264,7 @@ describe('api contracts', () => {
 
     uploadProductImage(formData)
 
-    expect(mocks.post).toHaveBeenCalledWith('/files/images', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    })
+    expect(mocks.post).toHaveBeenCalledWith('/files/images', formData)
   })
 
   it('exposes category APIs under shop-scoped routes', () => {

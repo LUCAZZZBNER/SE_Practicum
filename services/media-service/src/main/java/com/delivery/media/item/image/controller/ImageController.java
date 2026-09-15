@@ -5,6 +5,7 @@ import com.delivery.media.item.image.service.ImageService;
 import com.delivery.media.security.CurrentPrincipal;
 import com.delivery.media.security.RequireRole;
 import com.delivery.media.security.Role;
+import com.delivery.media.security.PublicEndpoint;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -37,6 +38,7 @@ public class ImageController {
   }
 
   @GetMapping("/{imageId}")
+  @PublicEndpoint
   public ResponseEntity<byte[]> content(@PathVariable long imageId) {
     ImageService.Content content = service.content(imageId);
     return ResponseEntity.ok()

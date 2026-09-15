@@ -54,7 +54,7 @@ public class ApiGatewayController {
             entry("users", identityUrl), entry("merchants", identityUrl), entry("user-addresses", identityUrl),
             entry("shops", catalogUrl), entry("products", catalogUrl), entry("skus", catalogUrl),
             entry("categories", catalogUrl), entry("cart-items", cartUrl), entry("orders", orderUrl),
-            entry("merchant", orderUrl), entry("files", mediaUrl), entry("uploads", mediaUrl));
+            entry("merchant", orderUrl), entry("files", mediaUrl));
   }
 
   @RequestMapping("/api/v1/**")

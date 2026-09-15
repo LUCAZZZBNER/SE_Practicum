@@ -3,6 +3,7 @@ package com.delivery.identity.merchant.service.impl;
 import com.delivery.identity.common.ApiError;
 import com.delivery.identity.common.BusinessException;
 import com.delivery.identity.merchant.dao.MerchantDao;
+import com.delivery.identity.merchant.client.CatalogMerchantProjectionClient;
 import com.delivery.identity.merchant.entity.MerchantEntity;
 import com.delivery.identity.merchant.service.MerchantService;
 import com.delivery.identity.security.JwtTokenService;
@@ -21,11 +22,13 @@ public class MerchantServiceImpl implements MerchantService {
   private final MerchantDao merchantDao;
   private final JwtTokenService jwtTokenService;
   private final PasswordEncoder passwordEncoder;
+  private final CatalogMerchantProjectionClient catalogProjection;
 
-  public MerchantServiceImpl(MerchantDao merchantDao, JwtTokenService jwtTokenService, PasswordEncoder passwordEncoder) {
+  public MerchantServiceImpl(MerchantDao merchantDao, JwtTokenService jwtTokenService, PasswordEncoder passwordEncoder, CatalogMerchantProjectionClient catalogProjection) {
     this.merchantDao = merchantDao;
     this.jwtTokenService = jwtTokenService;
     this.passwordEncoder = passwordEncoder;
+    this.catalogProjection = catalogProjection;
   }
 
   @Override
@@ -54,7 +57,7 @@ public class MerchantServiceImpl implements MerchantService {
     } catch (DuplicateKeyException exception) {
       throw new BusinessException(ApiError.MERCHANT_ACCOUNT_EXISTS);
     }
-    return toView(requireById(merchant.getId()));
+    MerchantView view=toView(requireById(merchant.getId())); catalogProjection.upsert(view); return view;
   }
 
   @Override
