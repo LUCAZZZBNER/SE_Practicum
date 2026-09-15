@@ -60,7 +60,8 @@ echo "Running frontend tests..."
 echo "Running end-to-end business-risk checks..."
 (
   cd "$ROOT_DIR"
-  python3 e2e/scenarios/backend_business_risks.py
+  DELIVERY_BASE_URL="http://localhost:${FRONTEND_PORT:-5173}/api/v1" \
+    python3 e2e/scenarios/backend_business_risks.py
 )
 
 echo "All tests passed. Docker services remain running."

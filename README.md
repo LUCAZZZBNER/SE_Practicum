@@ -42,7 +42,7 @@ docs/                    项目文档
 
 ## Docker 启动
 
-项目提供了包含 MySQL、Kafka、Spring Boot gateway、兼容后端和 Nginx/Vue 前端的 Docker Compose 配置。
+项目提供了包含 MySQL、Kafka、Spring Boot gateway、独立领域服务和 Nginx/Vue 前端的 Docker Compose 配置。
 
 首次启动前复制 `.env.example` 为 `.env`，修改其中的本地开发密码，并确保 `JWT_SECRET` 至少包含 32 个 UTF-8 字节：
 
@@ -59,7 +59,7 @@ docker compose up --build
 启动后访问：
 
 - 前端：http://localhost:5173
-- 后端 API：http://localhost:8080/api/v1
+- API 网关：http://localhost:8081/api/v1
 
 停止服务但保留数据库数据：
 

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Black-box regression checks for the backend business-risk scenarios.
 
-Run this script against a running Spring Boot instance.  DELIVERY_BASE_URL may
-point at the Vite proxy (for example, http://localhost:5173/api/v1) or directly
-at the backend (http://localhost:8080/api/v1).
+Run this script against a running gateway or frontend proxy. DELIVERY_BASE_URL
+may point at the frontend proxy (for example, http://localhost:5173/api/v1) or
+directly at the gateway (http://localhost:8081/api/v1).
 """
 
 import json
@@ -14,7 +14,7 @@ import urllib.request
 import uuid
 
 
-BASE_URL = os.environ.get("DELIVERY_BASE_URL", "http://localhost:8080/api/v1").rstrip("/")
+BASE_URL = os.environ.get("DELIVERY_BASE_URL", "http://localhost:5173/api/v1").rstrip("/")
 PASSWORD = "Passw0rd!"
 
 

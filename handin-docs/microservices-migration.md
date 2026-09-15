@@ -136,7 +136,7 @@ This arrangement permits services to be deployed or scaled independently while t
 
 ### Compose
 
-`docker-compose.yml` starts MySQL, Kafka 3.9, the five services, the gateway, and the frontend. Service health and startup dependencies are declared for the database and gateway. Kafka runs in single-node KRaft mode for local acceptance, with topic auto-creation disabled. The frontend is exposed on port 5173 and the gateway on port 8081 by default.
+`docker-compose.yml` starts MySQL, Kafka 3.9, the five services, the gateway, and the frontend. Service health and startup dependencies are declared for the database and gateway. Kafka runs in single-node KRaft mode for local acceptance, with topic auto-creation enabled for development. The frontend is exposed on port 5173 and the gateway on port 8081 by default.
 
 The Compose stack is suitable for migration acceptance and local development. It uses a named MySQL volume; acceptance runs should use a disposable Compose project and volume so a failed experiment cannot alter a developer database.
 
