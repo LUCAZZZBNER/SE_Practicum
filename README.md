@@ -1,6 +1,8 @@
 # SE_Practicum
 
 轻量级外卖服务平台（仿饿了么）课程实践项目。
+当前分支为已完成的monolith后端主版本
+MicroServices分支为微服务后端版本
 
 ## 目录结构
 
