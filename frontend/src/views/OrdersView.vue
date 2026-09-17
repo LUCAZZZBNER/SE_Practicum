@@ -94,8 +94,14 @@ onMounted(loadOrders)
 .order-side { display: grid; justify-items: end; gap: 8px; }
 .order-side strong { color: #c8473d; font-size: 19px; }
 
-@media (max-width: 560px) {
-  .order-row { align-items: stretch; flex-direction: column; }
-  .order-side { grid-template-columns: 1fr auto; align-items: center; justify-items: start; }
+@media (max-width: 768px) {
+  .order-row { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; padding: 14px; }
+  .order-copy { gap: 9px; }
+  .order-heading { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 8px; }
+  .transaction-status { align-items: flex-start; flex-wrap: wrap; gap: 6px; }
+  .shop-name { min-width: 0; white-space: normal; overflow-wrap: anywhere; }
+  .order-number { overflow-wrap: anywhere; }
+  .order-side { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 12px; border-top: 1px solid #edf0ee; }
+  .order-side .el-button { width: auto; min-width: 96px; margin: 0; }
 }
 </style>

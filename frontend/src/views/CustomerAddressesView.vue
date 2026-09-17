@@ -265,8 +265,16 @@ onMounted(loadAddresses)
 .address-main p { margin: 9px 0 0; color: #59655f; line-height: 1.6; overflow-wrap: anywhere; }
 .address-actions { display: flex; flex: 0 0 auto; align-items: center; gap: 4px; }
 
-@media (max-width: 640px) {
-  .address-item { align-items: stretch; flex-direction: column; }
-  .address-actions { justify-content: flex-end; flex-wrap: wrap; }
+@media (max-width: 768px) {
+  .addresses-toolbar { width: 100%; align-items: center; }
+  .addresses-toolbar > .el-button { width: auto; min-height: 40px; margin: 0; }
+  .address-item { width: 100%; max-width: 100%; align-items: stretch; flex-direction: column; }
+  .address-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .address-actions > *, .address-actions :deep(.el-button) { width: 100%; margin: 0; }
+}
+
+@media (max-width: 420px) {
+  .addresses-toolbar { align-items: stretch; flex-direction: column; }
+  .addresses-toolbar > .el-button { width: 100%; }
 }
 </style>

@@ -296,11 +296,21 @@ onMounted(loadInitialData)
 }
 .checkout-total { color: #202925; font-size: 18px; font-weight: 700; }
 
-@media (max-width: 760px) {
-  .cart-row { grid-template-columns: 72px minmax(0, 1fr); }
+@media (max-width: 768px) {
+  .cart-row { grid-template-columns: 72px minmax(0, 1fr); gap: 12px; padding: 14px; }
   .cart-image { width: 72px; }
-  .cart-meta { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .cart-actions { grid-column: 1 / -1; flex-wrap: wrap; }
-  .checkout-bar { bottom: 8px; justify-content: space-between; }
+  .cart-meta { grid-template-columns: 1fr; gap: 5px; }
+  .cart-name { grid-column: auto; overflow-wrap: anywhere; }
+  .cart-actions { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1fr) auto; width: 100%; }
+  .cart-actions :deep(.el-input-number) { width: 100%; }
+  .checkout-bar {
+    bottom: calc(70px + env(safe-area-inset-bottom));
+    align-items: stretch;
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px 14px;
+  }
+  .checkout-bar :deep(.el-button) { width: 100%; }
+  .address-empty { align-items: stretch; flex-direction: column; }
 }
 </style>

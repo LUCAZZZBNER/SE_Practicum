@@ -23,7 +23,7 @@ function getActivePath(path) {
   <el-container class="app-shell" direction="vertical">
     <AppHeader title="商家工作台" profile-path="/merchant/profile" />
 
-    <el-container>
+    <el-container class="app-body">
       <AppSidebar :menu-items="menuItems" />
 
       <el-main class="app-main">

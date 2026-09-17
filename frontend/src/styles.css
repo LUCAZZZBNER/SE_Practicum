@@ -5,9 +5,12 @@
 }
 
 * { box-sizing: border-box; }
-body { margin: 0; min-width: 320px; }
+html { overflow-x: hidden; }
+body { margin: 0; min-width: 320px; overflow-x: hidden; }
+img { max-width: 100%; }
 .app-shell { min-height: 100vh; }
-.app-header { display: flex; align-items: center; justify-content: space-between; background: #ffffff; border-bottom: 1px solid #e5e7eb; }
+.app-header { position: sticky; top: 0; z-index: 30; display: flex; align-items: center; justify-content: space-between; background: #ffffff; border-bottom: 1px solid #e5e7eb; }
+.app-body { min-width: 0; flex: 1; }
 .brand, .header-actions { display: flex; align-items: center; gap: 8px; }
 .brand { color: #c8473d; font-weight: 700; }
 .brand a { color: inherit; text-decoration: none; }
@@ -50,7 +53,8 @@ body { margin: 0; min-width: 320px; }
   transform: translateY(-50%);
 }
 .app-aside .sidebar-menu-item .el-icon { margin-right: 0; }
-.app-main { max-width: 1200px; width: 100%; margin: 0 auto; }
+.app-main { max-width: 1200px; min-width: 0; width: 100%; margin: 0 auto; }
+.app-main > *, .app-main .el-card, .app-main .manage-panel { min-width: 0; max-width: 100%; }
 .customer-mobile-nav { display: none; }
 .merchant-mobile-nav { display: none; }
 .page-heading { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 24px; }
@@ -84,65 +88,84 @@ body { margin: 0; min-width: 320px; }
 .auth-actions { display: flex; gap: 12px; flex-wrap: wrap; }
 .auth-form-card { width: min(560px, 100%); border-radius: 8px; }
 
-@media (max-width: 640px) {
+@media (max-width: 768px) {
   .app-aside { display: none; }
-  .app-main { padding: 18px 18px 88px; }
-  .brand span { display: none; }
+  .app-header { height: 56px; padding: 0 14px; }
+  .app-main {
+    padding: 16px 14px calc(84px + env(safe-area-inset-bottom));
+    overflow-x: hidden;
+  }
+  .brand { min-width: 0; }
+  .brand a { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .page-heading { display: block; }
-  .page-heading h1 { margin-bottom: 6px; }
-  .customer-mobile-nav {
-    position: fixed;
-    right: 0;
-    bottom: 0;
-    left: 0;
-    z-index: 20;
-    display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-    min-height: 64px;
-    padding-bottom: env(safe-area-inset-bottom);
-    background: #ffffff;
-    border-top: 1px solid #e5e7eb;
-  }
-  .customer-mobile-nav a {
-    display: flex;
-    min-width: 0;
-    align-items: center;
-    justify-content: center;
-    flex-direction: column;
-    gap: 3px;
-    color: #7a8580;
-    font-size: 12px;
-    text-decoration: none;
-  }
-  .customer-mobile-nav a.active { color: #c8473d; font-weight: 600; }
-  .customer-mobile-nav .el-icon { font-size: 20px; }
+  .page-heading h1 { margin-bottom: 6px; font-size: 21px; }
+  .customer-mobile-nav,
   .merchant-mobile-nav {
     position: fixed;
     right: 0;
     bottom: 0;
     left: 0;
-    z-index: 20;
+    z-index: 40;
     display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-    min-height: 64px;
+    min-height: 62px;
     padding-bottom: env(safe-area-inset-bottom);
     background: #ffffff;
     border-top: 1px solid #e5e7eb;
+    box-shadow: 0 -6px 18px rgba(31, 41, 55, 0.06);
   }
+  .customer-mobile-nav { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .merchant-mobile-nav { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .customer-mobile-nav a,
   .merchant-mobile-nav a {
     display: flex;
     min-width: 0;
+    min-height: 62px;
     align-items: center;
     justify-content: center;
     flex-direction: column;
     gap: 3px;
+    padding: 6px 2px;
     color: #7a8580;
     font-size: 12px;
     text-decoration: none;
+    -webkit-tap-highlight-color: transparent;
   }
-  .merchant-mobile-nav a.active { color: #c8473d; font-weight: 600; }
+  .customer-mobile-nav a.active,
+  .merchant-mobile-nav a.active { color: #c8473d; font-weight: 600; background: #fdf6f5; }
+  .customer-mobile-nav .el-icon,
   .merchant-mobile-nav .el-icon { font-size: 20px; }
   .action-bar { align-items: stretch; flex-direction: column; }
+  .inline-form,
+  .category-row,
+  .product-row { align-items: stretch; flex-direction: column; }
+  .inline-form > *,
+  .category-row > *,
+  .product-row > * { width: 100%; max-width: none; }
+  .manage-panel { padding: 14px; }
+  .el-form-item { align-items: stretch; display: block; }
+  .el-form-item__label { width: auto !important; height: auto; padding: 0 0 7px; line-height: 1.4; }
+  .el-form-item__content { min-width: 0; margin-left: 0 !important; }
+  .el-select,
+  .el-input,
+  .el-input-number,
+  .el-textarea,
+  .el-date-editor { width: 100%; max-width: 100%; }
+  .el-radio-group { display: flex; width: 100%; }
+  .el-radio-button { flex: 1; min-width: 0; }
+  .el-radio-button__inner { width: 100%; padding-right: 8px; padding-left: 8px; white-space: normal; }
+  .el-dialog { width: calc(100vw - 24px) !important; max-height: calc(100dvh - 32px); margin-top: 16px !important; overflow-y: auto; }
+  .el-dialog__body { padding: 14px 16px; }
+  .el-dialog__footer { padding: 10px 16px 16px; }
+  .el-descriptions__table { table-layout: fixed; }
+  .el-descriptions__label { width: 92px; }
+  .el-descriptions__cell { overflow-wrap: anywhere; word-break: break-word; }
   .auth-grid { grid-template-columns: 1fr; }
   .auth-intro h1 { font-size: 24px; }
+}
+
+@media (max-width: 420px) {
+  .app-main { padding-right: 12px; padding-left: 12px; }
+  .app-header { padding-right: 10px; padding-left: 12px; }
+  .brand a { max-width: 190px; }
+  .page-heading { margin-bottom: 18px; }
 }

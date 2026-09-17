@@ -211,9 +211,12 @@ onMounted(loadOrder)
 .line-copy strong { color: #202925; }
 .line-subtotal { color: #c8473d; font-weight: 600; }
 
-@media (max-width: 720px) {
-  .order-item { grid-template-columns: 56px minmax(0, 1fr); }
-  .order-item > span { grid-column: 2; }
+@media (max-width: 768px) {
+  .action-bar { align-items: stretch; flex-direction: column; }
+  .action-bar > *, .action-bar :deep(.el-button) { width: 100%; margin: 0; }
+  .order-item { grid-template-columns: 56px minmax(0, 1fr); gap: 10px 12px; padding: 12px; }
+  .order-item > span { grid-column: 2; overflow-wrap: anywhere; }
   .order-item img, .line-image-placeholder { width: 56px; }
+  .line-copy { min-width: 0; overflow-wrap: anywhere; }
 }
 </style>

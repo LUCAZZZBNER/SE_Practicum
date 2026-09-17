@@ -211,8 +211,10 @@ onMounted(loadStore)
 .section-heading p { margin: 6px 0 0; }
 .status-badge { padding: 4px 10px; color: #287a4b; background: #edf8f0; border-radius: 999px; font-size: 13px; }
 
-@media (max-width: 640px) {
+@media (max-width: 768px) {
   .store-summary { grid-template-columns: 1fr; }
   .section-heading { align-items: stretch; flex-direction: column; }
+  .section-heading > .el-button { width: 100%; margin: 0; }
+  .status-badge { align-self: flex-start; }
 }
 </style>

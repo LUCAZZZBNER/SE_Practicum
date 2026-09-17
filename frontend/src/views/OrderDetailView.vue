@@ -161,7 +161,7 @@ onMounted(loadOrder)
 
     <div v-if="loading">加载中...</div>
     <template v-else>
-      <el-descriptions title="订单信息" border>
+      <el-descriptions title="订单信息" :column="1" border class="order-descriptions">
         <el-descriptions-item label="订单号">{{ order.orderNumber }}</el-descriptions-item>
         <el-descriptions-item label="店铺">{{ order.shopName }}</el-descriptions-item>
         <el-descriptions-item label="订单状态">
@@ -307,12 +307,26 @@ onMounted(loadOrder)
 .cancel-form label { color: #303b36; font-weight: 600; }
 .reason-count { justify-self: end; color: #8a948f; font-size: 12px; }
 .field-error { color: #c8473d; font-size: 13px; }
+.order-descriptions :deep(.el-descriptions__label) { width: 96px; white-space: nowrap; }
+.order-descriptions :deep(.el-descriptions__content) {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
 
-@media (max-width: 720px) {
+@media (max-width: 768px) {
   .action-bar { align-items: stretch; flex-direction: column; }
-  .order-item { grid-template-columns: 56px minmax(0, 1fr); }
-  .order-item > span { grid-column: 2; }
+  .action-bar > *, .action-bar :deep(.el-button) { width: 100%; margin: 0; }
+  .order-descriptions :deep(.el-descriptions__label) { width: 88px; }
+  .order-item { grid-template-columns: 56px minmax(0, 1fr); gap: 8px 12px; padding: 12px; }
+  .order-item > span {
+    display: block;
+    grid-column: 2;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
   .order-item img, .line-image-placeholder { width: 56px; }
+  .line-copy { min-width: 0; overflow-wrap: anywhere; }
   .refund-detail { grid-template-columns: 1fr; }
   .refund-detail h2 { grid-column: auto; }
 }

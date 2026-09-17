@@ -131,4 +131,13 @@ onMounted(loadProfile)
   border: 1px solid #e1e6e3;
   border-radius: 8px;
 }
+
+@media (max-width: 768px) {
+  .narrow-form { width: 100%; max-width: 100%; }
+  .profile-section { padding: 14px; }
+  .profile-section :deep(.el-form-item),
+  .profile-section :deep(.el-form-item__content),
+  .profile-section :deep(.el-input) { width: 100%; max-width: 100%; }
+  .narrow-form :deep(.el-form-item:last-child .el-button) { width: 100%; margin: 0; }
+}
 </style>

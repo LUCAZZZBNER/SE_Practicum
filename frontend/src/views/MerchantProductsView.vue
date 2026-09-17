@@ -448,10 +448,23 @@ onMounted(loadProducts)
 .sku-row { display: grid; grid-template-columns: minmax(100px, 1fr) 90px 120px 70px auto auto; align-items: center; gap: 10px; padding: 10px 0; color: #56615c; }
 .empty-skus { padding: 10px 0; color: #8a948f; font-size: 13px; }
 
-@media (max-width: 760px) {
+@media (max-width: 768px) {
   .product-summary { grid-template-columns: 1fr; }
   .product-editor, .product-main { grid-template-columns: 1fr; }
+  .image-uploader input { width: 100%; }
+  .image-uploader img, .product-main > img, .image-placeholder { width: min(120px, 100%); }
+  .product-form, .category-row { display: grid; grid-template-columns: 1fr; }
+  .product-form > *, .category-row > * { width: 100%; }
+  .row-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .row-actions > *, .row-actions :deep(.el-button) { width: 100%; margin: 0; }
   .sku-list { margin-left: 0; }
-  .sku-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .sku-heading { align-items: stretch; flex-direction: column; }
+  .sku-heading :deep(.el-button) { width: 100%; margin: 0; }
+  .sku-row { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 12px 0; }
+  .sku-row > *, .sku-row :deep(.el-button) { min-width: 0; width: 100%; margin: 0; }
+}
+
+@media (max-width: 420px) {
+  .sku-row { grid-template-columns: 1fr; }
 }
 </style>

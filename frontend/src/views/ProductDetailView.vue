@@ -205,9 +205,21 @@ onMounted(loadProductDetail)
 .selection-summary span { color: #6c7772; font-size: 14px; }
 .action-bar { display: flex; align-items: center; gap: 12px; margin-top: 14px; }
 
-@media (max-width: 720px) {
+@media (max-width: 768px) {
   .product-detail { grid-template-columns: 1fr; }
-  .product-image { max-width: 360px; }
+  .product-image { width: min(100%, 240px); max-width: 240px; justify-self: center; }
   .metadata, .action-bar { align-items: stretch; flex-direction: column; }
+  .metadata { gap: 10px; }
+  .metadata div { display: grid; grid-template-columns: 72px minmax(0, 1fr); }
+  .metadata dd { overflow-wrap: anywhere; }
+  .sku-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .sku-option { min-width: 0; width: 100%; margin: 0; }
+  .action-bar :deep(.el-input-number), .action-bar :deep(.el-button) { width: 100%; margin: 0; }
+  .selection-summary { justify-content: space-between; flex-wrap: wrap; }
+}
+
+@media (max-width: 420px) {
+  .product-image { width: min(100%, 200px); max-width: 200px; }
+  .sku-options { grid-template-columns: 1fr; }
 }
 </style>

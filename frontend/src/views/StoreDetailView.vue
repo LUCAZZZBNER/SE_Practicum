@@ -60,7 +60,7 @@ onMounted(loadStoreDetail)
       返回店铺列表
     </el-button>
 
-    <el-descriptions :title="store.name" border>
+    <el-descriptions :title="store.name" :column="1" border class="store-descriptions">
       <el-descriptions-item label="店铺状态">{{ formatStoreStatus(store.status) }}</el-descriptions-item>
       <el-descriptions-item label="店铺简介">{{ store.description }}</el-descriptions-item>
       <el-descriptions-item label="分类数量">{{ categories.length }}</el-descriptions-item>
@@ -148,9 +148,22 @@ onMounted(loadStoreDetail)
 .product-meta span { color: #318258; font-size: 13px; }
 .product-meta .soldOut { color: #8a948f; }
 
-@media (max-width: 640px) {
-  .product-row { grid-template-columns: 76px minmax(0, 1fr); }
+.store-descriptions :deep(.el-descriptions__label) {
+  width: 96px;
+  white-space: nowrap;
+}
+.store-descriptions :deep(.el-descriptions__content) {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+@media (max-width: 768px) {
+  .store-descriptions :deep(.el-descriptions__label) { width: 88px; }
+  .product-row { grid-template-columns: 76px minmax(0, 1fr); gap: 12px; }
   .product-image { width: 76px; }
+  .product-copy h3, .product-copy p { overflow-wrap: anywhere; }
+  .product-meta { align-items: flex-start; flex-direction: column; gap: 5px; }
   .product-row > button { grid-column: 1 / -1; justify-self: stretch; }
 }
 </style>

@@ -155,11 +155,24 @@ onMounted(loadStores)
   -webkit-line-clamp: 2;
 }
 
-@media (max-width: 640px) {
-  .store-toolbar { align-items: stretch; }
+@media (max-width: 768px) {
+  .store-toolbar { width: 100%; align-items: center; }
+  .store-toolbar .search-box,
+  .store-toolbar :deep(.el-input) { flex: 1 1 auto; width: auto; min-width: 0; max-width: none; }
+  .store-toolbar > .el-button { flex: 0 0 72px; width: 72px; min-height: 40px; margin: 0; }
+  .store-item { width: 100%; max-width: 100%; }
   .store-card-content { grid-template-columns: 48px minmax(0, 1fr); gap: 12px; }
   .store-visual { width: 48px; height: 48px; }
-  .store-card-content > .el-button { grid-column: 1 / -1; width: 100%; margin: 0; }
-  .store-title-row { align-items: flex-start; justify-content: space-between; }
+  .store-card-content > .el-button { grid-column: 1 / -1; justify-self: end; width: auto; min-width: 104px; margin: 0; }
+  .store-title-row { align-items: flex-start; justify-content: space-between; flex-wrap: wrap; }
+}
+
+@media (max-width: 420px) {
+  .store-toolbar { align-items: stretch; flex-direction: column; }
+  .store-toolbar .search-box,
+  .store-toolbar :deep(.el-input),
+  .store-toolbar > .el-button { width: 100%; max-width: 100%; }
+  .store-toolbar > .el-button { flex-basis: auto; }
+  .store-card-content > .el-button { width: 100%; }
 }
 </style>
